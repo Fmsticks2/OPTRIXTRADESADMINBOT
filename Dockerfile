@@ -19,8 +19,8 @@ COPY . .
 # Expose port for webhook
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+# Health check - increased start period to give app more time to initialize
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the bot using bot_runner.py in webhook mode

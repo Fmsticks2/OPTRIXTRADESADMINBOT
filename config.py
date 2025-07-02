@@ -86,7 +86,7 @@ class BotConfig:
     BOT_MODE: str = os.getenv('BOT_MODE', 'polling')
     WEBHOOK_ENABLED: bool = os.getenv('WEBHOOK_ENABLED', 'false').lower() == 'true'
     WEBHOOK_URL: str = os.getenv('WEBHOOK_URL', '')
-    WEBHOOK_PORT: int = int(os.getenv('WEBHOOK_PORT', '8000'))
+    WEBHOOK_PORT: int = int(os.getenv('PORT', os.getenv('WEBHOOK_PORT', '8000')))
     WEBHOOK_SECRET_TOKEN: str = os.getenv('WEBHOOK_SECRET_TOKEN', '')
     WEBHOOK_PATH: str = os.getenv('WEBHOOK_PATH', '/webhook')
 
