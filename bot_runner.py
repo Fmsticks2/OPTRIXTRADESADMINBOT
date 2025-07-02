@@ -18,7 +18,12 @@ def run_polling_mode():
 def run_webhook_mode():
     """Run bot in webhook mode (production)"""
     from webhook.webhook_server import run_webhook_server
+    from health_check import start_health_server
+    
     print("🌐 Starting bot in WEBHOOK mode...")
+    # Start health check server in background
+    start_health_server()
+    # Run webhook server
     run_webhook_server()
 
 def main():
