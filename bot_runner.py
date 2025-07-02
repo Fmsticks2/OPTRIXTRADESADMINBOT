@@ -81,7 +81,6 @@ async def home():
 @health_app.get('/debug')
 async def debug_info():
     """Debug endpoint to help troubleshoot Railway deployment"""
-    import psutil
     import platform
     
     try:
@@ -91,8 +90,7 @@ async def debug_info():
                 'platform': platform.platform(),
                 'railway_env': os.environ.get('RAILWAY_ENVIRONMENT', 'Not set'),
                 'port': os.environ.get('PORT', 'Not set'),
-                'cpu_percent': psutil.cpu_percent(),
-                'memory_percent': psutil.virtual_memory().percent,
+                'webhook_port': os.environ.get('WEBHOOK_PORT', 'Not set'),
                 'bot_config': {
                     'mode': getattr(config, 'BOT_MODE', 'polling'),
                     'admin': config.ADMIN_USERNAME,
@@ -101,23 +99,7 @@ async def debug_info():
                 'environment_vars': {
                     k: ('***' if 'token' in k.lower() or 'key' in k.lower() else v)
                     for k, v in os.environ.items() 
-                    if k.startswith(('BOT_', 'RAILWAY_', 'PORT'))
-                }
-            },
-            status_code=200
-        )
-    except ImportError:
-        # psutil might not be available
-        return JSONResponse(
-            content={
-                'python_version': platform.python_version(),
-                'platform': platform.platform(),
-                'railway_env': os.environ.get('RAILWAY_ENVIRONMENT', 'Not set'),
-                'port': os.environ.get('PORT', 'Not set'),
-                'bot_config': {
-                    'mode': getattr(config, 'BOT_MODE', 'polling'),
-                    'admin': config.ADMIN_USERNAME,
-                    'auto_verify': config.AUTO_VERIFY_ENABLED
+                    if k.startswith(('BOT_', 'RAILWAY_', 'PORT', 'WEBHOOK_'))
                 }
             },
             status_code=200
@@ -128,6 +110,90 @@ async def debug_info():
             status_code=500
         )
 
+def run_polling_mode():
+    """Run bot in polling mode (development)"""
+    from telegram_bot import main
+    print("🔄 Starting bot in POLLING mode...")
+    
+    # Start health server on a different port for polling mode
+    health_port = int(os.environ.get('HEALTH_PORT', 8001))
+    os.environ['PORT'] = str(health_port)
+    
+    health_thread = start_health_server()
+    
+    # Give health server time to start
+    import time
+    time.sleep(2)
+    
+    # Run the bot
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n🛑 Polling mode stopped by user")
+    finally:
+        asyncio.run(stop_health_server())
+
+def run_webhook_mode():
+    """Run bot in webhook mode (production) with FastAPI - FIXED VERSION"""
+    try:
+        # Import webhook server
+        from webhook.webhook_server import run_webhook_server
+        print("🌐 Starting bot in WEBHOOK mode with FastAPI...")
+        
+        # DON'T start a separate health server - let webhook server handle it
+        # The webhook server should include health endpoints
+        
+        # Check if webhook server already has health endpoints
+        try:
+            from webhook.webhook_server import app as webhook_app
+            # If webhook server has its own FastAPI app, use that
+            logger.info("Using webhook server's own FastAPI app")
+            run_webhook_server()
+        except ImportError:
+            # Fallback: webhook server doesn't have health endpoints
+            logger.info("Webhook server doesn't have health endpoints, starting combined server")
+            run_combined_webhook_health_server()
+        
+    except ImportError as e:
+        logger.error(f"Webhook dependencies not found: {e}")
+        logger.info("Falling back to polling mode...")
+        run_polling_mode()
+
+def run_combined_webhook_health_server():
+    """Run webhook with health endpoints in the same FastAPI app"""
+    try:
+        from webhook.webhook_server import app as webhook_app, setup_webhook_routes
+        
+        # Add health endpoints to webhook app
+        @webhook_app.get('/health')
+        async def webhook_health_check():
+            return await health_check()
+        
+        @webhook_app.get('/debug')
+        async def webhook_debug_info():
+            return await debug_info()
+        
+        # Setup webhook routes
+        setup_webhook_routes(webhook_app)
+        
+        # Run the combined server
+        port = int(os.environ.get('PORT', 8080))
+        logger.info(f"🌐 Starting combined webhook + health server on port {port}")
+        
+        uvicorn.run(
+            webhook_app,
+            host='0.0.0.0',
+            port=port,
+            log_level='info',
+            access_log=True,
+            timeout_keep_alive=30
+        )
+        
+    except Exception as e:
+        logger.error(f"Combined server failed: {e}")
+        # Final fallback: just run health server
+        run_fastapi_only()
+
 def start_health_server():
     """Start FastAPI health check server in a separate thread"""
     global health_server, health_thread
@@ -136,21 +202,16 @@ def start_health_server():
         port = int(os.environ.get('PORT', 8000))
         logger.info(f"🏥 Starting FastAPI health check server on port {port}")
         
-        # Railway-specific configuration
         host = '0.0.0.0'
-        if os.environ.get('RAILWAY_ENVIRONMENT'):
-            # Listen on both IPv4 and IPv6 for Railway
-            host = '::'
-            logger.info("🚄 Railway detected: Using IPv6 binding")
         
         config_uvicorn = uvicorn.Config(
             health_app,
             host=host,
             port=port,
             log_level='info',
-            access_log=True,  # Enable access logs for debugging
+            access_log=True,
             loop='asyncio',
-            timeout_keep_alive=30,  # Increase keep-alive timeout
+            timeout_keep_alive=30,
             timeout_graceful_shutdown=30
         )
         
@@ -175,99 +236,19 @@ async def stop_health_server():
         logger.info("🛑 Stopping health server...")
         health_server.should_exit = True
 
-def run_polling_mode():
-    """Run bot in polling mode (development)"""
-    from telegram_bot import main
-    print("🔄 Starting bot in POLLING mode...")
-    
-    # Start health server for Railway compatibility
-    health_thread = start_health_server()
-    
-    # Give health server time to start
-    import time
-    time.sleep(2)
-    
-    # Run the bot
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n🛑 Polling mode stopped by user")
-    finally:
-        asyncio.run(stop_health_server())
-
-def run_webhook_mode():
-    """Run bot in webhook mode (production) with FastAPI"""
-    try:
-        # Try to import webhook server
-        from webhook.webhook_server import run_webhook_server
-        print("🌐 Starting bot in WEBHOOK mode with FastAPI...")
-        
-        # Check if webhook server has its own FastAPI health checks
-        try:
-            from health_check import start_health_server as webhook_health_server
-            webhook_health_server()
-        except ImportError:
-            # Use our FastAPI health server
-            logger.info("Using FastAPI health server for webhook mode")
-            start_health_server()
-            import time
-            time.sleep(2)
-        
-        # Run webhook server
-        run_webhook_server()
-        
-    except ImportError as e:
-        logger.error(f"Webhook dependencies not found: {e}")
-        logger.info("Falling back to polling mode with FastAPI health server...")
-        run_polling_mode()
-
 def run_railway_mode():
-    """Special mode for Railway deployment with FastAPI"""
-    print("🚄 Starting bot in RAILWAY mode with FastAPI...")
+    """Special mode for Railway deployment - SIMPLIFIED"""
+    print("🚄 Starting bot in RAILWAY mode...")
     
-    # Always start FastAPI health server for Railway
-    health_thread = start_health_server()
-    
-    # Give health server more time to start on Railway
-    import time
-    logger.info("⏳ Waiting for health server to initialize...")
-    time.sleep(5)  # Increased from 3 to 5 seconds
-    
-    # Test the health endpoint internally
-    try:
-        import requests
-        port = int(os.environ.get('PORT', 8000))
-        test_url = f"http://localhost:{port}/health"
-        response = requests.get(test_url, timeout=5)
-        if response.status_code == 200:
-            logger.info("✅ Health endpoint is responding correctly")
-        else:
-            logger.warning(f"⚠️ Health endpoint returned status {response.status_code}")
-    except Exception as e:
-        logger.warning(f"⚠️ Could not test health endpoint: {e}")
-    
-    # Determine which bot mode to use
+    # Determine which bot mode to use based on config
     bot_mode = getattr(config, 'BOT_MODE', 'polling').lower()
     
     if bot_mode == 'webhook':
-        try:
-            from webhook.webhook_server import run_webhook_server
-            logger.info("Running webhook server alongside FastAPI health server...")
-            run_webhook_server()
-        except ImportError:
-            logger.info("Webhook not available, using polling mode...")
-            from telegram_bot import main
-            try:
-                main()
-            except KeyboardInterrupt:
-                print("\n🛑 Railway mode stopped by user")
+        logger.info("Railway: Using webhook mode")
+        run_webhook_mode()
     else:
-        # Default to polling
-        from telegram_bot import main
-        try:
-            main()
-        except KeyboardInterrupt:
-            print("\n🛑 Railway polling mode stopped by user")
+        logger.info("Railway: Using polling mode with health server")
+        run_fastapi_only()  # Just run health server for Railway
 
 def setup_signal_handlers():
     """Setup graceful shutdown handlers"""
@@ -280,15 +261,11 @@ def setup_signal_handlers():
     signal.signal(signal.SIGINT, signal_handler)
 
 def run_fastapi_only():
-    """Run only the FastAPI health server (useful for debugging)"""
+    """Run only the FastAPI health server"""
     print("🌐 Starting FastAPI health server only...")
     port = int(os.environ.get('PORT', 8000))
     
-    # Railway-specific configuration
     host = '0.0.0.0'
-    if os.environ.get('RAILWAY_ENVIRONMENT'):
-        host = '::'
-        logger.info("🚄 Railway detected: Using IPv6 binding for standalone server")
     
     logger.info(f"🏥 Starting FastAPI server on {host}:{port}")
     uvicorn.run(
@@ -319,7 +296,7 @@ def main():
         mode = sys.argv[1].lower()
     
     # Force railway mode if on Railway platform
-    if is_railway and mode not in ['railway', 'webhook']:
+    if is_railway:
         mode = 'railway'
         print("🚄 Railway deployment detected, using Railway mode")
     
@@ -331,7 +308,7 @@ def main():
     
     if is_railway:
         port = os.environ.get('PORT', 8000)
-        print(f"🔌 Health check port: {port}")
+        print(f"🔌 Port: {port}")
     
     print("=" * 40)
     
