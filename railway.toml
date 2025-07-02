@@ -1,0 +1,26 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pip install -r requirements.txt"
+
+[deploy]
+startCommand = "python bot_runner.py webhook"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[environments.production]
+variables = { BOT_MODE = "webhook", WEBHOOK_ENABLED = "true", DATABASE_TYPE = "postgresql" }
+
+[environments.development]
+variables = { BOT_MODE = "polling", DEBUG_MODE = "true", DATABASE_TYPE = "postgresql" }
+
+# Railway PostgreSQL service configuration
+[[services]]
+name = "optrixtrades-bot"
+source = "."
+
+[[services]]
+name = "postgres"
+image = "postgres:15"
+variables = { POSTGRES_DB = "optrixtrades", POSTGRES_USER = "optrixtrades_user" }

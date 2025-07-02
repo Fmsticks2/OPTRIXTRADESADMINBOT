@@ -1,0 +1,16 @@
+# Railway configuration for webhook deployment
+build:
+  builder: DOCKERFILE
+  dockerfilePath: webhook/Dockerfile
+
+deploy:
+  startCommand: python webhook/webhook_server.py
+  healthcheckPath: /health
+  healthcheckTimeout: 30
+  restartPolicyType: ON_FAILURE
+  restartPolicyMaxRetries: 3
+
+variables:
+  BOT_MODE: webhook
+  WEBHOOK_ENABLED: true
+  WEBHOOK_PORT: 8000
