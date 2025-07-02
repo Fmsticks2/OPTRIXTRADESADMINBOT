@@ -17,7 +17,8 @@ class BotConfig:
     
     # Database
     DATABASE_PATH: str = os.getenv('DATABASE_PATH', 'trading_bot.db')
-    DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'sqlite')  # Add this line
+    DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'sqlite')
+    DATABASE_URL: str = os.getenv('DATABASE_URL', '')  # Add this line
     
     # Auto-Verification
     AUTO_VERIFY_ENABLED: bool = os.getenv('AUTO_VERIFY_ENABLED', 'true').lower() == 'true'
@@ -197,4 +198,3 @@ if validation_result['warnings']:
     print("⚠️  Configuration Warnings:")
     for warning in validation_result['warnings']:
         print(f"  - {warning}")
-
