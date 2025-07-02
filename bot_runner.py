@@ -38,14 +38,31 @@ health_app = FastAPI(
 @health_app.get('/health')
 async def health_check():
     """Health check endpoint for Railway and other platforms"""
-    return JSONResponse(
-        content={
-            'status': 'healthy', 
-            'service': 'optrixtrades-bot',
-            'mode': getattr(config, 'BOT_MODE', 'polling')
-        },
-        status_code=200
-    )
+    try:
+        # Add some basic health checks
+        return JSONResponse(
+            content={
+                'status': 'healthy', 
+                'service': 'optrixtrades-bot',
+                'mode': getattr(config, 'BOT_MODE', 'polling'),
+                'timestamp': str(asyncio.get_event_loop().time()),
+                'platform': 'Railway' if os.environ.get('RAILWAY_ENVIRONMENT') else 'Local'
+            },
+            status_code=200,
+            headers={
+                'Cache-Control': 'no-cache',
+                'Content-Type': 'application/json'
+            }
+        )
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return JSONResponse(
+            content={
+                'status': 'unhealthy',
+                'error': str(e)
+            },
+            status_code=503
+        )
 
 @health_app.get('/')
 async def home():
@@ -61,21 +78,55 @@ async def home():
         status_code=200
     )
 
-@health_app.get('/status')
-async def detailed_status():
-    """Detailed status endpoint"""
-    return JSONResponse(
-        content={
-            'bot_name': 'OPTRIXTRADES Bot',
-            'mode': getattr(config, 'BOT_MODE', 'polling'),
-            'platform': 'Railway' if os.environ.get('RAILWAY_ENVIRONMENT') else 'Local',
-            'port': int(os.environ.get('PORT', 8000)),
-            'auto_verify_enabled': config.AUTO_VERIFY_ENABLED,
-            'admin_username': config.ADMIN_USERNAME,
-            'health': 'OK'
-        },
-        status_code=200
-    )
+@health_app.get('/debug')
+async def debug_info():
+    """Debug endpoint to help troubleshoot Railway deployment"""
+    import psutil
+    import platform
+    
+    try:
+        return JSONResponse(
+            content={
+                'python_version': platform.python_version(),
+                'platform': platform.platform(),
+                'railway_env': os.environ.get('RAILWAY_ENVIRONMENT', 'Not set'),
+                'port': os.environ.get('PORT', 'Not set'),
+                'cpu_percent': psutil.cpu_percent(),
+                'memory_percent': psutil.virtual_memory().percent,
+                'bot_config': {
+                    'mode': getattr(config, 'BOT_MODE', 'polling'),
+                    'admin': config.ADMIN_USERNAME,
+                    'auto_verify': config.AUTO_VERIFY_ENABLED
+                },
+                'environment_vars': {
+                    k: ('***' if 'token' in k.lower() or 'key' in k.lower() else v)
+                    for k, v in os.environ.items() 
+                    if k.startswith(('BOT_', 'RAILWAY_', 'PORT'))
+                }
+            },
+            status_code=200
+        )
+    except ImportError:
+        # psutil might not be available
+        return JSONResponse(
+            content={
+                'python_version': platform.python_version(),
+                'platform': platform.platform(),
+                'railway_env': os.environ.get('RAILWAY_ENVIRONMENT', 'Not set'),
+                'port': os.environ.get('PORT', 'Not set'),
+                'bot_config': {
+                    'mode': getattr(config, 'BOT_MODE', 'polling'),
+                    'admin': config.ADMIN_USERNAME,
+                    'auto_verify': config.AUTO_VERIFY_ENABLED
+                }
+            },
+            status_code=200
+        )
+    except Exception as e:
+        return JSONResponse(
+            content={'error': f'Debug info failed: {str(e)}'},
+            status_code=500
+        )
 
 def start_health_server():
     """Start FastAPI health check server in a separate thread"""
@@ -85,13 +136,22 @@ def start_health_server():
         port = int(os.environ.get('PORT', 8000))
         logger.info(f"🏥 Starting FastAPI health check server on port {port}")
         
+        # Railway-specific configuration
+        host = '0.0.0.0'
+        if os.environ.get('RAILWAY_ENVIRONMENT'):
+            # Listen on both IPv4 and IPv6 for Railway
+            host = '::'
+            logger.info("🚄 Railway detected: Using IPv6 binding")
+        
         config_uvicorn = uvicorn.Config(
             health_app,
-            host='0.0.0.0',
+            host=host,
             port=port,
             log_level='info',
-            access_log=False,
-            loop='asyncio'
+            access_log=True,  # Enable access logs for debugging
+            loop='asyncio',
+            timeout_keep_alive=30,  # Increase keep-alive timeout
+            timeout_graceful_shutdown=30
         )
         
         global health_server
@@ -101,6 +161,8 @@ def start_health_server():
             asyncio.run(health_server.serve())
         except Exception as e:
             logger.error(f"Health server error: {e}")
+            import traceback
+            traceback.print_exc()
     
     health_thread = threading.Thread(target=run_health_server, daemon=True)
     health_thread.start()
@@ -166,9 +228,23 @@ def run_railway_mode():
     # Always start FastAPI health server for Railway
     health_thread = start_health_server()
     
-    # Give health server time to start
+    # Give health server more time to start on Railway
     import time
-    time.sleep(3)
+    logger.info("⏳ Waiting for health server to initialize...")
+    time.sleep(5)  # Increased from 3 to 5 seconds
+    
+    # Test the health endpoint internally
+    try:
+        import requests
+        port = int(os.environ.get('PORT', 8000))
+        test_url = f"http://localhost:{port}/health"
+        response = requests.get(test_url, timeout=5)
+        if response.status_code == 200:
+            logger.info("✅ Health endpoint is responding correctly")
+        else:
+            logger.warning(f"⚠️ Health endpoint returned status {response.status_code}")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not test health endpoint: {e}")
     
     # Determine which bot mode to use
     bot_mode = getattr(config, 'BOT_MODE', 'polling').lower()
@@ -208,13 +284,20 @@ def run_fastapi_only():
     print("🌐 Starting FastAPI health server only...")
     port = int(os.environ.get('PORT', 8000))
     
-    logger.info(f"🏥 Starting FastAPI server on port {port}")
+    # Railway-specific configuration
+    host = '0.0.0.0'
+    if os.environ.get('RAILWAY_ENVIRONMENT'):
+        host = '::'
+        logger.info("🚄 Railway detected: Using IPv6 binding for standalone server")
+    
+    logger.info(f"🏥 Starting FastAPI server on {host}:{port}")
     uvicorn.run(
         health_app,
-        host='0.0.0.0',
+        host=host,
         port=port,
         log_level='info',
-        access_log=True
+        access_log=True,
+        timeout_keep_alive=30
     )
 
 def main():
