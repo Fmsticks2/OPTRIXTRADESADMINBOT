@@ -91,21 +91,19 @@ class BotConfig:
     TEST_MODE: bool = os.getenv('TEST_MODE', 'false').lower() == 'true'
     MOCK_VERIFICATION: bool = os.getenv('MOCK_VERIFICATION', 'false').lower() == 'true'
 
-    # Webhook Configuration
-    BOT_MODE: str = os.getenv('BOT_MODE', 'polling')
-    WEBHOOK_ENABLED: bool = os.getenv('WEBHOOK_ENABLED', 'false').lower() == 'true'
+    # Webhook Configuration (consolidated and Railway-optimized)
+    BOT_MODE: str = os.getenv('BOT_MODE', 'webhook')  # Default to webhook for Railway
+    WEBHOOK_ENABLED: bool = os.getenv('WEBHOOK_ENABLED', 'true').lower() == 'true'  # Enable by default
     WEBHOOK_URL: str = os.getenv('WEBHOOK_URL', '')
-    WEBHOOK_PORT: int = int(os.getenv('PORT', os.getenv('WEBHOOK_PORT', '8000')))
+    WEBHOOK_PORT: int = int(os.getenv('PORT', os.getenv('WEBHOOK_PORT', '8080')))  # Railway uses PORT
     WEBHOOK_SECRET_TOKEN: str = os.getenv('WEBHOOK_SECRET_TOKEN', '')
     WEBHOOK_PATH: str = os.getenv('WEBHOOK_PATH', '/webhook')
 
-    # Ngrok Configuration
+    # Ngrok Configuration (not needed for Railway)
     NGROK_ENABLED: bool = os.getenv('NGROK_ENABLED', 'false').lower() == 'true'
     NGROK_AUTH_TOKEN: str = os.getenv('NGROK_AUTH_TOKEN', '')
     
-    # Optional Settings
-    WEBHOOK_URL: str = os.getenv('WEBHOOK_URL', '')
-    WEBHOOK_SECRET_TOKEN: str = os.getenv('WEBHOOK_SECRET_TOKEN', '')
+    # Optional Services
     REDIS_URL: str = os.getenv('REDIS_URL', '')
     REDIS_PASSWORD: str = os.getenv('REDIS_PASSWORD', '')
     ANALYTICS_ENABLED: bool = os.getenv('ANALYTICS_ENABLED', 'false').lower() == 'true'
@@ -151,6 +149,10 @@ class BotConfig:
         if cls.BUSINESS_HOURS_START >= cls.BUSINESS_HOURS_END:
             warnings.append("BUSINESS_HOURS_START should be less than BUSINESS_HOURS_END")
         
+        # Webhook validation for Railway
+        if cls.BOT_MODE == 'webhook' and not cls.WEBHOOK_URL and not os.getenv('RAILWAY_ENVIRONMENT'):
+            warnings.append("WEBHOOK_URL should be set when using webhook mode (auto-detected on Railway)")
+        
         return {
             'valid': len(errors) == 0,
             'errors': errors,
@@ -165,10 +167,16 @@ class BotConfig:
 ========================================
 
 Bot Settings:
-- Token: {cls.BOT_TOKEN[:10]}...
+- Token: {cls.BOT_TOKEN[:10] + '...' if cls.BOT_TOKEN else 'NOT SET'}
+- Mode: {cls.BOT_MODE.upper()}
 - Broker: {cls.BROKER_NAME}
 - Channel: {cls.PREMIUM_CHANNEL_ID}
 - Admin: @{cls.ADMIN_USERNAME}
+
+Webhook Settings:
+- Enabled: {cls.WEBHOOK_ENABLED}
+- Port: {cls.WEBHOOK_PORT}
+- URL: {cls.WEBHOOK_URL or 'Auto-detect on Railway'}
 
 Auto-Verification:
 - Enabled: {cls.AUTO_VERIFY_ENABLED}
@@ -190,6 +198,24 @@ Development:
 - Test Mode: {cls.TEST_MODE}
 ========================================
         """.strip()
+    
+    @classmethod
+    def is_railway_environment(cls) -> bool:
+        """Check if running on Railway"""
+        return bool(os.getenv('RAILWAY_ENVIRONMENT'))
+    
+    @classmethod
+    def get_webhook_url(cls) -> str:
+        """Get webhook URL, auto-detect on Railway"""
+        if cls.WEBHOOK_URL:
+            return cls.WEBHOOK_URL
+        
+        # Auto-detect Railway URL
+        railway_url = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+        if railway_url:
+            return f"https://{railway_url}/webhook/{cls.BOT_TOKEN}"
+        
+        return ""
 
 # Create global config instance
 config = BotConfig()
@@ -205,3 +231,12 @@ if validation_result['warnings']:
     print("⚠️  Configuration Warnings:")
     for warning in validation_result['warnings']:
         print(f"  - {warning}")
+
+# Railway-specific setup
+if config.is_railway_environment():
+    print(f"🚄 Railway Environment Detected")
+    print(f"📡 Webhook Mode: {config.WEBHOOK_ENABLED}")
+    print(f"🔌 Port: {config.WEBHOOK_PORT}")
+    webhook_url = config.get_webhook_url()
+    if webhook_url:
+        print(f"🌐 Webhook URL: {webhook_url}")

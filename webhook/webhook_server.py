@@ -5,6 +5,8 @@ Handles incoming webhook updates from Telegram
 
 import asyncio
 import logging
+import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -31,23 +33,17 @@ logger = logging.getLogger(__name__)
 
 class WebhookServer:
     def __init__(self):
-        self.app = FastAPI(
-            title="OPTRIXTRADES Bot Webhook",
-            description="Webhook server for OPTRIXTRADES Telegram bot",
-            version="1.0.0"
-        )
         self.bot_instance = TradingBot()
         self.application: Optional[Application] = None
-        self.setup_routes()
         
-    def setup_routes(self):
+    def setup_routes(self, app: FastAPI):
         """Setup FastAPI routes"""
         
-        @self.app.get("/")
+        @app.get("/")
         async def root():
             return {"message": "OPTRIXTRADES Bot Webhook Server", "status": "running"}
         
-        @self.app.get("/health")
+        @app.get("/health")
         async def health_check():
             return {
                 "status": "healthy",
@@ -56,12 +52,12 @@ class WebhookServer:
                 "webhook_enabled": True
             }
         
-        @self.app.post(f"/webhook/{config.BOT_TOKEN}")
+        @app.post(f"/webhook/{config.BOT_TOKEN}")
         async def webhook_handler(request: Request, background_tasks: BackgroundTasks):
             """Handle incoming webhook updates from Telegram"""
             try:
                 # Verify webhook secret if configured
-                if config.WEBHOOK_SECRET_TOKEN:
+                if hasattr(config, 'WEBHOOK_SECRET_TOKEN') and config.WEBHOOK_SECRET_TOKEN:
                     if not self.verify_webhook_signature(request):
                         raise HTTPException(status_code=403, detail="Invalid signature")
                 
@@ -81,7 +77,7 @@ class WebhookServer:
                 logger.error(f"Webhook handler error: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error")
         
-        @self.app.post("/admin/set_webhook")
+        @app.post("/admin/set_webhook")
         async def set_webhook(request: Request):
             """Admin endpoint to set webhook URL"""
             try:
@@ -103,7 +99,7 @@ class WebhookServer:
                 logger.error(f"Set webhook error: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.delete("/admin/delete_webhook")
+        @app.delete("/admin/delete_webhook")
         async def delete_webhook():
             """Admin endpoint to delete webhook"""
             try:
@@ -118,7 +114,7 @@ class WebhookServer:
                 logger.error(f"Delete webhook error: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
         
-        @self.app.get("/admin/webhook_info")
+        @app.get("/admin/webhook_info")
         async def webhook_info():
             """Get current webhook information"""
             try:
@@ -153,7 +149,8 @@ class WebhookServer:
         """Process incoming Telegram update"""
         try:
             if not self.application:
-                await self.initialize_application()
+                logger.error("Application not initialized")
+                return
             
             # Create Update object
             update = Update.de_json(update_data, self.application.bot)
@@ -171,6 +168,10 @@ class WebhookServer:
     async def initialize_application(self):
         """Initialize Telegram application for webhook mode"""
         try:
+            if self.application:
+                logger.info("Application already initialized")
+                return
+                
             # Create application
             self.application = Application.builder().token(config.BOT_TOKEN).build()
             
@@ -200,9 +201,10 @@ class WebhookServer:
             bot = Bot(token=config.BOT_TOKEN)
             
             # Set webhook
+            secret_token = getattr(config, 'WEBHOOK_SECRET_TOKEN', None)
             result = await bot.set_webhook(
                 url=webhook_url,
-                secret_token=config.WEBHOOK_SECRET_TOKEN if config.WEBHOOK_SECRET_TOKEN else None,
+                secret_token=secret_token,
                 max_connections=100,
                 drop_pending_updates=True,
                 allowed_updates=["message", "callback_query", "inline_query"]
@@ -258,26 +260,40 @@ class WebhookServer:
 # Create global webhook server instance
 webhook_server = WebhookServer()
 
-# FastAPI app instance
-app = webhook_server.app
-
-# Startup and shutdown events
-@app.on_event("startup")
-async def startup_event():
+# Lifespan context manager for FastAPI
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     await webhook_server.startup()
-
-@app.on_event("shutdown")
-async def shutdown_event():
+    yield
+    # Shutdown
     await webhook_server.shutdown()
+
+# Create FastAPI app with lifespan
+app = FastAPI(
+    title="OPTRIXTRADES Bot Webhook",
+    description="Webhook server for OPTRIXTRADES Telegram bot",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Setup routes
+webhook_server.setup_routes(app)
 
 def run_webhook_server():
     """Run the webhook server"""
+    # Use Railway's PORT environment variable, fallback to config or 8080
+    port = int(os.environ.get("PORT", getattr(config, 'WEBHOOK_PORT', 8080)))
+    
+    logger.info(f"Starting server on port {port}")
+    
     uvicorn.run(
         "webhook.webhook_server:app",
         host="0.0.0.0",
-        port=int(config.WEBHOOK_PORT),
+        port=port,
         log_level=config.LOG_LEVEL.lower(),
-        access_log=True
+        access_log=True,
+        reload=False  # Disable reload in production
     )
 
 if __name__ == "__main__":
