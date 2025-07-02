@@ -17,6 +17,7 @@ class BotConfig:
     
     # Database
     DATABASE_PATH: str = os.getenv('DATABASE_PATH', 'trading_bot.db')
+    DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'sqlite')  # Add this line
     
     # Auto-Verification
     AUTO_VERIFY_ENABLED: bool = os.getenv('AUTO_VERIFY_ENABLED', 'true').lower() == 'true'
