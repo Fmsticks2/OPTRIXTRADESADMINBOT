@@ -1,9 +1,9 @@
 {
   "build": {
-    "builder": "NIXPACKS"
+    "builder": "DOCKERFILE"
   },
   "deploy": {
-    "startCommand": "python telegram_bot.py",
+    "startCommand": "python bot_runner.py webhook",
     "restartPolicyType": "ON_FAILURE"
   }
 }
