@@ -17,7 +17,8 @@ variables = {
     POSTGRES_PORT = "${{Postgres.POSTGRES_PORT}}",
     POSTGRES_DB = "${{Postgres.POSTGRES_DB}}",
     POSTGRES_USER = "${{Postgres.POSTGRES_USER}}",
-    POSTGRES_PASSWORD = "${{Postgres.POSTGRES_PASSWORD}}"
+    POSTGRES_PASSWORD = "${{Postgres.POSTGRES_PASSWORD}}",
+    WEBHOOK_PORT = "${{PORT}}"
 }
 
 [environments.development]
