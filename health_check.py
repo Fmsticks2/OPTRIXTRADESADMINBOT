@@ -1,6 +1,12 @@
+# This file is deprecated as health checks are now handled by FastAPI in bot_runner.py
+# Keeping this file for reference only
+
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 import json
+
+# Health check functionality has been moved to bot_runner.py
+# Do not use this file
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
