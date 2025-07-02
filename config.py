@@ -18,7 +18,14 @@ class BotConfig:
     # Database
     DATABASE_PATH: str = os.getenv('DATABASE_PATH', 'trading_bot.db')
     DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'sqlite')
-    DATABASE_URL: str = os.getenv('DATABASE_URL', '')  # Add this line
+    DATABASE_URL: str = os.getenv('DATABASE_URL', '')
+    
+    # PostgreSQL specific settings
+    POSTGRES_HOST: str = os.getenv('POSTGRES_HOST', 'localhost')
+    POSTGRES_PORT: int = int(os.getenv('POSTGRES_PORT', '5432'))
+    POSTGRES_DB: str = os.getenv('POSTGRES_DB', 'optrixtrades')
+    POSTGRES_USER: str = os.getenv('POSTGRES_USER', 'optrixtrades_user')
+    POSTGRES_PASSWORD: str = os.getenv('POSTGRES_PASSWORD', '')
     
     # Auto-Verification
     AUTO_VERIFY_ENABLED: bool = os.getenv('AUTO_VERIFY_ENABLED', 'true').lower() == 'true'

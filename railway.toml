@@ -12,7 +12,12 @@ variables = {
     BOT_MODE = "webhook", 
     WEBHOOK_ENABLED = "true", 
     DATABASE_TYPE = "postgresql",
-    DATABASE_URL = "${{Postgres.DATABASE_URL}}"
+    DATABASE_URL = "${{Postgres.DATABASE_URL}}",
+    POSTGRES_HOST = "${{Postgres.POSTGRES_HOST}}",
+    POSTGRES_PORT = "${{Postgres.POSTGRES_PORT}}",
+    POSTGRES_DB = "${{Postgres.POSTGRES_DB}}",
+    POSTGRES_USER = "${{Postgres.POSTGRES_USER}}",
+    POSTGRES_PASSWORD = "${{Postgres.POSTGRES_PASSWORD}}"
 }
 
 [environments.development]
@@ -20,7 +25,12 @@ variables = {
     BOT_MODE = "polling", 
     DEBUG_MODE = "true", 
     DATABASE_TYPE = "postgresql",
-    DATABASE_URL = "${{Postgres.DATABASE_URL}}"
+    DATABASE_URL = "${{Postgres.DATABASE_URL}}",
+    POSTGRES_HOST = "${{Postgres.POSTGRES_HOST}}",
+    POSTGRES_PORT = "${{Postgres.POSTGRES_PORT}}",
+    POSTGRES_DB = "${{Postgres.POSTGRES_DB}}",
+    POSTGRES_USER = "${{Postgres.POSTGRES_USER}}",
+    POSTGRES_PASSWORD = "${{Postgres.POSTGRES_PASSWORD}}"
 }
 
 # Railway PostgreSQL service configuration
