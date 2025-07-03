@@ -58,11 +58,10 @@ class WebhookServer:
             try:
                 logger.info(f"Webhook handler called - Headers: {dict(request.headers)}")
                 
-                # Verify webhook secret if configured
-                if hasattr(config, 'WEBHOOK_SECRET_TOKEN') and config.WEBHOOK_SECRET_TOKEN:
-                    if not self.verify_webhook_signature(request):
-                        logger.warning("Invalid webhook signature received")
-                        raise HTTPException(status_code=403, detail="Invalid signature")
+                # Verify webhook signature
+                if not self.verify_webhook_signature(request):
+                    logger.warning("Invalid webhook signature received")
+                    raise HTTPException(status_code=403, detail="Invalid signature")
                 
                 # Get update data
                 try:
@@ -155,8 +154,18 @@ class WebhookServer:
     def verify_webhook_signature(self, request: Request) -> bool:
         """Verify webhook signature for security"""
         try:
+            # If no secret token is configured, skip verification
+            if not config.WEBHOOK_SECRET_TOKEN:
+                logger.debug("No webhook secret token configured, skipping signature verification")
+                return True
+                
             signature = request.headers.get('X-Telegram-Bot-Api-Secret-Token')
-            return signature == config.WEBHOOK_SECRET_TOKEN
+            is_valid = signature == config.WEBHOOK_SECRET_TOKEN
+            
+            if not is_valid:
+                logger.warning(f"Invalid webhook signature. Expected: {config.WEBHOOK_SECRET_TOKEN}, Got: {signature}")
+            
+            return is_valid
         except Exception as e:
             logger.error(f"Signature verification error: {e}")
             return False

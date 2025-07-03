@@ -33,18 +33,37 @@ class DatabaseManager:
     
     def __init__(self):
         self.pool = None
-        self.db_type = os.getenv('DATABASE_TYPE', 'sqlite').lower()
-        self.database_url = os.getenv('DATABASE_URL', '')
+        self.database_url = os.getenv('DATABASE_URL', '').strip()
         self.sqlite_path = os.getenv('SQLITE_DATABASE_PATH', 'trading_bot.db')
         self.is_initialized = False
+        
+        # Determine database type based on actual configuration
+        if self.database_url and ('postgresql://' in self.database_url or 'postgres://' in self.database_url):
+            self.db_type = 'postgresql'
+        else:
+            self.db_type = 'sqlite'
         
     async def initialize(self):
         """Initialize database connection"""
         try:
-            if self.db_type == 'postgresql' and POSTGRES_AVAILABLE and self.database_url:
-                await self._init_postgresql()
+            # Try PostgreSQL first if properly configured
+            if (self.db_type == 'postgresql' and POSTGRES_AVAILABLE and self.database_url):
+                try:
+                    await self._init_postgresql()
+                    logger.info("Using PostgreSQL database")
+                except Exception as e:
+                    logger.error(f"PostgreSQL initialization failed: {e}")
+                    if SQLITE_AVAILABLE:
+                        logger.info("Falling back to SQLite database")
+                        self.db_type = 'sqlite'
+                        await self._init_sqlite()
+                    else:
+                        raise RuntimeError("PostgreSQL failed and SQLite not available")
             elif SQLITE_AVAILABLE:
+                # Use SQLite as default or fallback
                 await self._init_sqlite()
+                self.db_type = 'sqlite'
+                logger.info("Using SQLite database")
             else:
                 raise RuntimeError("No suitable database backend available")
             
@@ -125,6 +144,7 @@ class DatabaseManager:
                 cursor = await self.pool.execute('SELECT name FROM migrations ORDER BY id')
                 executed_migrations = await cursor.fetchall()
                 executed_names = {m[0] for m in executed_migrations}
+                await cursor.close()
             
             # Run pending migrations
             migrations = self._get_migrations()
@@ -143,7 +163,10 @@ class DatabaseManager:
                                         migration_name
                                     )
                         else:
-                            await self.pool.execute(migration_sql)
+                            # For SQLite, split multiple statements and execute individually
+                            statements = [stmt.strip() for stmt in migration_sql.split(';') if stmt.strip()]
+                            for statement in statements:
+                                await self.pool.execute(statement)
                             await self.pool.execute(
                                 "INSERT INTO migrations (name) VALUES (?)",
                                 (migration_name,)
