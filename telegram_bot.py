@@ -862,14 +862,33 @@ We'll be here when you're ready to start your trading journey! 🚀"""
             logger.error(f"Error in account menu: {e}")
 
     async def handle_help_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Show help menu"""
+        """Show help menu with available commands"""
         try:
             query = update.callback_query
             await query.answer()
             
-            help_text = f"ℹ️ Help Center\n\n"\
-                f"How can we assist you today?\n\n"\
-                f"Select a topic below or contact our support team."
+            user_id = query.from_user.id
+            is_admin = str(user_id) == config.ADMIN_USER_ID
+            
+            help_text = "ℹ️ Available Commands\n\n"
+            
+            # User commands
+            help_text += "👤 User Commands:\n"
+            help_text += "/start - Begin using the bot\n"
+            help_text += "/menu - Show main menu\n"
+            help_text += "UPGRADE - Request premium upgrade\n"
+            help_text += "Send UID + screenshot - Complete verification\n\n"
+            
+            # Admin commands
+            if is_admin:
+                help_text += "👨‍💼 Admin Commands:\n"
+                help_text += "/admin - Admin dashboard\n"
+                help_text += "/verify <user_id> - Approve user\n"
+                help_text += "/reject <user_id> - Reject user\n"
+                help_text += "/queue - View verification queue\n"
+                help_text += "/stats - View bot statistics\n"
+            
+            help_text += "\nNeed more help? Contact @{config.ADMIN_USERNAME}"
             
             await query.edit_message_text(
                 help_text,
