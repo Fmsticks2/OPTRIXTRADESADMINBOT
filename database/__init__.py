@@ -11,7 +11,9 @@ from .connection import (
     initialize_db,
     cleanup_db,
     health_check,
-    get_pending_verifications
+    get_pending_verifications,
+    get_all_users,
+    delete_user
 )
 
 __all__ = [
@@ -23,5 +25,7 @@ __all__ = [
     'initialize_db',
     'cleanup_db',
     'health_check',
-    'get_pending_verifications'
+    'get_pending_verifications',
+    'get_all_users',
+    'delete_user'
 ]

@@ -427,6 +427,37 @@ async def cleanup_db():
     """Cleanup database connections"""
     await db_manager.close()
 
+async def get_all_users() -> List[Dict[str, Any]]:
+    """Get all users from database"""
+    try:
+        if db_manager.db_type == 'postgresql':
+            query = 'SELECT * FROM users ORDER BY join_date DESC'
+        else:
+            query = 'SELECT * FROM users ORDER BY join_date DESC'
+        
+        return await db_manager.execute(query, fetch='all')
+    except Exception as e:
+        logger.error(f"Error getting all users: {e}")
+        return []
+
+async def delete_user(user_id: int) -> bool:
+    """Delete user from database"""
+    try:
+        # First delete related records
+        if db_manager.db_type == 'postgresql':
+            await db_manager.execute('DELETE FROM user_interactions WHERE user_id = $1', user_id)
+            await db_manager.execute('DELETE FROM verification_requests WHERE user_id = $1', user_id)
+            await db_manager.execute('DELETE FROM users WHERE user_id = $1', user_id)
+        else:
+            await db_manager.execute('DELETE FROM user_interactions WHERE user_id = ?', user_id)
+            await db_manager.execute('DELETE FROM verification_requests WHERE user_id = ?', user_id)
+            await db_manager.execute('DELETE FROM users WHERE user_id = ?', user_id)
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting user: {e}")
+        return False
+
 async def health_check() -> Dict[str, Any]:
     """Perform database health check"""
     try:
