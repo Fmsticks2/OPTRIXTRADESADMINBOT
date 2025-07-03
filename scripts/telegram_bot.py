@@ -277,7 +277,7 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     activation_text = f"""To activate your free access and join our VIP Signal Channel, follow these steps:
 
 1️⃣ Click the link below to register with our official broker partner
-{BotConfig.BROKER_LINK}
+{BROKER_LINK}
 
 2️⃣ Deposit $20 or more
 
@@ -585,7 +585,7 @@ async def help_signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Step-by-step registration guide:
 
-1. Click this link: {BotConfig.BROKER_LINK}
+1. Click this link: {BROKER_LINK}
 2. Fill in your personal details
 3. Verify your email address
 4. Complete account verification
