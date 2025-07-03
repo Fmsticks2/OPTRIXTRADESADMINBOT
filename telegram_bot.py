@@ -251,6 +251,16 @@ Use /queue to see all pending verifications"""
             await create_user(user_id, username, first_name)
             await log_interaction(user_id, "start_command")
             
+            # Check admin status
+            is_admin = str(user_id) == config.ADMIN_USER_ID
+            
+            if is_admin:
+                await update.message.reply_text(
+                    "👑 ADMIN MODE ACTIVATED\n\nYou now have access to all admin commands.",
+                    reply_markup=self.admin_keyboard
+                )
+                return
+            
             welcome_text = f"""Heyy {first_name}! 👋
 
 Welcome to OPTRIXTRADES
@@ -358,8 +368,11 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
             user_id = update.effective_user.id
             text = update.message.text
             
+            # Check admin status
+            is_admin = str(user_id) == config.ADMIN_USER_ID
+            
             # Admin commands
-            if str(user_id) == config.ADMIN_USER_ID:
+            if is_admin:
                 if text.startswith('/verify '):
                     await self.admin_verify_user(update, context)
                     return
