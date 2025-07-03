@@ -1,52 +1,73 @@
 import asyncio
-import sqlite3
+import sys
+import os
 from datetime import datetime, timedelta
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 import logging
+
+# Add parent directory to path to import config and db_manager
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import BotConfig
+from database.db_manager import db_manager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Bot Configuration - Updated with your actual values
-BOT_TOKEN = "7560905481:AAFm1Ra0zAknomOhXvjsR4kkruurz_O033s"
-BROKER_LINK = "https://affiliate.iqbroker.com/redir/?aff=755757&aff_model=revenue&afftrack="
-ADMIN_USERNAME = "Optrixtradesadmin"
+# Bot Configuration
+BOT_TOKEN = BotConfig.BOT_TOKEN
+BROKER_LINK = BotConfig.BROKER_LINK
+ADMIN_USERNAME = BotConfig.ADMIN_USERNAME
 
 def update_user_follow_up_day(user_id, day):
-    conn = sqlite3.connect('trading_bot.db')
-    cursor = conn.cursor()
-    cursor.execute('UPDATE users SET follow_up_day = ?, last_interaction = ? WHERE user_id = ?', 
-                   (day, datetime.now(), user_id))
-    conn.commit()
-    conn.close()
+    try:
+        if BotConfig.DATABASE_TYPE == 'postgresql':
+            query = 'UPDATE users SET follow_up_day = %s, last_interaction = CURRENT_TIMESTAMP WHERE user_id = %s'
+        else:
+            query = 'UPDATE users SET follow_up_day = ?, last_interaction = CURRENT_TIMESTAMP WHERE user_id = ?'
+        db_manager.execute_query(query, (day, user_id))
+    except Exception as e:
+        logger.error(f"Error updating follow-up day for user {user_id}: {e}")
 
 def log_interaction(user_id, interaction_type, interaction_data=""):
-    conn = sqlite3.connect('trading_bot.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO user_interactions (user_id, interaction_type, interaction_data)
-        VALUES (?, ?, ?)
-    ''', (user_id, interaction_type, interaction_data))
-    conn.commit()
-    conn.close()
+    try:
+        if BotConfig.DATABASE_TYPE == 'postgresql':
+            query = '''
+                INSERT INTO interactions (user_id, interaction_type, interaction_data)
+                VALUES (%s, %s, %s)
+            '''
+        else:
+            query = '''
+                INSERT INTO interactions (user_id, interaction_type, interaction_data)
+                VALUES (?, ?, ?)
+            '''
+        db_manager.execute_query(query, (user_id, interaction_type, interaction_data))
+    except Exception as e:
+        logger.error(f"Error logging interaction for user {user_id}: {e}")
 
 async def send_follow_up_messages():
     bot = Bot(token=BOT_TOKEN)
-    conn = sqlite3.connect('trading_bot.db')
-    cursor = conn.cursor()
     
     # Follow-up 2 (Day 2) - Scarcity + Social Proof
     day_2_cutoff = datetime.now() - timedelta(hours=23)
-    cursor.execute('''
-        SELECT user_id, first_name FROM users 
-        WHERE last_interaction < ? 
-        AND deposit_confirmed = FALSE 
-        AND follow_up_day = 1
-        AND is_active = TRUE
-    ''', (day_2_cutoff,))
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query2 = '''
+            SELECT user_id, first_name FROM users 
+            WHERE last_interaction < %s 
+            AND deposit_confirmed = FALSE 
+            AND follow_up_day = 1
+            AND is_active = TRUE
+        '''
+    else:
+        query2 = '''
+            SELECT user_id, first_name FROM users 
+            WHERE last_interaction < ? 
+            AND deposit_confirmed = FALSE 
+            AND follow_up_day = 1
+            AND is_active = TRUE
+        '''
     
-    day_2_users = cursor.fetchall()
+    day_2_users = db_manager.execute_query(query2, (day_2_cutoff,), fetch=True) or []
     
     for user_id, first_name in day_2_users:
         try:
@@ -73,15 +94,24 @@ Don't miss your shot! 🎯"""
     
     # Follow-up 3 (Day 3) - Friendly Reminder + Value Recap
     day_3_cutoff = datetime.now() - timedelta(hours=22)
-    cursor.execute('''
-        SELECT user_id, first_name FROM users 
-        WHERE last_interaction < ? 
-        AND deposit_confirmed = FALSE 
-        AND follow_up_day = 2
-        AND is_active = TRUE
-    ''', (day_3_cutoff,))
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query3 = '''
+            SELECT user_id, first_name FROM users 
+            WHERE last_interaction < %s 
+            AND deposit_confirmed = FALSE 
+            AND follow_up_day = 2
+            AND is_active = TRUE
+        '''
+    else:
+        query3 = '''
+            SELECT user_id, first_name FROM users 
+            WHERE last_interaction < ? 
+            AND deposit_confirmed = FALSE 
+            AND follow_up_day = 2
+            AND is_active = TRUE
+        '''
     
-    day_3_users = cursor.fetchall()
+    day_3_users = db_manager.execute_query(query3, (day_3_cutoff,), fetch=True) or []
     
     for user_id, first_name in day_3_users:
         try:
@@ -112,15 +142,24 @@ And yes, it's still 100% free when you use our broker link! 🆓"""
     
     # Follow-up 4 (Day 4) - Personal + Soft CTA
     day_4_cutoff = datetime.now() - timedelta(days=1)
-    cursor.execute('''
-        SELECT user_id, first_name FROM users 
-        WHERE last_interaction < ? 
-        AND deposit_confirmed = FALSE 
-        AND follow_up_day = 3
-        AND is_active = TRUE
-    ''', (day_4_cutoff,))
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query4 = '''
+            SELECT user_id, first_name FROM users 
+            WHERE last_interaction < %s 
+            AND deposit_confirmed = FALSE 
+            AND follow_up_day = 3
+            AND is_active = TRUE
+        '''
+    else:
+        query4 = '''
+            SELECT user_id, first_name FROM users 
+            WHERE last_interaction < ? 
+            AND deposit_confirmed = FALSE 
+            AND follow_up_day = 3
+            AND is_active = TRUE
+        '''
     
-    day_4_users = cursor.fetchall()
+    day_4_users = db_manager.execute_query(query4, (day_4_cutoff,), fetch=True) or []
     
     for user_id, first_name in day_4_users:
         try:
@@ -145,15 +184,24 @@ Even if you don't have a big budget right now, we'll guide you to start small an
     
     # Follow-up 5 (Day 5) - Last Chance + Exit Option
     day_5_cutoff = datetime.now() - timedelta(days=1)
-    cursor.execute('''
-        SELECT user_id, first_name FROM users 
-        WHERE last_interaction < ? 
-        AND deposit_confirmed = FALSE 
-        AND follow_up_day = 4
-        AND is_active = TRUE
-    ''', (day_5_cutoff,))
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query5 = '''
+            SELECT user_id, first_name FROM users 
+            WHERE last_interaction < %s 
+            AND deposit_confirmed = FALSE 
+            AND follow_up_day = 4
+            AND is_active = TRUE
+        '''
+    else:
+        query5 = '''
+            SELECT user_id, first_name FROM users 
+            WHERE last_interaction < ? 
+            AND deposit_confirmed = FALSE 
+            AND follow_up_day = 4
+            AND is_active = TRUE
+        '''
     
-    day_5_users = cursor.fetchall()
+    day_5_users = db_manager.execute_query(query5, (day_5_cutoff,), fetch=True) or []
     
     for user_id, first_name in day_5_users:
         try:
@@ -176,7 +224,6 @@ Want in? 🤔"""
         except Exception as e:
             logger.error(f"Failed to send follow-up 5 to user {user_id}: {e}")
     
-    conn.close()
     logger.info(f"Follow-up messages sent: Day 2: {len(day_2_users)}, Day 3: {len(day_3_users)}, Day 4: {len(day_4_users)}, Day 5: {len(day_5_users)}")
 
 async def main():

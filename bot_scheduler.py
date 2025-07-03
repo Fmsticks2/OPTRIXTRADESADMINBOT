@@ -1,10 +1,15 @@
 import asyncio
-import sqlite3
 import os
+import sys
 import logging
 from datetime import datetime, timedelta
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
+
+# Add parent directory to path to import config
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from config import BotConfig
+from database.db_manager import db_manager
 
 # Configure logging
 logging.basicConfig(
@@ -18,10 +23,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-BOT_TOKEN = os.getenv('BOT_TOKEN', '7560905481:AAFm1Ra0zAknomOhXvjsR4kkruurz_O033s')
-BROKER_LINK = os.getenv('BROKER_LINK', 'https://affiliate.iqbroker.com/redir/?aff=755757&aff_model=revenue&afftrack=')
-ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'Optrixtradesadmin')
-DATABASE_PATH = os.getenv('DATABASE_PATH', 'trading_bot.db')
+BOT_TOKEN = BotConfig.BOT_TOKEN
+BROKER_LINK = BotConfig.BROKER_LINK
+ADMIN_USERNAME = BotConfig.ADMIN_USERNAME
 
 class FollowUpScheduler:
     def __init__(self):
@@ -30,46 +34,54 @@ class FollowUpScheduler:
     def update_user_follow_up_day(self, user_id, day):
         """Update user follow-up day"""
         try:
-            conn = sqlite3.connect(DATABASE_PATH)
-            cursor = conn.cursor()
-            cursor.execute('UPDATE users SET follow_up_day = ?, last_interaction = ? WHERE user_id = ?', 
-                           (day, datetime.now(), user_id))
-            conn.commit()
-            conn.close()
+            if BotConfig.DATABASE_TYPE == 'postgresql':
+                query = 'UPDATE users SET follow_up_day = %s, last_interaction = CURRENT_TIMESTAMP WHERE user_id = %s'
+            else:
+                query = 'UPDATE users SET follow_up_day = ?, last_interaction = CURRENT_TIMESTAMP WHERE user_id = ?'
+            db_manager.execute_query(query, (day, user_id))
         except Exception as e:
             logger.error(f"Error updating follow-up day for user {user_id}: {e}")
 
     def log_interaction(self, user_id, interaction_type, interaction_data=""):
         """Log interaction"""
         try:
-            conn = sqlite3.connect(DATABASE_PATH)
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO user_interactions (user_id, interaction_type, interaction_data)
-                VALUES (?, ?, ?)
-            ''', (user_id, interaction_type, interaction_data))
-            conn.commit()
-            conn.close()
+            if BotConfig.DATABASE_TYPE == 'postgresql':
+                query = '''
+                    INSERT INTO interactions (user_id, interaction_type, interaction_data)
+                    VALUES (%s, %s, %s)
+                '''
+            else:
+                query = '''
+                    INSERT INTO interactions (user_id, interaction_type, interaction_data)
+                    VALUES (?, ?, ?)
+                '''
+            db_manager.execute_query(query, (user_id, interaction_type, interaction_data))
         except Exception as e:
             logger.error(f"Error logging interaction for user {user_id}: {e}")
 
     async def send_follow_up_messages(self):
         """Send follow-up messages to users"""
         try:
-            conn = sqlite3.connect(DATABASE_PATH)
-            cursor = conn.cursor()
-            
             # Follow-up 1 (6 hours after last interaction)
             six_hours_ago = datetime.now() - timedelta(hours=6)
-            cursor.execute('''
-                SELECT user_id, first_name FROM users 
-                WHERE last_interaction < ? 
-                AND deposit_confirmed = FALSE 
-                AND follow_up_day = 0
-                AND is_active = TRUE
-            ''', (six_hours_ago,))
+            if BotConfig.DATABASE_TYPE == 'postgresql':
+                query1 = '''
+                    SELECT user_id, first_name FROM users 
+                    WHERE last_interaction < %s 
+                    AND deposit_confirmed = FALSE 
+                    AND follow_up_day = 0
+                    AND is_active = TRUE
+                '''
+            else:
+                query1 = '''
+                    SELECT user_id, first_name FROM users 
+                    WHERE last_interaction < ? 
+                    AND deposit_confirmed = FALSE 
+                    AND follow_up_day = 0
+                    AND is_active = TRUE
+                '''
             
-            follow_up_1_users = cursor.fetchall()
+            follow_up_1_users = db_manager.execute_query(query1, (six_hours_ago,), fetch=True) or []
             
             for user_id, first_name in follow_up_1_users:
                 try:
@@ -104,15 +116,24 @@ Tap below to continue your registration. You're just one step away! 🚀"""
 
             # Follow-up 2 (Day 2)
             day_2_cutoff = datetime.now() - timedelta(hours=23)
-            cursor.execute('''
-                SELECT user_id, first_name FROM users 
-                WHERE last_interaction < ? 
-                AND deposit_confirmed = FALSE 
-                AND follow_up_day = 1
-                AND is_active = TRUE
-            ''', (day_2_cutoff,))
+            if BotConfig.DATABASE_TYPE == 'postgresql':
+                query2 = '''
+                    SELECT user_id, first_name FROM users 
+                    WHERE last_interaction < %s 
+                    AND deposit_confirmed = FALSE 
+                    AND follow_up_day = 1
+                    AND is_active = TRUE
+                '''
+            else:
+                query2 = '''
+                    SELECT user_id, first_name FROM users 
+                    WHERE last_interaction < ? 
+                    AND deposit_confirmed = FALSE 
+                    AND follow_up_day = 1
+                    AND is_active = TRUE
+                '''
             
-            day_2_users = cursor.fetchall()
+            day_2_users = db_manager.execute_query(query2, (day_2_cutoff,), fetch=True) or []
             
             for user_id, first_name in day_2_users:
                 try:
@@ -138,8 +159,6 @@ Don't miss your shot! 🎯"""
                     logger.error(f"Failed to send follow-up 2 to user {user_id}: {e}")
                 except Exception as e:
                     logger.error(f"Unexpected error sending follow-up 2 to user {user_id}: {e}")
-
-            conn.close()
             logger.info(f"Follow-up messages sent: Follow-up 1: {len(follow_up_1_users)}, Day 2: {len(day_2_users)}")
             
         except Exception as e:

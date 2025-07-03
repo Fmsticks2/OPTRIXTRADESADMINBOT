@@ -1,5 +1,4 @@
 import logging
-import sqlite3
 import asyncio
 import os
 import sys
@@ -580,26 +579,45 @@ Use /verify {user_id} to approve or /reject {user_id} to reject."""
             "buttons": ["Join Premium Group", "Contact Support"]
         })
         
-        # Send additional follow-up message with timeline
-        follow_up_text = """⏰ **Verification Timeline:**
+        # Send enhanced follow-up message with timeline and status tracking
+        follow_up_text = f"""⏰ **Verification Timeline & Status:**
 
 🔄 **Step 1:** Screenshot submitted ✅
 🔄 **Step 2:** Admin review (2-4 hours) ⏳
 🔄 **Step 3:** Approval notification 📧
 🔄 **Step 4:** Premium access granted 🎯
 
-**You'll receive an automatic notification once approved!**"""
+📋 **Current Status:** PENDING REVIEW
+
+🔔 **Important:** You will receive an automatic notification when your verification is:
+✅ **APPROVED** - Instant premium access
+❌ **REJECTED** - Resubmission instructions
+
+⚠️ **Do not submit multiple screenshots - this may delay your verification!**"""
+        
+        # Add helpful action buttons
+        keyboard = [
+            [InlineKeyboardButton("❓ Verification Help", callback_data="verification_help")],
+            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         
         await context.bot.send_message(
             chat_id=user_id,
             text=follow_up_text,
+            reply_markup=reply_markup,
             parse_mode='Markdown'
         )
         
         # Log follow-up message
         db_manager.log_chat_message(user_id, "bot_response", follow_up_text, {
-            "action": "verification_timeline"
+            "action": "verification_timeline",
+            "status": "pending_review",
+            "buttons": ["Verification Help", "Contact Support"]
         })
+        
+        # Update user flow to indicate they're waiting for verification
+        update_user_data(user_id, current_flow='awaiting_verification')
             
     else:
         await update.message.reply_text("Please complete the registration process first by using /start")
@@ -612,6 +630,183 @@ Use /verify {user_id} to approve or /reject {user_id} to reject."""
         
         db_manager.log_chat_message(user_id, "bot_response", "Please complete the registration process first by using /start", {
             "action": "invalid_photo_response"
+        })
+
+# Handle document uploads (PDF and image files)
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    document = update.message.document
+    
+    # Check if user is admin
+    if is_admin(user_id):
+        await update.message.reply_text("📄 Document received by admin.")
+        return
+    
+    # Get user data
+    user_data = get_user_data(user_id)
+    
+    if user_data and user_data[3] == 'awaiting_deposit_screenshot':
+        # Check if document is a valid format (PDF or image)
+        file_name = document.file_name.lower() if document.file_name else ""
+        mime_type = document.mime_type.lower() if document.mime_type else ""
+        
+        valid_formats = [
+            'application/pdf',
+            'image/jpeg',
+            'image/jpg', 
+            'image/png'
+        ]
+        
+        valid_extensions = ['.pdf', '.jpg', '.jpeg', '.png']
+        
+        is_valid_format = (
+            mime_type in valid_formats or 
+            any(file_name.endswith(ext) for ext in valid_extensions)
+        )
+        
+        if not is_valid_format:
+            await update.message.reply_text(
+                "❌ **Invalid file format!**\n\n"
+                "Please upload one of these formats:\n"
+                "📄 PDF files (.pdf)\n"
+                "🖼️ Image files (.jpg, .jpeg, .png)\n\n"
+                "Try uploading your deposit screenshot again.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Process the document as deposit proof
+        file_info = await context.bot.get_file(document.file_id)
+        
+        # Create verification request
+        create_verification_request(user_id, document.file_id)
+        
+        # Send confirmation to user
+        await update.message.reply_text("📄 **Document Received Successfully!**\n\nYour deposit proof has been submitted for verification.")
+        
+        # Log the document submission
+        db_manager.log_chat_message(user_id, "user_action", f"Uploaded document: {file_name}", {
+            "action_type": "document_upload",
+            "file_type": mime_type,
+            "file_name": file_name,
+            "file_id": document.file_id
+        })
+        
+        # Notify admin with document
+        first_name = update.effective_user.first_name or "User"
+        username = update.effective_user.username or "No username"
+        uid = user_data[2] if user_data else "Unknown"
+        
+        admin_notification = f"""🔔 **NEW VERIFICATION REQUEST**
+
+👤 **User:** {first_name} (@{username})
+🆔 **User ID:** `{user_id}`
+💳 **UID:** {uid}
+📄 **Document:** {file_name}
+📊 **Type:** {mime_type}
+
+**Commands:**
+• `/verify {user_id}` - Approve
+• `/reject {user_id} [reason]` - Reject"""
+        
+        await context.bot.send_document(
+            chat_id=ADMIN_USER_ID,
+            document=document.file_id,
+            caption=admin_notification,
+            parse_mode='Markdown'
+        )
+        
+        # Log admin notification
+        db_manager.log_chat_message(user_id, "bot_response", "Document submitted for admin review", {
+            "action": "admin_notification_sent",
+            "admin_id": ADMIN_USER_ID,
+            "file_type": mime_type
+        })
+        
+        # Provide next steps to user
+        next_steps_text = """🎯 **What's Next?**
+
+⏳ **Your verification is being reviewed**
+• Our admin team will check your deposit
+• You'll get notified once approved
+• Usually takes 2-4 hours
+
+🚀 **While you wait:**
+• Join our premium group for trading tips
+• Contact support if you have questions
+
+📞 **Need help?** Contact @{}""".format(BotConfig.ADMIN_USERNAME)
+        
+        keyboard = [
+            [InlineKeyboardButton("🔗 Join Premium Group", callback_data="request_group_access")],
+            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            next_steps_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+        # Log the next steps message
+        db_manager.log_chat_message(user_id, "bot_response", next_steps_text, {
+            "action": "verification_next_steps",
+            "buttons": ["Join Premium Group", "Contact Support"]
+        })
+        
+        # Send enhanced follow-up message with timeline and status tracking
+        follow_up_text = f"""⏰ **Verification Timeline & Status:**
+
+🔄 **Step 1:** Document submitted ✅
+🔄 **Step 2:** Admin review (2-4 hours) ⏳
+🔄 **Step 3:** Approval notification 📧
+🔄 **Step 4:** Premium access granted 🎯
+
+📋 **Current Status:** PENDING REVIEW
+
+🔔 **Important:** You will receive an automatic notification when your verification is:
+✅ **APPROVED** - Instant premium access
+❌ **REJECTED** - Resubmission instructions
+
+⚠️ **Do not submit multiple documents - this may delay your verification!**"""
+        
+        # Add helpful action buttons
+        keyboard = [
+            [InlineKeyboardButton("❓ Verification Help", callback_data="verification_help")],
+            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=follow_up_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+        # Log follow-up message
+        db_manager.log_chat_message(user_id, "bot_response", follow_up_text, {
+            "action": "verification_timeline",
+            "status": "pending_review",
+            "buttons": ["Verification Help", "Contact Support"]
+        })
+        
+        # Update user flow to indicate they're waiting for verification
+        update_user_data(user_id, current_flow='awaiting_verification')
+            
+    else:
+        await update.message.reply_text("Please complete the registration process first by using /start")
+        
+        # Log chat history for invalid document upload
+        db_manager.log_chat_message(user_id, "user_action", "Uploaded document outside of flow", {
+            "action_type": "invalid_document_upload",
+            "current_flow": user_data[3] if user_data else "unknown",
+            "file_name": document.file_name if document.file_name else "unknown"
+        })
+        
+        db_manager.log_chat_message(user_id, "bot_response", "Please complete the registration process first by using /start", {
+            "action": "invalid_document_response"
         })
 
 # Handle upgrade requests
@@ -773,10 +968,73 @@ async def handle_group_access_request(update: Update, context: ContextTypes.DEFA
         "first_name": first_name
     })
     
-    # Provide group link for user to join manually
+    # Check if user is verified before allowing premium access
+    user_data = get_user_data(user_id)
+    is_verified = user_data and user_data[4] == 1  # deposit_confirmed field
+    
+    # Also check verification requests table
+    if not is_verified:
+        if BotConfig.DATABASE_TYPE == 'postgresql':
+            query = '''
+                SELECT status FROM verification_requests 
+                WHERE user_id = %s AND status = 'approved'
+                ORDER BY created_at DESC LIMIT 1
+            '''
+        else:
+            query = '''
+                SELECT status FROM verification_requests 
+                WHERE user_id = ? AND status = 'approved'
+                ORDER BY created_at DESC LIMIT 1
+            '''
+        result = db_manager.execute_query(query, (user_id,), fetch=True)
+        is_verified = result is not None and len(result) > 0
+    
+    if not is_verified:
+        # User is not verified - show verification required message
+        verification_required_text = f"""🔒 **Verification Required**
+
+Hi {first_name}! To access our premium group, you need to complete verification first.
+
+**Current Status:** ❌ Not Verified
+
+📋 **To get verified:**
+1. Register with our broker: {BROKER_LINK[:50]}...
+2. Make a minimum deposit of $20
+3. Upload your deposit screenshot
+4. Wait for admin approval (2-4 hours)
+
+⏳ **Have you already submitted verification?**
+Please wait for admin approval. You'll be notified automatically.
+
+💡 **Need help with verification?**
+Click the button below for detailed guidance."""
+        
+        keyboard = [
+            [InlineKeyboardButton("❓ Verification Help", callback_data="verification_help")],
+            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=verification_required_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+        # Log verification required response
+        db_manager.log_chat_message(user_id, "bot_response", verification_required_text, {
+            "action": "verification_required_for_premium",
+            "verification_status": "not_verified",
+            "buttons": ["Verification Help", "Contact Support"]
+        })
+        
+        return
+    
+    # User is verified - provide group access
     join_text = f"""🎯 **Join OPTRIXTRADES Premium Group**
 
-Hi {first_name}! Click the link below to join our premium trading group:
+Hi {first_name}! ✅ **You are verified!** Click the link below to join our premium trading group:
 
 🔗 **Group Link:** {PREMIUM_GROUP_LINK}
 
@@ -804,6 +1062,7 @@ Hi {first_name}! Click the link below to join our premium trading group:
     db_manager.log_chat_message(user_id, "bot_response", join_text, {
         "action": "premium_group_join_instructions",
         "group_link": PREMIUM_GROUP_LINK,
+        "verification_status": "verified",
         "buttons": ["I've Joined the Group"]
     })
     
@@ -823,21 +1082,24 @@ async def handle_admin_queue_callback(update: Update, context: ContextTypes.DEFA
     pending_requests = get_pending_verifications()
     
     if not pending_requests:
-        await context.bot.send_message(chat_id=query.message.chat_id, text="✅ No pending verification requests.")
-        return
+        queue_text = "✅ No pending verification requests."
+    else:
+        queue_text = "📋 **Pending Verification Queue:**\n\n"
+        
+        for req in pending_requests:
+            req_id, user_id_req, first_name, username, uid, created_at = req
+            username_display = f"@{username}" if username else "No username"
+            queue_text += f"**#{req_id}** - {first_name} ({username_display})\n"
+            queue_text += f"🆔 User ID: `{user_id_req}`\n"
+            queue_text += f"💳 UID: {uid}\n"
+            queue_text += f"⏰ Submitted: {created_at}\n"
+            queue_text += f"**Commands:** `/verify {user_id_req}` | `/reject {user_id_req}`\n\n"
     
-    queue_text = "📋 **Pending Verification Queue:**\n\n"
+    # Add admin dashboard button to preserve menu
+    keyboard = [[InlineKeyboardButton("⬅️ Back to Admin Dashboard", callback_data="admin_dashboard")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
-    for req in pending_requests:
-        req_id, user_id_req, first_name, username, uid, created_at = req
-        username_display = f"@{username}" if username else "No username"
-        queue_text += f"**#{req_id}** - {first_name} ({username_display})\n"
-        queue_text += f"🆔 User ID: `{user_id_req}`\n"
-        queue_text += f"💳 UID: {uid}\n"
-        queue_text += f"⏰ Submitted: {created_at}\n"
-        queue_text += f"**Commands:** `/verify {user_id_req}` | `/reject {user_id_req}`\n\n"
-    
-    await context.bot.send_message(chat_id=query.message.chat_id, text=queue_text, parse_mode='Markdown')
+    await context.bot.send_message(chat_id=query.message.chat_id, text=queue_text, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def handle_admin_activity_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -869,20 +1131,72 @@ async def handle_admin_activity_callback(update: Update, context: ContextTypes.D
     recent_activity = db_manager.execute_query(activity_query, (10,), fetch=True)
     
     if not recent_activity:
-        await context.bot.send_message(chat_id=query.message.chat_id, text="📊 No recent activity found.")
-        return
+        activity_text = "📊 No recent activity found."
+    else:
+        activity_text = "📊 **Recent Activity (Last 10):**\n\n"
+        
+        for activity in recent_activity:
+            user_id_act, first_name, msg_type, msg_content, created_at = activity
+            # Truncate long messages
+            content_preview = msg_content[:50] + "..." if len(msg_content) > 50 else msg_content
+            activity_text += f"👤 {first_name} (`{user_id_act}`)\n"
+            activity_text += f"📝 {msg_type}: {content_preview}\n"
+            activity_text += f"⏰ {created_at}\n\n"
     
-    activity_text = "📊 **Recent Activity (Last 10):**\n\n"
+    # Add admin dashboard button to preserve menu
+    keyboard = [[InlineKeyboardButton("⬅️ Back to Admin Dashboard", callback_data="admin_dashboard")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
-    for activity in recent_activity:
-        user_id_act, first_name, msg_type, msg_content, created_at = activity
-        # Truncate long messages
-        content_preview = msg_content[:50] + "..." if len(msg_content) > 50 else msg_content
-        activity_text += f"👤 {first_name} (`{user_id_act}`)\n"
-        activity_text += f"📝 {msg_type}: {content_preview}\n"
-        activity_text += f"⏰ {created_at}\n\n"
+    await context.bot.send_message(chat_id=query.message.chat_id, text=activity_text, reply_markup=reply_markup, parse_mode='Markdown')
+
+# New handler for verification help
+async def handle_verification_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
     
-    await context.bot.send_message(chat_id=query.message.chat_id, text=activity_text, parse_mode='Markdown')
+    user_id = query.from_user.id
+    log_interaction(user_id, "verification_help")
+    
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_action", "Requested verification help", {
+        "action_type": "button_click",
+        "button_data": "verification_help"
+    })
+    
+    help_text = f"""❓ **Verification Help & FAQ**
+
+**What happens during verification?**
+• Our admin team reviews your deposit screenshot
+• We verify the transaction details and amount
+• Approval typically takes 2-24 hours
+
+**Common reasons for rejection:**
+❌ Screenshot is unclear or blurry
+❌ Deposit amount is less than $20 minimum
+❌ Screenshot doesn't show transaction confirmation
+❌ Wrong broker platform used
+
+**Tips for faster approval:**
+✅ Use clear, high-quality screenshots
+✅ Ensure all transaction details are visible
+✅ Use the correct broker: {BROKER_LINK[:50]}...
+✅ Wait for one verification before resubmitting
+
+**Need immediate help?**
+Contact: @{ADMIN_USERNAME}
+
+**Your current status:** PENDING REVIEW"""
+    
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=help_text,
+        parse_mode='Markdown'
+    )
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", help_text, {
+        "action": "verification_help_response"
+    })
 
 # New handler for contact support
 async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -990,6 +1304,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await help_deposit(update, context)
     elif data == "contact_support":
         await handle_contact_support(update, context)
+    elif data == "verification_help":
+        await handle_verification_help(update, context)
     elif data == "not_interested":
         await handle_not_interested(update, context)
     else:
@@ -1015,15 +1331,19 @@ async def admin_verify_command(update: Update, context: ContextTypes.DEFAULT_TYP
         update_user_data(target_user_id, deposit_confirmed=True, current_flow='completed')
         
         # Update verification request status
-        conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''
-            UPDATE verification_requests 
-            SET status = 'approved', admin_response = 'Manually approved by admin', updated_at = ?
-            WHERE user_id = ? AND status = 'pending'
-        ''', (datetime.now(), target_user_id))
-        conn.commit()
-        conn.close()
+        if BotConfig.DATABASE_TYPE == 'postgresql':
+            query = '''
+                UPDATE verification_requests 
+                SET status = 'approved', admin_response = 'Manually approved by admin', updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = %s AND status = 'pending'
+            '''
+        else:
+            query = '''
+                UPDATE verification_requests 
+                SET status = 'approved', admin_response = 'Manually approved by admin', updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND status = 'pending'
+            '''
+        db_manager.execute_query(query, (target_user_id,))
         
         # Get user data for notification
         user_data = get_user_data(target_user_id)
@@ -1096,37 +1416,60 @@ async def admin_reject_command(update: Update, context: ContextTypes.DEFAULT_TYP
         reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Verification rejected by admin"
         
         # Update verification request status
-        conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''
-            UPDATE verification_requests 
-            SET status = 'rejected', admin_response = ?, updated_at = ?
-            WHERE user_id = ? AND status = 'pending'
-        ''', (reason, datetime.now(), target_user_id))
-        conn.commit()
-        conn.close()
+        if BotConfig.DATABASE_TYPE == 'postgresql':
+            query = '''
+                UPDATE verification_requests 
+                SET status = 'rejected', admin_response = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = %s AND status = 'pending'
+            '''
+        else:
+            query = '''
+                UPDATE verification_requests 
+                SET status = 'rejected', admin_response = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND status = 'pending'
+            '''
+        db_manager.execute_query(query, (reason, target_user_id))
         
         # Get user data for notification
         user_data = get_user_data(target_user_id)
         if user_data:
-            # Notify user of rejection
+            # Notify user of rejection with helpful action buttons
             rejection_message = f"""❌ **Verification Rejected**
 
 Unfortunately, your verification request has been rejected.
 
 **Reason:** {reason}
 
-📞 **Need Help?**
-Please contact our support team for assistance: @{ADMIN_USERNAME}
+📋 **Next Steps:**
+• Review the rejection reason above
+• Check our verification help guide
+• Resubmit with correct information
+• Contact support if you need assistance
 
-You can resubmit your verification with the correct information."""
+💡 **Tip:** Most rejections are due to unclear screenshots or insufficient deposit amounts."""
+            
+            # Create action buttons for rejected user
+            keyboard = [
+                [InlineKeyboardButton("❓ Verification Help", callback_data="verification_help")],
+                [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
             
             try:
                 await context.bot.send_message(
                     chat_id=target_user_id,
                     text=rejection_message,
+                    reply_markup=reply_markup,
                     parse_mode='Markdown'
                 )
+                
+                # Log the rejection notification
+                db_manager.log_chat_message(target_user_id, "bot_response", rejection_message, {
+                    "action": "verification_rejected",
+                    "rejected_by_admin": user_id,
+                    "reason": reason,
+                    "buttons": ["Verification Help", "Contact Support"]
+                })
                 await update.message.reply_text(f"❌ User {target_user_id} ({user_data[2]}) verification rejected and notified.")
             except Exception as e:
                 await update.message.reply_text(f"❌ User {target_user_id} rejected, but notification failed: {e}")
@@ -1185,15 +1528,20 @@ async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_
         return
     
     # Create broadcast record
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO broadcast_messages (message_text, total_users)
-        VALUES (?, ?)
-    ''', (message_text, len(users)))
-    broadcast_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = '''
+            INSERT INTO broadcast_messages (message_text, total_users)
+            VALUES (%s, %s) RETURNING id
+        '''
+        result = db_manager.execute_query(query, (message_text, len(users)), fetch=True)
+        broadcast_id = result[0]['id'] if result else None
+    else:
+        query = '''
+            INSERT INTO broadcast_messages (message_text, total_users)
+            VALUES (?, ?)
+        '''
+        db_manager.execute_query(query, (message_text, len(users)))
+        broadcast_id = None  # SQLite lastrowid not easily accessible through db_manager
     
     successful_sends = 0
     failed_sends = 0
@@ -1219,15 +1567,20 @@ async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_
             logger.error(f"Failed to send broadcast to {user_id_target}: {e}")
     
     # Update broadcast record
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE broadcast_messages 
-        SET successful_sends = ?, failed_sends = ?, completed_at = ?
-        WHERE id = ?
-    ''', (successful_sends, failed_sends, datetime.now(), broadcast_id))
-    conn.commit()
-    conn.close()
+    if broadcast_id:  # Only update if we have a valid broadcast_id
+        if BotConfig.DATABASE_TYPE == 'postgresql':
+            query = '''
+                UPDATE broadcast_messages 
+                SET sent_count = %s, failed_count = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            '''
+        else:
+            query = '''
+                UPDATE broadcast_messages 
+                SET sent_count = ?, failed_count = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            '''
+        db_manager.execute_query(query, (successful_sends, failed_sends, broadcast_id))
     
     # Send delivery confirmation to admin
     confirmation_text = f"""✅ **Broadcast Complete!**
@@ -1498,8 +1851,183 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode='Markdown'
         )
     
+    elif callback_data == "admin_settings":
+        settings_text = f"""⚙️ **Bot Settings & Configuration**
+
+🔧 **Current Configuration:**
+• Bot Token: {BOT_TOKEN[:10]}...
+• Admin ID: {ADMIN_USER_ID}
+• Premium Channel: {PREMIUM_CHANNEL_ID}
+• Premium Group: {PREMIUM_GROUP_LINK[:30]}...
+• Broker Link: {BROKER_LINK[:30]}...
+
+📊 **Database Status:** ✅ Connected
+🤖 **Bot Status:** ✅ Running
+
+⚠️ **Note:** Configuration changes require bot restart.
+
+**Available Commands:**
+• `/broadcast <message>` - Send message to all users
+• `/verify <user_id>` - Approve verification
+• `/reject <user_id> [reason]` - Reject verification"""
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Restart Bot", callback_data="admin_restart")],
+            [InlineKeyboardButton("⬅️ Back to Dashboard", callback_data="admin_dashboard")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=settings_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+    
+    elif callback_data == "admin_search":
+        search_text = """🔍 **Search User**
+
+To search for a user, use one of these commands:
+
+**Search by User ID:**
+`/chathistory <user_id>`
+
+**Search by Username:**
+Use the format: `/searchuser @username`
+
+**Examples:**
+• `/chathistory 123456789` - View chat history
+• `/searchuser @john_doe` - Search by username
+
+📋 **What you can find:**
+• User registration details
+• Verification status
+• Chat history
+• Recent activity
+• Deposit information"""
+        
+        keyboard = [
+            [InlineKeyboardButton("👥 View All Users", callback_data="admin_users")],
+            [InlineKeyboardButton("📊 User Activity", callback_data="admin_activity")],
+            [InlineKeyboardButton("⬅️ Back to Dashboard", callback_data="admin_dashboard")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=search_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+    
+    elif callback_data == "admin_restart":
+        restart_text = """🔄 **Bot Restart**
+
+⚠️ **Warning:** Restarting the bot will:
+• Stop all current operations
+• Disconnect all users temporarily
+• Reload configuration
+• Clear temporary data
+
+🔧 **To restart the bot:**
+1. Stop the current process
+2. Run the bot script again
+3. Check logs for successful startup
+
+📝 **Note:** This action should be performed manually from the server console."""
+        
+        keyboard = [
+            [InlineKeyboardButton("⬅️ Back to Dashboard", callback_data="admin_dashboard")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=restart_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+    
     else:
-        await context.bot.send_message(chat_id=query.message.chat_id, text="⚠️ This feature is coming soon!")
+        await context.bot.send_message(chat_id=query.message.chat_id, text="⚠️ Unknown admin command!")
+
+# Admin search user command
+async def admin_search_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ You don't have permission to use this command.")
+        return
+    
+    if not context.args:
+        await update.message.reply_text(
+            "🔍 **Search User Usage:**\n\n"
+            "**Search by username:**\n"
+            "`/searchuser @username`\n\n"
+            "**Search by user ID:**\n"
+            "`/searchuser 123456789`\n\n"
+            "**Examples:**\n"
+            "• `/searchuser @john_doe`\n"
+            "• `/searchuser 987654321`",
+            parse_mode='Markdown'
+        )
+        return
+    
+    search_term = context.args[0]
+    
+    # Remove @ if present for username search
+    if search_term.startswith('@'):
+        username = search_term[1:]
+        # Search by username
+        user_data = db_manager.search_user_by_username(username)
+        if not user_data:
+            await update.message.reply_text(f"❌ No user found with username: @{username}")
+            return
+    else:
+        # Try to search by user ID
+        try:
+            search_user_id = int(search_term)
+            user_data = get_user_data(search_user_id)
+            if not user_data:
+                await update.message.reply_text(f"❌ No user found with ID: {search_user_id}")
+                return
+        except ValueError:
+            await update.message.reply_text("❌ Invalid user ID format. Please use numbers only.")
+            return
+    
+    # Extract user information
+    found_user_id, first_name, uid, current_flow, username_db, created_at = user_data
+    username_display = f"@{username_db}" if username_db else "No username"
+    
+    # Check verification status
+    verification_status = "❌ Not Verified"
+    pending_verification = db_manager.get_verification_request(found_user_id)
+    if pending_verification:
+        verification_status = "⏳ Pending Verification"
+    elif db_manager.is_user_verified(found_user_id):
+        verification_status = "✅ Verified"
+    
+    # Get recent activity count
+    recent_activity = db_manager.get_recent_activity_for_user(found_user_id, 5)
+    activity_count = len(recent_activity) if recent_activity else 0
+    
+    user_info = f"""👤 **User Information**
+
+🆔 **User ID:** `{found_user_id}`
+👤 **Name:** {first_name}
+📱 **Username:** {username_display}
+💳 **UID:** {uid if uid else 'Not provided'}
+📊 **Status:** {verification_status}
+🔄 **Current Flow:** {current_flow if current_flow else 'None'}
+📅 **Joined:** {created_at if created_at else 'Unknown'}
+📈 **Recent Activity:** {activity_count} messages
+
+**Available Actions:**
+• `/verify {found_user_id}` - Approve verification
+• `/reject {found_user_id} [reason]` - Reject verification
+• `/chathistory {found_user_id}` - View chat history"""
+    
+    await update.message.reply_text(user_info, parse_mode='Markdown')
 
 # Error handler
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -1523,11 +2051,13 @@ def main():
     application.add_handler(CommandHandler("broadcast", admin_broadcast_command))
     application.add_handler(CommandHandler("chathistory", admin_chat_history_command))
     application.add_handler(CommandHandler("activity", admin_recent_activity_command))
+    application.add_handler(CommandHandler("searchuser", admin_search_user_command))
     
     # Add callback and message handlers
     application.add_handler(CallbackQueryHandler(button_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    application.add_handler(MessageHandler(filters.Document.PDF | filters.Document.IMAGE, handle_document))
     application.add_error_handler(error_handler)
     
     # Start the bot

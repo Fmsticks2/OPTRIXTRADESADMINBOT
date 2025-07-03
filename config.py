@@ -17,16 +17,16 @@ class BotConfig:
     
     # Database
     DATABASE_PATH: str = os.getenv('DATABASE_PATH', 'trading_bot.db')
-    SQLITE_DATABASE_PATH: str = os.path.join(os.path.dirname(__file__), os.getenv('DATABASE_PATH', 'trading_bot.db'))
-    DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'sqlite')
+    SQLITE_DATABASE_PATH: str = os.path.join(os.path.dirname(__file__), os.getenv('SQLITE_DATABASE_PATH', 'trading_bot.db'))
+    DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'postgresql')
     DATABASE_URL: str = os.getenv('DATABASE_URL', '')
     
     # PostgreSQL specific settings
-    POSTGRES_HOST: str = os.getenv('POSTGRES_HOST', 'localhost')
-    POSTGRES_PORT: int = int(os.getenv('POSTGRES_PORT', '5432'))
-    POSTGRES_DB: str = os.getenv('POSTGRES_DB', 'optrixtrades')
-    POSTGRES_USER: str = os.getenv('POSTGRES_USER', 'optrixtrades_user')
-    POSTGRES_PASSWORD: str = os.getenv('POSTGRES_PASSWORD', '')
+    POSTGRES_HOST: str = os.getenv('PGHOST', os.getenv('POSTGRES_HOST', 'localhost'))
+    POSTGRES_PORT: int = int(os.getenv('PGPORT', os.getenv('POSTGRES_PORT', '5432')))
+    POSTGRES_DB: str = os.getenv('PGDATABASE', os.getenv('POSTGRES_DB', 'railway'))
+    POSTGRES_USER: str = os.getenv('PGUSER', os.getenv('POSTGRES_USER', 'postgres'))
+    POSTGRES_PASSWORD: str = os.getenv('PGPASSWORD', os.getenv('POSTGRES_PASSWORD', ''))
     
     # Auto-Verification
     AUTO_VERIFY_ENABLED: bool = os.getenv('AUTO_VERIFY_ENABLED', 'true').lower() == 'true'
