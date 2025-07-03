@@ -172,6 +172,40 @@ def get_all_active_users():
     result = db_manager.execute_query(query, (True,), fetch=True)
     return [(user['user_id'], user['first_name']) for user in result] if result else []
 
+# Command to get user ID for admin setup
+async def get_my_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    user_id = user.id
+    username = user.username or "No username"
+    first_name = user.first_name or "Unknown"
+    
+    id_info_text = f"""🆔 **Your Telegram Information:**
+
+👤 **Name:** {first_name}
+📱 **Username:** @{username}
+🔢 **User ID:** `{user_id}`
+
+**To set yourself as admin:**
+1. Copy your User ID: `{user_id}`
+2. Update the .env file: `ADMIN_USER_ID={user_id}`
+3. Restart the bot
+
+**Current Admin Status:** {'✅ You are admin' if is_admin(user_id) else '❌ Not admin'}"""
+    
+    await update.message.reply_text(id_info_text, parse_mode='Markdown')
+    
+    # Log the ID request
+    db_manager.log_chat_message(user_id, "command", "/getmyid", {
+        "username": username,
+        "first_name": first_name,
+        "current_admin_status": is_admin(user_id)
+    })
+    
+    db_manager.log_chat_message(user_id, "bot_response", id_info_text, {
+        "action": "user_id_info",
+        "user_id_revealed": user_id
+    })
+
 # Flow 1: Welcome & Hook
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -425,6 +459,30 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_data = get_user_data(user_id)
     
+    # Check if user is admin first
+    if is_admin(user_id):
+        admin_photo_text = f"""🔧 **Admin Photo Upload Detected**
+
+📸 **Photo received from admin:** {update.effective_user.first_name}
+🆔 **Admin User ID:** {user_id}
+⏰ **Time:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+**Admin Actions Available:**
+• Use /verify <user_id> to approve users
+• Use /queue to see pending verifications
+• Use /activity to see recent activity
+
+**Note:** This photo was uploaded by an admin account."""
+        
+        await update.message.reply_text(admin_photo_text, parse_mode='Markdown')
+        
+        # Log admin photo upload
+        db_manager.log_chat_message(user_id, "admin_action", "Admin uploaded photo", {
+            "action_type": "admin_photo_upload",
+            "file_id": update.message.photo[-1].file_id
+        })
+        return
+    
     if not user_data:
         await update.message.reply_text("Please start with /start first.")
         return
@@ -522,6 +580,27 @@ Use /verify {user_id} to approve or /reject {user_id} to reject."""
         db_manager.log_chat_message(user_id, "bot_response", next_steps_text, {
             "action": "verification_next_steps",
             "buttons": ["Join Premium Group", "Contact Support"]
+        })
+        
+        # Send additional follow-up message with timeline
+        follow_up_text = """⏰ **Verification Timeline:**
+
+🔄 **Step 1:** Screenshot submitted ✅
+🔄 **Step 2:** Admin review (2-4 hours) ⏳
+🔄 **Step 3:** Approval notification 📧
+🔄 **Step 4:** Premium access granted 🎯
+
+**You'll receive an automatic notification once approved!**"""
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=follow_up_text,
+            parse_mode='Markdown'
+        )
+        
+        # Log follow-up message
+        db_manager.log_chat_message(user_id, "bot_response", follow_up_text, {
+            "action": "verification_timeline"
         })
             
     else:
@@ -947,7 +1026,7 @@ async def admin_verify_command(update: Update, context: ContextTypes.DEFAULT_TYP
         # Get user data for notification
         user_data = get_user_data(target_user_id)
         if user_data:
-            # Notify user of approval
+            # Notify user of approval with action buttons
             success_message = f"""🎉 **Verification Approved!**
 
 Congratulations! Your deposit has been verified by our admin team.
@@ -965,12 +1044,28 @@ You now have access to:
 
 Your trading journey starts now! 🚀"""
             
+            # Create action buttons for approved user
+            keyboard = [
+                [InlineKeyboardButton("🔗 Join Premium Group", callback_data="request_group_access")],
+                [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")],
+                [InlineKeyboardButton("🎯 Start Trading", callback_data="get_vip_access")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
             try:
                 await context.bot.send_message(
                     chat_id=target_user_id,
                     text=success_message,
+                    reply_markup=reply_markup,
                     parse_mode='Markdown'
                 )
+                
+                # Log the approval notification
+                db_manager.log_chat_message(target_user_id, "bot_response", success_message, {
+                    "action": "verification_approved",
+                    "approved_by_admin": user_id,
+                    "buttons": ["Join Premium Group", "Contact Support", "Start Trading"]
+                })
                 await update.message.reply_text(f"✅ User {target_user_id} ({user_data[2]}) has been verified and notified.")
             except Exception as e:
                 await update.message.reply_text(f"✅ User {target_user_id} verified, but notification failed: {e}")
@@ -1263,6 +1358,7 @@ def main():
     
     # Add user command handlers
     application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("getmyid", get_my_id_command))
     
     # Add admin command handlers
     application.add_handler(CommandHandler("verify", admin_verify_command))
@@ -1285,6 +1381,9 @@ def main():
     print(f"📢 Premium Channel: {PREMIUM_CHANNEL_ID}")
     print(f"🔗 Premium Group: {PREMIUM_GROUP_LINK}")
     print(f"👨‍💼 Admin User ID: {ADMIN_USER_ID}")
+    print("\n📋 Available Commands:")
+    print("• /start - Start the bot")
+    print("• /getmyid - Get your Telegram user ID (for admin setup)")
     print("\n📋 Available Admin Commands:")
     print("• /verify <user_id> - Approve user verification")
     print("• /reject <user_id> [reason] - Reject user verification")
