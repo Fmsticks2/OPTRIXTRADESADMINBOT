@@ -11,6 +11,7 @@ from telegram.error import TelegramError
 # Add parent directory to path to import config
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import BotConfig
+from database.db_manager import db_manager
 
 # Configure logging
 logging.basicConfig(
@@ -30,111 +31,72 @@ ADMIN_USER_ID = int(BotConfig.ADMIN_USER_ID) if BotConfig.ADMIN_USER_ID.isdigit(
 
 # Database setup
 def init_database():
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
-            username TEXT,
-            first_name TEXT,
-            current_flow TEXT DEFAULT 'welcome',
-            registration_status TEXT DEFAULT 'not_started',
-            deposit_confirmed BOOLEAN DEFAULT FALSE,
-            uid TEXT,
-            join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_interaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            follow_up_day INTEGER DEFAULT 0,
-            is_active BOOLEAN DEFAULT TRUE
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_interactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            interaction_type TEXT,
-            interaction_data TEXT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (user_id)
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS verification_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            uid TEXT,
-            screenshot_file_id TEXT,
-            status TEXT DEFAULT 'pending',
-            admin_response TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (user_id)
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS broadcast_messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            message_text TEXT,
-            total_users INTEGER,
-            successful_sends INTEGER DEFAULT 0,
-            failed_sends INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            completed_at TIMESTAMP
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
+    """Initialize database using the database manager"""
+    db_manager.init_database()
+
+def is_admin(user_id):
+    """Check if user is admin"""
+    return user_id == BotConfig.ADMIN_USER_ID
 
 def get_user_data(user_id):
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
-    user = cursor.fetchone()
-    conn.close()
-    return user
+    """Get user data from database"""
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = 'SELECT * FROM users WHERE user_id = %s'
+    else:
+        query = 'SELECT * FROM users WHERE user_id = ?'
+    
+    result = db_manager.execute_query(query, (user_id,), fetch=True)
+    return result[0] if result else None
 
 def update_user_data(user_id, **kwargs):
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
-    
-    # Update last_interaction
-    kwargs['last_interaction'] = datetime.now()
+    """Update user data in database"""
+    if not kwargs:
+        return
     
     # Build dynamic update query
-    set_clause = ', '.join([f"{key} = ?" for key in kwargs.keys()])
+    set_clause = ', '.join([f"{key} = {'%s' if BotConfig.DATABASE_TYPE == 'postgresql' else '?'}" for key in kwargs.keys()])
     values = list(kwargs.values()) + [user_id]
     
-    cursor.execute(f'UPDATE users SET {set_clause} WHERE user_id = ?', values)
-    conn.commit()
-    conn.close()
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = f"UPDATE users SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE user_id = %s"
+    else:
+        query = f"UPDATE users SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?"
+    
+    db_manager.execute_query(query, values)
 
 def create_user(user_id, username, first_name):
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
+    """Create new user in database"""
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = '''
+            INSERT INTO users (user_id, username, first_name, created_at, updated_at)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            first_name = EXCLUDED.first_name,
+            updated_at = CURRENT_TIMESTAMP
+        '''
+    else:
+        query = '''
+            INSERT OR REPLACE INTO users (user_id, username, first_name, created_at, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        '''
     
-    cursor.execute('''
-        INSERT OR REPLACE INTO users (user_id, username, first_name, join_date, last_interaction)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (user_id, username, first_name, datetime.now(), datetime.now()))
-    
-    conn.commit()
-    conn.close()
+    db_manager.execute_query(query, (user_id, username, first_name))
 
 def log_interaction(user_id, interaction_type, interaction_data=""):
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
+    """Log user interaction"""
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = '''
+            INSERT INTO interactions (user_id, interaction_type, interaction_data)
+            VALUES (%s, %s, %s)
+        '''
+    else:
+        query = '''
+            INSERT INTO interactions (user_id, interaction_type, interaction_data)
+            VALUES (?, ?, ?)
+        '''
     
-    cursor.execute('''
-        INSERT INTO user_interactions (user_id, interaction_type, interaction_data)
-        VALUES (?, ?, ?)
-    ''', (user_id, interaction_type, interaction_data))
-    
-    conn.commit()
-    conn.close()
+    db_manager.execute_query(query, (user_id, interaction_type, interaction_data))
 
 def is_admin(user_id):
     """Check if user is admin"""
@@ -142,61 +104,75 @@ def is_admin(user_id):
 
 def create_verification_request(user_id, uid, screenshot_file_id):
     """Create a new verification request"""
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        INSERT INTO verification_requests (user_id, uid, screenshot_file_id)
-        VALUES (?, ?, ?)
-    ''', (user_id, uid, screenshot_file_id))
-    
-    conn.commit()
-    conn.close()
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = '''
+            INSERT INTO verification_requests (user_id, uid, screenshot_file_id)
+            VALUES (%s, %s, %s) RETURNING id
+        '''
+        result = db_manager.execute_query(query, (user_id, uid, screenshot_file_id), fetch=True)
+        return result[0]['id'] if result else None
+    else:
+        query = '''
+            INSERT INTO verification_requests (user_id, uid, screenshot_file_id)
+            VALUES (?, ?, ?)
+        '''
+        db_manager.execute_query(query, (user_id, uid, screenshot_file_id))
+        # For SQLite, we'd need to get the last insert rowid differently
+        return None
 
 def get_pending_verifications():
     """Get all pending verification requests"""
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = '''
+            SELECT vr.id, vr.user_id, u.first_name, u.username, vr.uid, vr.created_at
+            FROM verification_requests vr
+            JOIN users u ON vr.user_id = u.user_id
+            WHERE vr.status = %s
+            ORDER BY vr.created_at ASC
+        '''
+    else:
+        query = '''
+            SELECT vr.id, vr.user_id, u.first_name, u.username, vr.uid, vr.created_at
+            FROM verification_requests vr
+            JOIN users u ON vr.user_id = u.user_id
+            WHERE vr.status = ?
+            ORDER BY vr.created_at ASC
+        '''
     
-    cursor.execute('''
-        SELECT vr.id, vr.user_id, u.first_name, u.username, vr.uid, vr.created_at
-        FROM verification_requests vr
-        JOIN users u ON vr.user_id = u.user_id
-        WHERE vr.status = 'pending'
-        ORDER BY vr.created_at ASC
-    ''')
-    
-    requests = cursor.fetchall()
-    conn.close()
-    return requests
+    return db_manager.execute_query(query, ('pending',), fetch=True)
 
 def update_verification_status(request_id, status, admin_response=""):
     """Update verification request status"""
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = '''
+            UPDATE verification_requests 
+            SET status = %s, admin_response = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        '''
+    else:
+        query = '''
+            UPDATE verification_requests 
+            SET status = ?, admin_response = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        '''
     
-    cursor.execute('''
-        UPDATE verification_requests 
-        SET status = ?, admin_response = ?, updated_at = ?
-        WHERE id = ?
-    ''', (status, admin_response, datetime.now(), request_id))
-    
-    conn.commit()
-    conn.close()
+    db_manager.execute_query(query, (status, admin_response, request_id))
 
 def get_all_active_users():
     """Get all active users for broadcasting"""
-    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
-    cursor = conn.cursor()
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = '''
+            SELECT user_id, first_name FROM users 
+            WHERE is_active = %s
+        '''
+    else:
+        query = '''
+            SELECT user_id, first_name FROM users 
+            WHERE is_active = ?
+        '''
     
-    cursor.execute('''
-        SELECT user_id, first_name FROM users 
-        WHERE is_active = TRUE
-    ''')
-    
-    users = cursor.fetchall()
-    conn.close()
-    return users
+    result = db_manager.execute_query(query, (True,), fetch=True)
+    return [(user['user_id'], user['first_name']) for user in result] if result else []
 
 # Flow 1: Welcome & Hook
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -208,6 +184,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Create or update user
     create_user(user_id, username, first_name)
     log_interaction(user_id, "start_command")
+    
+    # Log chat history
+    db_manager.log_chat_message(user_id, "command", "/start", {
+        "username": username,
+        "first_name": first_name
+    })
     
     welcome_text = f"""Heyy {first_name}! 👋
 
@@ -232,6 +214,11 @@ Choose your next step:"""
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", welcome_text, {
+        "buttons": ["Request Premium Group Access", "Get Free VIP Access"]
+    })
 
 # Flow 2: Activation Instructions
 async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -304,23 +291,58 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
 # Handle text messages (UID, UPGRADE, etc.)
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    text = update.message.text.upper()
+    message_text = update.message.text.strip()
+    text = message_text.upper()
     
     user_data = get_user_data(user_id)
     if not user_data:
         await start_command(update, context)
         return
     
-    log_interaction(user_id, "text_message", update.message.text)
+    log_interaction(user_id, "text_message", message_text)
     
-    if text == "UPGRADE":
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_message", message_text)
+    
+    # Handle UID submission
+    if text.startswith("UID:") or message_text.isdigit():
+        uid = message_text.replace("UID:", "").strip()
+        
+        # Update user with UID
+        update_user_data(user_id, uid=uid)
+        
+        response_text = f"✅ UID received: {uid}\n\n📸 Now please send a screenshot of your deposit to complete verification."
+        await update.message.reply_text(response_text)
+        
+        # Log bot response
+        db_manager.log_chat_message(user_id, "bot_response", response_text, {"uid": uid})
+        
+    elif text == "UPGRADE":
         await handle_upgrade_request(update, context)
     elif user_data[3] == 'confirmation':  # current_flow is confirmation
         # Assume this is a UID
-        update_user_data(user_id, uid=update.message.text)
-        await update.message.reply_text(
-            "UID received! Now please send your deposit screenshot."
-        )
+        update_user_data(user_id, uid=message_text)
+        response_text = "UID received! Now please send your deposit screenshot."
+        await update.message.reply_text(response_text)
+        
+        # Log bot response
+        db_manager.log_chat_message(user_id, "bot_response", response_text, {"uid": message_text})
+    else:
+        # Default response for unrecognized messages
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        keyboard = [
+            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")],
+            [InlineKeyboardButton("❓ Get Help", callback_data="help_signup")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        response_text = "I didn't understand that. How can I help you?"
+        await update.message.reply_text(response_text, reply_markup=reply_markup)
+        
+        # Log bot response
+        db_manager.log_chat_message(user_id, "bot_response", response_text, {
+            "buttons": ["Contact Support", "Get Help"]
+        })
 
 # Handle photo messages (deposit screenshots)
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -471,8 +493,16 @@ async def handle_group_access_request(update: Update, context: ContextTypes.DEFA
     
     user_id = query.from_user.id
     first_name = query.from_user.first_name or "there"
+    username = query.from_user.username or ""
     
     log_interaction(user_id, "group_access_request")
+    
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_action", "Requested premium group access", {
+        "action_type": "group_access_request",
+        "username": username,
+        "first_name": first_name
+    })
     
     # Simulate automatic addition to group (in real implementation, you'd use bot.add_chat_member)
     success_text = f"""🎉 **Welcome to OPTRIXTRADES Premium Group!**
@@ -494,6 +524,13 @@ Hi {first_name}! You've been successfully added to our premium trading group.
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.edit_message_text(success_text, reply_markup=reply_markup, parse_mode='Markdown')
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", success_text, {
+        "action": "premium_group_welcome",
+        "group_link": PREMIUM_GROUP_LINK,
+        "buttons": ["Start Trading Journey"]
+    })
     
     # Update user status
     update_user_data(user_id, current_flow='group_member')
@@ -717,6 +754,11 @@ async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_
                 parse_mode='Markdown'
             )
             successful_sends += 1
+            # Log broadcast message to each user's chat history
+            db_manager.log_chat_message(user_id_target, "broadcast", message_text, {
+                "sent_by_admin": True,
+                "admin_id": user_id
+            })
         except Exception as e:
             failed_sends += 1
             logger.error(f"Failed to send broadcast to {user_id_target}: {e}")
@@ -745,6 +787,111 @@ async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_
     
     await status_message.edit_text(confirmation_text, parse_mode='Markdown')
 
+async def admin_chat_history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to view chat history for a specific user"""
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ You don't have permission to use this command.")
+        return
+    
+    # Get target user ID
+    if not context.args:
+        await update.message.reply_text(
+            "Usage: /chathistory <user_id> [limit]\n\n"
+            "Example: /chathistory 123456789 50"
+        )
+        return
+    
+    try:
+        target_user_id = int(context.args[0])
+        limit = int(context.args[1]) if len(context.args) > 1 else 20
+    except ValueError:
+        await update.message.reply_text("❌ Invalid user ID or limit. Please use numbers only.")
+        return
+    
+    # Get chat history
+    chat_history = db_manager.get_chat_history(target_user_id, limit)
+    
+    if not chat_history:
+        await update.message.reply_text(f"No chat history found for user {target_user_id}.")
+        return
+    
+    # Format chat history
+    history_text = f"📋 Chat History for User {target_user_id}\n"
+    history_text += f"📊 Showing last {len(chat_history)} messages\n\n"
+    
+    for entry in chat_history:
+        timestamp = entry[2]  # created_at
+        message_type = entry[3]  # message_type
+        content = entry[4]  # content
+        
+        if message_type == "user_message":
+            history_text += f"👤 {timestamp}: {content}\n"
+        elif message_type == "bot_response":
+            history_text += f"🤖 {timestamp}: {content}\n"
+        elif message_type == "command":
+            history_text += f"⚡ {timestamp}: {content}\n"
+        elif message_type == "user_action":
+            history_text += f"🔘 {timestamp}: {content}\n"
+        elif message_type == "broadcast":
+            history_text += f"📢 {timestamp}: {content}\n"
+        else:
+            history_text += f"📝 {timestamp}: {content}\n"
+        
+        history_text += "\n"
+    
+    # Split long messages
+    if len(history_text) > 4000:
+        chunks = [history_text[i:i+4000] for i in range(0, len(history_text), 4000)]
+        for i, chunk in enumerate(chunks):
+            if i == 0:
+                await update.message.reply_text(chunk)
+            else:
+                await update.message.reply_text(f"📋 Chat History (Part {i+1})\n\n{chunk}")
+    else:
+        await update.message.reply_text(history_text)
+
+async def admin_recent_activity_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to view recent activity across all users"""
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ You don't have permission to use this command.")
+        return
+    
+    limit = int(context.args[0]) if context.args else 30
+    
+    # Get recent activity
+    recent_activity = db_manager.get_recent_activity(limit)
+    
+    if not recent_activity:
+        await update.message.reply_text("No recent activity found.")
+        return
+    
+    # Format recent activity
+    activity_text = f"📊 Recent Activity (Last {len(recent_activity)} messages)\n\n"
+    
+    for entry in recent_activity:
+        user_id_entry = entry[1]  # user_id
+        timestamp = entry[2]  # created_at
+        message_type = entry[3]  # message_type
+        content = entry[4][:50] + "..." if len(entry[4]) > 50 else entry[4]  # truncated content
+        
+        activity_text += f"👤 User {user_id_entry} | {timestamp}\n"
+        activity_text += f"📝 {message_type}: {content}\n\n"
+    
+    # Split long messages
+    if len(activity_text) > 4000:
+        chunks = [activity_text[i:i+4000] for i in range(0, len(activity_text), 4000)]
+        for i, chunk in enumerate(chunks):
+            if i == 0:
+                await update.message.reply_text(chunk)
+            else:
+                await update.message.reply_text(f"📊 Recent Activity (Part {i+1})\n\n{chunk}")
+    else:
+        await update.message.reply_text(activity_text)
+
 # Error handler
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Exception while handling an update: {context.error}")
@@ -764,6 +911,8 @@ def main():
     application.add_handler(CommandHandler("reject", admin_reject_command))
     application.add_handler(CommandHandler("queue", admin_queue_command))
     application.add_handler(CommandHandler("broadcast", admin_broadcast_command))
+    application.add_handler(CommandHandler("chathistory", admin_chat_history_command))
+    application.add_handler(CommandHandler("activity", admin_recent_activity_command))
     
     # Add callback and message handlers
     application.add_handler(CallbackQueryHandler(button_callback))
@@ -783,6 +932,8 @@ def main():
     print("• /reject <user_id> [reason] - Reject user verification")
     print("• /queue - View pending verifications")
     print("• /broadcast <message> - Send message to all users")
+    print("• /chathistory <user_id> [limit] - View chat history for user")
+    print("• /activity [limit] - View recent activity across all users")
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
