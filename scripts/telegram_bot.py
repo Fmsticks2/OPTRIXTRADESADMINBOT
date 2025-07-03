@@ -595,10 +595,11 @@ Use /verify {user_id} to approve or /reject {user_id} to reject."""
 
 ⚠️ **Do not submit multiple screenshots - this may delay your verification!**"""
         
-        # Add helpful action buttons
+        # Add helpful action buttons including main menu
         keyboard = [
             [InlineKeyboardButton("❓ Verification Help", callback_data="verification_help")],
-            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")]
+            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -771,10 +772,11 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 ⚠️ **Do not submit multiple documents - this may delay your verification!**"""
         
-        # Add helpful action buttons
+        # Add helpful action buttons including main menu
         keyboard = [
             [InlineKeyboardButton("❓ Verification Help", callback_data="verification_help")],
-            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")]
+            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -789,7 +791,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db_manager.log_chat_message(user_id, "bot_response", follow_up_text, {
             "action": "verification_timeline",
             "status": "pending_review",
-            "buttons": ["Verification Help", "Contact Support"]
+            "buttons": ["Verification Help", "Contact Support", "Main Menu"]
         })
         
         # Update user flow to indicate they're waiting for verification
@@ -1308,8 +1310,231 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_verification_help(update, context)
     elif data == "not_interested":
         await handle_not_interested(update, context)
+    elif data == "main_menu":
+        await main_menu_callback(update, context)
+    elif data == "account_menu":
+        await account_menu_callback(update, context)
+    elif data == "help_menu":
+        await help_menu_callback(update, context)
+    elif data == "notification_settings":
+        await notification_settings_callback(update, context)
     else:
         await query.answer("Unknown action")
+
+# Menu Command
+async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show main menu to user"""
+    user = update.effective_user
+    user_id = user.id
+    first_name = user.first_name or "there"
+    
+    log_interaction(user_id, "menu_command")
+    
+    # Get user data to check verification status
+    user_data = get_user_data(user_id)
+    is_verified = user_data and user_data[4] == 1 if user_data else False
+    
+    menu_text = f"""🎯 **OPTRIXTRADES Main Menu**
+
+Hi {first_name}! Welcome to your trading dashboard.
+
+**Your Status:** {'✅ Verified' if is_verified else '⏳ Pending Verification'}
+
+📋 **Available Options:**"""
+    
+    keyboard = [
+        [InlineKeyboardButton("👤 Account Status", callback_data="account_menu"),
+         InlineKeyboardButton("❓ Help & Support", callback_data="help_menu")],
+        [InlineKeyboardButton("🔔 Notifications", callback_data="notification_settings"),
+         InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")]
+    ]
+    
+    if is_verified:
+        keyboard.insert(0, [InlineKeyboardButton("🔗 Join Premium Group", callback_data="request_group_access")])
+    else:
+        keyboard.insert(0, [InlineKeyboardButton("🚀 Get Verified", callback_data="get_vip_access")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        menu_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+    
+    # Log chat history
+    db_manager.log_chat_message(user_id, "command", "/menu", {
+        "username": user.username or "",
+        "first_name": first_name,
+        "verification_status": "verified" if is_verified else "pending"
+    })
+
+# Menu Callback Handlers
+async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle main menu callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    first_name = query.from_user.first_name or "there"
+    
+    # Get user data to check verification status
+    user_data = get_user_data(user_id)
+    is_verified = user_data and user_data[4] == 1 if user_data else False
+    
+    menu_text = f"""🎯 **OPTRIXTRADES Main Menu**
+
+Hi {first_name}! Welcome to your trading dashboard.
+
+**Your Status:** {'✅ Verified' if is_verified else '⏳ Pending Verification'}
+
+📋 **Available Options:**"""
+    
+    keyboard = [
+        [InlineKeyboardButton("👤 Account Status", callback_data="account_menu"),
+         InlineKeyboardButton("❓ Help & Support", callback_data="help_menu")],
+        [InlineKeyboardButton("🔔 Notifications", callback_data="notification_settings"),
+         InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")]
+    ]
+    
+    if is_verified:
+        keyboard.insert(0, [InlineKeyboardButton("🔗 Join Premium Group", callback_data="request_group_access")])
+    else:
+        keyboard.insert(0, [InlineKeyboardButton("🚀 Get Verified", callback_data="get_vip_access")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=menu_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def account_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle account menu callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    user_data = get_user_data(user_id)
+    
+    if not user_data:
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="❌ User data not found. Please use /start to register."
+        )
+        return
+    
+    username = user_data[1] or "Not set"
+    first_name = user_data[2]
+    current_flow = user_data[3]
+    is_verified = user_data[4] == 1
+    uid = user_data[6] or "Not provided"
+    
+    status_text = f"""👤 **Account Information**
+
+**Name:** {first_name}
+**Username:** @{username}
+**User ID:** {user_id}
+**UID:** {uid}
+**Status:** {'✅ Verified' if is_verified else '⏳ Pending Verification'}
+**Current Flow:** {current_flow}
+
+📊 **Account Actions:**"""
+    
+    keyboard = [
+        [InlineKeyboardButton("🔄 Refresh Status", callback_data="account_menu")],
+        [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
+    ]
+    
+    if not is_verified:
+        keyboard.insert(0, [InlineKeyboardButton("🚀 Complete Verification", callback_data="get_vip_access")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=status_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def help_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle help menu callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    help_text = f"""❓ **Help & Support Center**
+
+🔍 **Common Questions:**
+• How to get verified?
+• How to deposit?
+• How to join premium group?
+• How to contact support?
+
+📚 **Resources:**
+• Verification guide
+• Deposit instructions
+• Trading tutorials
+• FAQ section
+
+📞 **Support Options:**"""
+    
+    keyboard = [
+        [InlineKeyboardButton("❓ Verification Help", callback_data="verification_help"),
+         InlineKeyboardButton("💰 Deposit Help", callback_data="help_deposit")],
+        [InlineKeyboardButton("📝 Registration Help", callback_data="help_signup"),
+         InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")],
+        [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=help_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def notification_settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle notification settings callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    settings_text = f"""🔔 **Notification Settings**
+
+⚙️ **Current Settings:**
+• Follow-up messages: ✅ Enabled
+• Verification updates: ✅ Enabled
+• Trading signals: ✅ Enabled
+• Admin notifications: ✅ Enabled
+
+📱 **Available Options:**
+
+⚠️ **Note:** This feature is currently under development. All notifications are enabled by default to ensure you don't miss important updates.
+
+🔜 **Coming Soon:**
+• Custom notification preferences
+• Quiet hours settings
+• Notification frequency control
+• Channel-specific settings"""
+    
+    keyboard = [
+        [InlineKeyboardButton("🔄 Refresh Settings", callback_data="notification_settings")],
+        [InlineKeyboardButton("📞 Request Feature", callback_data="contact_support")],
+        [InlineKeyboardButton("⬅️ Back to Main Menu", callback_data="main_menu")]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=settings_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
 
 # Admin Commands
 async def admin_verify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1718,21 +1943,20 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         pending_requests = get_pending_verifications()
         
         if not pending_requests:
-            await context.bot.send_message(chat_id=query.message.chat_id, text="✅ No pending verification requests.")
-            return
-        
-        queue_text = "📋 **Pending Verification Queue:**\n\n"
-        
-        for req in pending_requests[:5]:  # Show only first 5
-            req_id, user_id_req, first_name, username, uid, created_at = req
-            username_display = f"@{username}" if username else "No username"
-            queue_text += f"**#{req_id}** - {first_name} ({username_display})\n"
-            queue_text += f"🆔 User ID: `{user_id_req}`\n"
-            queue_text += f"💳 UID: {uid}\n"
-            queue_text += f"⏰ Submitted: {created_at}\n\n"
-        
-        if len(pending_requests) > 5:
-            queue_text += f"... and {len(pending_requests) - 5} more requests\n"
+            queue_text = "✅ No pending verification requests."
+        else:
+            queue_text = "📋 **Pending Verification Queue:**\n\n"
+            
+            for req in pending_requests[:5]:  # Show only first 5
+                req_id, user_id_req, first_name, username, uid, created_at = req
+                username_display = f"@{username}" if username else "No username"
+                queue_text += f"**#{req_id}** - {first_name} ({username_display})\n"
+                queue_text += f"🆔 User ID: `{user_id_req}`\n"
+                queue_text += f"💳 UID: {uid}\n"
+                queue_text += f"⏰ Submitted: {created_at}\n\n"
+            
+            if len(pending_requests) > 5:
+                queue_text += f"... and {len(pending_requests) - 5} more requests\n"
         
         keyboard = [
             [InlineKeyboardButton("🔄 Refresh", callback_data="admin_queue")],
@@ -1740,7 +1964,21 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await context.bot.send_message(chat_id=query.message.chat_id, text=queue_text, reply_markup=reply_markup, parse_mode='Markdown')
+        # Edit the existing message instead of sending a new one to preserve chat history
+        try:
+            await query.edit_message_text(
+                text=queue_text,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            # If editing fails, send a new message
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=queue_text,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
     
     elif callback_data == "admin_activity":
         recent_activity = db_manager.get_recent_activity(10)
@@ -2042,6 +2280,7 @@ def main():
     
     # Add user command handlers
     application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("getmyid", get_my_id_command))
     
     # Add admin command handlers
@@ -2069,6 +2308,7 @@ def main():
     print(f"👨‍💼 Admin User ID: {ADMIN_USER_ID}")
     print("\n📋 Available Commands:")
     print("• /start - Start the bot")
+    print("• /menu - Access main menu")
     print("• /getmyid - Get your Telegram user ID (for admin setup)")
     print("\n📋 Available Admin Commands:")
     print("• /verify <user_id> - Approve user verification")
