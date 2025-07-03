@@ -52,7 +52,10 @@ class DatabaseManager:
                     f"@{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/{config.POSTGRES_DB}"
                 )
         else:
-            return config.SQLITE_DATABASE_PATH
+            # Fallback to DATABASE_PATH if SQLITE_DATABASE_PATH not set
+            if hasattr(config, 'SQLITE_DATABASE_PATH') and config.SQLITE_DATABASE_PATH:
+                return config.SQLITE_DATABASE_PATH
+            return os.path.join(os.path.dirname(__file__), config.DATABASE_PATH)
     
     async def initialize(self):
         """Initialize database connection pool"""

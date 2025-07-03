@@ -17,6 +17,7 @@ class BotConfig:
     
     # Database
     DATABASE_PATH: str = os.getenv('DATABASE_PATH', 'trading_bot.db')
+    SQLITE_DATABASE_PATH: str = os.path.join(os.path.dirname(__file__), os.getenv('DATABASE_PATH', 'trading_bot.db'))
     DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'sqlite')
     DATABASE_URL: str = os.getenv('DATABASE_URL', '')
     
@@ -122,7 +123,8 @@ class BotConfig:
             ('BROKER_LINK', cls.BROKER_LINK),
             ('PREMIUM_CHANNEL_ID', cls.PREMIUM_CHANNEL_ID),
             ('ADMIN_USERNAME', cls.ADMIN_USERNAME),
-            ('ADMIN_USER_ID', cls.ADMIN_USER_ID)
+            ('ADMIN_USER_ID', cls.ADMIN_USER_ID),
+            ('SQLITE_DATABASE_PATH', cls.SQLITE_DATABASE_PATH)
         ]
         
         for field_name, field_value in required_fields:
