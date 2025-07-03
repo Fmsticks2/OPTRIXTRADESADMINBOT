@@ -30,6 +30,39 @@ class TradingBot:
     def __init__(self):
         self.premium_channel_link = f"https://t.me/c/{config.PREMIUM_CHANNEL_ID.replace('-100', '')}"
         
+        # Admin keyboards
+        self.admin_keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 Statistics", callback_data="admin_stats"),
+             InlineKeyboardButton("👥 Verification Queue", callback_data="admin_queue")],
+            [InlineKeyboardButton("📢 Post Signal", callback_data="post_signal"),
+             InlineKeyboardButton("📝 Edit Last Signal", callback_data="edit_signal")]
+        ])
+        
+        # User main menu keyboard
+        self.user_main_keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💎 VIP Access", callback_data="get_vip_access")],
+            [InlineKeyboardButton("📱 My Account", callback_data="my_account"),
+             InlineKeyboardButton("ℹ️ Help", callback_data="help_menu")],
+            [InlineKeyboardButton("📞 Support", callback_data="contact_support")]
+        ])
+        
+        # Help menu keyboard
+        self.help_keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📝 Registration Help", callback_data="help_signup"),
+             InlineKeyboardButton("💳 Deposit Help", callback_data="help_deposit")],
+            [InlineKeyboardButton("❓ FAQ", callback_data="faq"),
+             InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")],
+            [InlineKeyboardButton("🔙 Back to Main Menu", callback_data="main_menu")]
+        ])
+        
+        # Account menu keyboard
+        self.account_keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 My Status", callback_data="account_status"),
+             InlineKeyboardButton("⭐️ Upgrade Account", callback_data="upgrade_account")],
+            [InlineKeyboardButton("🔔 Notification Settings", callback_data="notification_settings")],
+            [InlineKeyboardButton("🔙 Back to Main Menu", callback_data="main_menu")]
+        ])
+
     async def initialize(self):
         """Initialize bot and database"""
         try:
@@ -184,7 +217,7 @@ Here's what you get as a member:
 ✅ Strategy sessions from 6-figure traders  
 ✅ Access to our private trader community
 ✅ Exclusive signup bonuses (up to $500)
-✅ Automated trading bot – trade while you sleep
+✅ Automated trading bot - trade while you sleep
 
 Tap below to activate your free VIP access and get started."""
 
@@ -224,10 +257,10 @@ The more you deposit, the more powerful your AI access:
 ✅ $100+ → Full access to OPTRIX Web AI Portal, Live Signals & AI tools
 
 ✅ $500+ → Includes:
-— All available signal alert options
-— VIP telegram group  
-— Access to private sessions and risk management blueprint
-— OPTRIX AI Auto-Trading (trades for you automatically)"""
+- All available signal alert options
+- VIP telegram group  
+- Access to private sessions and risk management blueprint
+- OPTRIX AI Auto-Trading (trades for you automatically)"""
 
             keyboard = [
                 [InlineKeyboardButton("➡️ I've Registered", callback_data="registered")],
@@ -362,7 +395,7 @@ You now have access to:
 
 Join our premium channel: {self.premium_channel_link}
 
-Your trading journey starts now! 🚀
+Your trading journey starts now! �
 
 Note: Your verification has been logged for admin review."""
 
@@ -743,10 +776,21 @@ We'll be here when you're ready to start your trading journey! 🚀"""
             query = update.callback_query
             data = query.data
             
-            if data == "get_vip_access":
+            # Main menu options
+            if data == "main_menu":
+                await self.handle_main_menu(update, context)
+            elif data == "my_account":
+                await self.handle_account_menu(update, context)
+            elif data == "help_menu":
+                await self.handle_help_menu(update, context)
+            
+            # VIP access flow
+            elif data == "get_vip_access":
                 await self.activation_instructions(update, context)
             elif data == "registered":
                 await self.registration_confirmation(update, context)
+                
+            # Help options
             elif data == "help_signup":
                 await self.help_signup(update, context)
             elif data == "help_deposit":
@@ -756,81 +800,218 @@ We'll be here when you're ready to start your trading journey! 🚀"""
             elif data == "contact_support":
                 await query.answer()
                 await query.edit_message_text(f"Please contact our support team: @{config.ADMIN_USERNAME}")
+            
+            # Account options
+            elif data == "account_status":
+                await self.handle_account_status(update, context)
+            elif data == "upgrade_account":
+                await self.handle_upgrade_request(update, context)
+            elif data == "notification_settings":
+                await self.handle_notification_settings(update, context)
+            
+            # Admin options
+            elif data.startswith("signal_"):
+                await self.handle_signal_type(update, context)
+            elif data == "admin_stats":
+                await self.show_admin_stats(update, context)
+            elif data == "admin_queue":
+                await self.show_verification_queue(update, context)
+            elif data == "edit_signal":
+                await self.handle_edit_signal(update, context)
+            elif data == "cancel_signal":
+                context.user_data.clear()
+                await query.edit_message_text("Signal posting cancelled.")
                 
         except Exception as e:
             logger.error(f"Error in button callback: {e}")
 
-    @error_handler("error_handler")
-    async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE):
-        """Handle errors"""
-        logger.error(f"Exception while handling an update: {context.error}")
-        
-        # Log error to database
+    @error_handler("handle_main_menu")
+    async def handle_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show main menu"""
         try:
-            if db_manager.db_type == 'postgresql':
-                query = """
-                    INSERT INTO error_logs (error_type, error_message, stack_trace, context, user_id, extra_data)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                """
-            else:
-                query = """
-                    INSERT INTO error_logs (error_type, error_message, stack_trace, context, user_id, extra_data)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """
+            query = update.callback_query
+            await query.answer()
             
-            user_id = None
-            if update and hasattr(update, 'effective_user') and update.effective_user:
-                user_id = update.effective_user.id
+            welcome_text = f"Welcome to OPTRIXTRADES! 👋\n\nWhat would you like to do?"
             
-            import traceback
-            await db_manager.execute_query(query, (
-                type(context.error).__name__,
-                str(context.error),
-                traceback.format_exc(),
-                'telegram_update',
-                user_id,
-                str(update) if update else None
-            ))
-            
-        except Exception as e:
-            logger.error(f"Failed to log error to database: {e}")
-
-    async def run(self):
-        """Run the bot with proper error handling"""
-        try:
-            # Initialize database first
-            await self.initialize()
-            
-            # Create application
-            application = Application.builder().token(config.BOT_TOKEN).build()
-            
-            # Add handlers
-            application.add_handler(CommandHandler("start", self.start_command))
-            application.add_handler(CallbackQueryHandler(self.button_callback))
-            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_message))
-            application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
-            application.add_error_handler(self.error_handler)
-            
-            # Start the bot
-            logger.info("🤖 OPTRIXTRADES Bot starting...")
-            logger.info(f"📱 Bot Token: {config.BOT_TOKEN[:10]}...")
-            logger.info(f"🔗 Broker Link: {config.BROKER_LINK}")
-            logger.info(f"📢 Premium Channel: {config.PREMIUM_CHANNEL_ID}")
-            logger.info(f"🗄️ Database: {db_manager.db_type.upper()}")
-            logger.info(f"🤖 Auto-Verification: {'Enabled' if config.AUTO_VERIFY_ENABLED else 'Disabled'}")
-            
-            # Use run_polling for production
-            application.run_polling(
-                allowed_updates=Update.ALL_TYPES,
-                drop_pending_updates=True
+            await query.edit_message_text(
+                welcome_text,
+                reply_markup=self.user_main_keyboard
             )
             
         except Exception as e:
-            logger.error(f"Failed to start bot: {e}")
+            logger.error(f"Error in main menu: {e}")
+
+    @error_handler("handle_account_menu")
+    async def handle_account_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show account menu"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            user_data = await get_user_data(user_id)
+            
+            if user_data:
+                status = "✅ Verified" if user_data.get('deposit_confirmed') else "⏳ Pending"
+                join_date = user_data.get('join_date', 'Unknown')
+                
+                account_text = f"📱 My Account\n\n"\
+                    f"Status: {status}\n"\
+                    f"Member since: {join_date}\n\n"\
+                    f"Select an option below:"
+                
+                await query.edit_message_text(
+                    account_text,
+                    reply_markup=self.account_keyboard
+                )
+            else:
+                await query.edit_message_text(
+                    "⚠️ Account not found. Please start over with /start"
+                )
+            
+        except Exception as e:
+            logger.error(f"Error in account menu: {e}")
+
+    @error_handler("handle_help_menu")
+    async def handle_help_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show help menu"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            help_text = f"ℹ️ Help Center\n\n"\
+                f"How can we assist you today?\n\n"\
+                f"Select a topic below or contact our support team."
+            
+            await query.edit_message_text(
+                help_text,
+                reply_markup=self.help_keyboard
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in help menu: {e}")
+
+    @error_handler("handle_account_status")
+    async def handle_account_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show account status"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            user_data = await get_user_data(user_id)
+            
+            if user_data:
+                status = "✅ Verified" if user_data.get('deposit_confirmed') else "⏳ Pending Verification"
+                join_date = user_data.get('join_date', 'Unknown')
+                verification_method = user_data.get('verification_method', 'Not verified')
+                
+                status_text = f"""📊 ACCOUNT STATUS
+
+🔹 Status: {status}
+🔹 Verification Method: {verification_method}
+🔹 Member Since: {join_date}"""
+
+                keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="my_account")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.edit_message_text(
+                    status_text,
+                    reply_markup=reply_markup
+                )
+            else:
+                await query.edit_message_text(
+                    "⚠️ Account not found. Please start over with /start"
+                )
+            
+        except Exception as e:
+            logger.error(f"Error in account status: {e}")
+
+    @error_handler("handle_notification_settings")
+    async def handle_notification_settings(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show notification settings"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            user_data = await get_user_data(user_id)
+            
+            if user_data:
+                notifications = user_data.get('notifications_enabled', True)
+                status = "✅ Enabled" if notifications else "❌ Disabled"
+                
+                settings_text = f"""🔔 NOTIFICATION SETTINGS
+
+Current status: {status}
+
+Would you like to receive trading signals and updates?"""
+
+                keyboard = [
+                    [
+                        InlineKeyboardButton("✅ Enable", callback_data="enable_notifications"),
+                        InlineKeyboardButton("❌ Disable", callback_data="disable_notifications")
+                    ],
+                    [InlineKeyboardButton("🔙 Back", callback_data="my_account")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.edit_message_text(
+                    settings_text,
+                    reply_markup=reply_markup
+                )
+            else:
+                await query.edit_message_text(
+                    "⚠️ Account not found. Please start over with /start"
+                )
+            
+        except Exception as e:
+            logger.error(f"Error in notification settings: {e}")
+
+    @error_handler("handle_edit_signal")
+    async def handle_edit_signal(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle edit signal request"""
+        try:
+            query = update.callback_query
+            if str(query.from_user.id) != config.ADMIN_USER_ID:
+                return
+            
+            await query.answer()
+            await query.edit_message_text(
+                "Edit signal functionality coming soon!"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in edit signal: {e}")
+
+    async def run(self):
+        """Run the bot with all handlers"""
+        try:
+            await self.initialize()
+            
+            application = Application.builder().token(config.BOT_TOKEN).build()
+            
+            # Add command handlers
+            application.add_handler(CommandHandler("start", self.start_command))
+            application.add_handler(CommandHandler("admin", self.handle_admin_menu))
+            
+            # Add callback query handlers
+            application.add_handler(CallbackQueryHandler(self.button_callback))
+            
+            # Add message handlers
+            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_message))
+            application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
+            
+            # Add error handler
+            application.add_error_handler(self.error_handler)
+            
+            # Start polling
+            await application.run_polling()
+            
+        except Exception as e:
+            logger.error(f"Error in run: {e}")
             raise
-        finally:
-            # Cleanup
-            await db_manager.close()
 
 def main():
     """Main function"""
