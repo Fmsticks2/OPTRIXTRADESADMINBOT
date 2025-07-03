@@ -56,26 +56,42 @@ class WebhookServer:
         async def webhook_handler(request: Request, background_tasks: BackgroundTasks):
             """Handle incoming webhook updates from Telegram"""
             try:
+                logger.info(f"Webhook handler called - Headers: {dict(request.headers)}")
+                
                 # Verify webhook secret if configured
                 if hasattr(config, 'WEBHOOK_SECRET_TOKEN') and config.WEBHOOK_SECRET_TOKEN:
                     if not self.verify_webhook_signature(request):
+                        logger.warning("Invalid webhook signature received")
                         raise HTTPException(status_code=403, detail="Invalid signature")
                 
                 # Get update data
-                update_data = await request.json()
-                logger.info(f"Received webhook update: {update_data.get('update_id', 'unknown')}")
+                try:
+                    update_data = await request.json()
+                    logger.info(f"Received update data: {json.dumps(update_data, indent=2)}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON in webhook request: {e}")
+                    # Return 200 to prevent Telegram from retrying
+                    return JSONResponse({"status": "error", "message": "Invalid JSON"})
                 
-                # Process update in background
-                background_tasks.add_task(self.process_update, update_data)
+                # Check if application is initialized
+                if not self.application:
+                    logger.error("Application not initialized in webhook handler")
+                    return JSONResponse({"status": "error", "message": "Application not ready"})
                 
+                # Process update in background with error isolation
+                background_tasks.add_task(self._safe_process_update, update_data)
+                
+                # Always return 200 OK to Telegram
                 return JSONResponse({"status": "ok"})
                 
-            except json.JSONDecodeError:
-                logger.error("Invalid JSON in webhook request")
-                raise HTTPException(status_code=400, detail="Invalid JSON")
+            except HTTPException as he:
+                logger.error(f"HTTP Exception in webhook handler: {he.detail}")
+                # Re-raise HTTP exceptions (like 403)
+                raise
             except Exception as e:
-                logger.error(f"Webhook handler error: {e}")
-                raise HTTPException(status_code=500, detail="Internal server error")
+                logger.error(f"Unexpected webhook handler error: {e}", exc_info=True)
+                # Return 200 to prevent Telegram from retrying
+                return JSONResponse({"status": "error", "message": "Processing error"})
         
         @app.post("/admin/set_webhook")
         async def set_webhook(request: Request):
@@ -145,6 +161,14 @@ class WebhookServer:
             logger.error(f"Signature verification error: {e}")
             return False
 
+    async def _safe_process_update(self, update_data: dict):
+        """Safely process update with complete error isolation"""
+        try:
+            await self.process_update(update_data)
+        except Exception as e:
+            logger.error(f"Error in _safe_process_update: {e}")
+            # Completely isolate errors to prevent any propagation
+
     async def process_update(self, update_data: dict):
         """Process incoming Telegram update"""
         try:
@@ -152,18 +176,28 @@ class WebhookServer:
                 logger.error("Application not initialized")
                 return
             
+            # Validate update data
+            if not update_data or not isinstance(update_data, dict):
+                logger.error("Invalid update data received")
+                return
+            
             # Create Update object
             update = Update.de_json(update_data, self.application.bot)
             
             if update:
-                # Process the update
-                await self.application.process_update(update)
-                logger.info(f"Processed update {update.update_id}")
+                # Process the update with error handling
+                try:
+                    await self.application.process_update(update)
+                    logger.info(f"Processed update {update.update_id}")
+                except Exception as process_error:
+                    logger.error(f"Error processing update {update.update_id}: {process_error}")
+                    # Don't re-raise to prevent 500 errors
             else:
                 logger.warning("Failed to create Update object from webhook data")
                 
         except Exception as e:
-            logger.error(f"Error processing update: {e}")
+            logger.error(f"Error in process_update: {e}")
+            # Don't re-raise to prevent 500 errors
 
     async def initialize_application(self):
         """Initialize Telegram application for webhook mode"""
@@ -174,6 +208,9 @@ class WebhookServer:
                 
             # Create application
             self.application = Application.builder().token(config.BOT_TOKEN).build()
+            
+            # Set the application instance in the bot
+            self.bot_instance.set_application(self.application)
             
             # Add handlers (same as polling mode)
             from telegram.ext import CommandHandler, CallbackQueryHandler, MessageHandler, filters
@@ -245,6 +282,15 @@ class WebhookServer:
         logger.info("🚀 OPTRIXTRADES Webhook Server starting...")
         logger.info(f"📱 Bot Token: {config.BOT_TOKEN[:10]}...")
         logger.info(f"🔗 Webhook Mode: Enabled")
+        
+        # Initialize database first
+        try:
+            from database import initialize_db
+            await initialize_db()
+            logger.info("✅ Database initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Database initialization failed: {e}")
+            # Continue anyway to allow webhook server to start
         
         # Initialize bot application
         await self.initialize_application()

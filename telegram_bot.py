@@ -62,6 +62,13 @@ class TradingBot:
         self.webhook_port = int(os.getenv('WEBHOOK_PORT', '8000'))
         self.webhook_path = os.getenv('WEBHOOK_PATH', '/webhook')
         
+        # Application instance (will be set during initialize)
+        self.application = None
+    
+    def set_application(self, application):
+        """Set the application instance for the bot"""
+        self.application = application
+        
         # Admin keyboard - only shown to admin users
         self.admin_keyboard = [
             [InlineKeyboardButton("📊 Stats", callback_data="stats")],
@@ -345,9 +352,11 @@ To verify your account:
             # Notify admin
             if self.admin_user_id:
                 try:
+                    user_data = await get_user_data(user_id)
+                    uid = user_data.get('uid', 'Not provided') if user_data else 'Not provided'
                     await context.bot.send_message(
                         chat_id=self.admin_user_id,
-                        text=f"🔄 New verification request from user {user_id}\n\nUID: {update_user_data.get('uid', 'Not provided')}"
+                        text=f"🔄 New verification request from user {user_id}\n\nUID: {uid}"
                     )
                     await context.bot.send_photo(
                         chat_id=self.admin_user_id,
@@ -492,13 +501,6 @@ Only risk 1-2% of your capital per trade"""
             data = query.data
             user_id = query.from_user.id
             
-            # Show processing state
-            await query.edit_message_text(
-                text=f"{query.message.text}\n\n🔄 Processing...",
-                reply_markup=query.message.reply_markup,
-                parse_mode="Markdown"
-            )
-            
             # Route to appropriate handler
             if data == "get_vip_access":
                 await self.get_vip_access(update, context)
@@ -520,13 +522,10 @@ Only risk 1-2% of your capital per trade"""
                 await self.handle_user_lookup(update, context)
             elif data == "main_menu":
                 await self.handle_main_menu(update, context)
-            
-            # Remove processing state
-            await query.edit_message_text(
-                text=query.message.text.replace("\n\n🔄 Processing...", ""),
-                reply_markup=query.message.reply_markup,
-                parse_mode="Markdown"
-            )
+            elif data == "uid_help":
+                await self.uid_help(update, context)
+            else:
+                await query.answer("Feature coming soon!")
         except Exception as e:
             logger.error(f"Error in button callback: {e}")
 
@@ -534,7 +533,7 @@ Only risk 1-2% of your capital per trade"""
         """Handle text messages from users"""
         try:
             user_id = update.effective_user.id
-            text = update.message.text.upper()
+            text = update.message.text.strip()
             
             user_data = await get_user_data(user_id)
             if not user_data:
@@ -543,14 +542,8 @@ Only risk 1-2% of your capital per trade"""
             
             await log_interaction(user_id, "text_message", update.message.text)
             
-            if text == "UPGRADE":
+            if text.upper() == "UPGRADE":
                 await self._handle_upgrade_request(update, context)
-            elif user_data.get("current_flow") == 'confirmation':
-                # Assume this is a UID
-                await update_user_data(user_id, uid=update.message.text)
-                await update.message.reply_text(
-                    "UID received! Now please send your deposit screenshot."
-                )
             else:
                 # Default response for unrecognized text
                 await update.message.reply_text(
@@ -572,28 +565,9 @@ Only risk 1-2% of your capital per trade"""
             
             await log_interaction(user_id, "photo_upload", "deposit_screenshot")
             
-            if user_data.get("current_flow") == 'confirmation':
-                # Mark deposit as confirmed
-                await update_user_data(user_id, deposit_confirmed=True, current_flow='completed', verified=True)
-                
-                success_text = f"""🎉 Congratulations! Your deposit has been verified.
-
-Welcome to OPTRIXTRADES Premium! 
-
-You now have access to:
-✅ Daily VIP trading signals
-✅ Premium trading strategies  
-✅ Live trading sessions
-✅ AI trading bot access
-
-Join our premium channel: {self.premium_channel_id}
-
-Your trading journey starts now! 🚀"""
-                
-                await update.message.reply_text(success_text)
-                
-                # Update user state
-                self.user_states[user_id] = True
+            # Check if user is in verification flow
+            if user_data.get("verification_pending") or user_data.get("uid"):
+                await self.handle_screenshot_upload(update, context)
             else:
                 await update.message.reply_text("Please complete the registration process first by using /start")
                 
@@ -622,6 +596,161 @@ Contact: @{self.admin_username}"""
             
         except Exception as e:
             logger.error(f"Error in _handle_upgrade_request: {e}")
+
+    async def _track_messages(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Track messages for persistent messaging"""
+        try:
+            if update.message and update.message.chat.type == 'private':
+                chat_id = update.message.chat_id
+                self.message_history[chat_id] = update.message.message_id
+        except Exception as e:
+            logger.error(f"Error tracking message: {e}")
+
+    async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Cancel current conversation"""
+        try:
+            await update.message.reply_text(
+                "❌ Operation cancelled. Type /start to begin again.",
+                reply_markup=ReplyKeyboardRemove()
+            )
+            return ConversationHandler.END
+        except Exception as e:
+            logger.error(f"Error in cancel: {e}")
+            return ConversationHandler.END
+
+    async def support_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle support requests"""
+        try:
+            user_id = update.effective_user.id if update.effective_user else None
+            
+            if update.callback_query:
+                await update.callback_query.answer()
+                user_id = update.callback_query.from_user.id
+            
+            support_text = f"""🆘 *Support & Help*
+
+📞 *Contact our support team:*
+👤 Admin: @{self.admin_username}
+
+❓ *Common Questions:*
+• How to verify my account?
+• Where to find my UID?
+• Minimum deposit amount?
+• How long does verification take?
+
+💬 *Live Chat:* Available 24/7"""
+            
+            keyboard = [
+                [InlineKeyboardButton("💬 Contact Admin", url=f"https://t.me/{self.admin_username}")],
+                [InlineKeyboardButton("⬅️ Back to Menu", callback_data="main_menu")]
+            ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=support_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Error in support_command: {e}")
+
+    async def handle_broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle broadcast functionality (admin only)"""
+        try:
+            user_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id
+            
+            if not await self._is_admin(user_id):
+                await update.callback_query.answer("⛔ Unauthorized")
+                return
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text="📢 *Broadcast Message*\n\nPlease send the message you want to broadcast to all users:",
+                parse_mode="Markdown"
+            )
+            
+            return BROADCAST_MESSAGE
+        except Exception as e:
+            logger.error(f"Error in handle_broadcast: {e}")
+
+    async def handle_user_lookup(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle user lookup functionality (admin only)"""
+        try:
+            user_id = update.effective_user.id if update.effective_user else update.callback_query.from_user.id
+            
+            if not await self._is_admin(user_id):
+                await update.callback_query.answer("⛔ Unauthorized")
+                return
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text="🔍 *User Lookup*\n\nPlease send the User ID you want to look up:",
+                parse_mode="Markdown"
+            )
+            
+            return USER_LOOKUP
+        except Exception as e:
+            logger.error(f"Error in handle_user_lookup: {e}")
+
+    async def handle_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle main menu navigation"""
+        try:
+            user_id = update.callback_query.from_user.id if update.callback_query else update.effective_user.id
+            
+            if await self._is_admin(user_id):
+                keyboard = self.admin_keyboard
+                text = "👑 *Admin Panel*\n\nSelect an option:"
+            elif await self._is_verified(user_id):
+                keyboard = self.verified_user_keyboard
+                text = "💎 *VIP Member Dashboard*\n\nWelcome back! Choose an option:"
+            else:
+                keyboard = self.unverified_user_keyboard
+                text = "🔓 *Get Started*\n\nComplete verification to unlock VIP features:"
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Error in handle_main_menu: {e}")
+
+    async def uid_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show UID help information"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            
+            help_text = f"""❓ *Where to find your UID?*
+
+1️⃣ Open your broker account
+2️⃣ Go to 'Profile' or 'Account Settings'
+3️⃣ Look for 'User ID', 'Account ID', or 'UID'
+4️⃣ Copy the alphanumeric code (8-20 characters)
+
+*Example UIDs:*
+• ABC123XYZ456
+• USER789012
+• ID1234567890
+
+*Need help?* Contact @{self.admin_username}"""
+            
+            keyboard = [
+                [InlineKeyboardButton("📝 Start Verification", callback_data="start_verification")],
+                [InlineKeyboardButton("⬅️ Back", callback_data="get_vip_access")]
+            ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=help_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Error in uid_help: {e}")
 
     async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Log errors caused by updates."""
@@ -670,6 +799,11 @@ Contact: @{self.admin_username}"""
         
         self.application.add_handler(CallbackQueryHandler(self.button_callback))
         self.application.add_handler(verification_conv)
+        
+        # Add text and photo handlers
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_message))
+        self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
+        
         self.application.add_error_handler(self.error_handler)
 
     async def start_polling(self):
