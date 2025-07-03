@@ -817,13 +817,13 @@ async def handle_admin_queue_callback(update: Update, context: ContextTypes.DEFA
     
     user_id = query.from_user.id
     if not is_admin(user_id):
-        await query.edit_message_text("❌ You don't have permission to use this command.")
+        await context.bot.send_message(chat_id=query.message.chat_id, text="❌ You don't have permission to use this command.")
         return
     
     pending_requests = get_pending_verifications()
     
     if not pending_requests:
-        await query.edit_message_text("✅ No pending verification requests.")
+        await context.bot.send_message(chat_id=query.message.chat_id, text="✅ No pending verification requests.")
         return
     
     queue_text = "📋 **Pending Verification Queue:**\n\n"
@@ -837,7 +837,7 @@ async def handle_admin_queue_callback(update: Update, context: ContextTypes.DEFA
         queue_text += f"⏰ Submitted: {created_at}\n"
         queue_text += f"**Commands:** `/verify {user_id_req}` | `/reject {user_id_req}`\n\n"
     
-    await query.edit_message_text(queue_text, parse_mode='Markdown')
+    await context.bot.send_message(chat_id=query.message.chat_id, text=queue_text, parse_mode='Markdown')
 
 async def handle_admin_activity_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -845,7 +845,7 @@ async def handle_admin_activity_callback(update: Update, context: ContextTypes.D
     
     user_id = query.from_user.id
     if not is_admin(user_id):
-        await query.edit_message_text("❌ You don't have permission to use this command.")
+        await context.bot.send_message(chat_id=query.message.chat_id, text="❌ You don't have permission to use this command.")
         return
     
     # Get recent activity from chat history
@@ -869,7 +869,7 @@ async def handle_admin_activity_callback(update: Update, context: ContextTypes.D
     recent_activity = db_manager.execute_query(activity_query, (10,), fetch=True)
     
     if not recent_activity:
-        await query.edit_message_text("📊 No recent activity found.")
+        await context.bot.send_message(chat_id=query.message.chat_id, text="📊 No recent activity found.")
         return
     
     activity_text = "📊 **Recent Activity (Last 10):**\n\n"
@@ -882,7 +882,7 @@ async def handle_admin_activity_callback(update: Update, context: ContextTypes.D
         activity_text += f"📝 {msg_type}: {content_preview}\n"
         activity_text += f"⏰ {created_at}\n\n"
     
-    await query.edit_message_text(activity_text, parse_mode='Markdown')
+    await context.bot.send_message(chat_id=query.message.chat_id, text=activity_text, parse_mode='Markdown')
 
 # New handler for contact support
 async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1356,7 +1356,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
     user_id = query.from_user.id
     
     if not is_admin(user_id):
-        await query.edit_message_text("❌ You don't have permission to use this feature.")
+        await context.bot.send_message(chat_id=query.message.chat_id, text="❌ You don't have permission to use this feature.")
         return
     
     callback_data = query.data
@@ -1365,7 +1365,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         pending_requests = get_pending_verifications()
         
         if not pending_requests:
-            await query.edit_message_text("✅ No pending verification requests.")
+            await context.bot.send_message(chat_id=query.message.chat_id, text="✅ No pending verification requests.")
             return
         
         queue_text = "📋 **Pending Verification Queue:**\n\n"
@@ -1387,13 +1387,13 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(queue_text, reply_markup=reply_markup, parse_mode='Markdown')
+        await context.bot.send_message(chat_id=query.message.chat_id, text=queue_text, reply_markup=reply_markup, parse_mode='Markdown')
     
     elif callback_data == "admin_activity":
         recent_activity = db_manager.get_recent_activity(10)
         
         if not recent_activity:
-            await query.edit_message_text("No recent activity found.")
+            await context.bot.send_message(chat_id=query.message.chat_id, text="No recent activity found.")
             return
         
         activity_text = "📊 **Recent Activity (Last 10):**\n\n"
@@ -1413,7 +1413,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(activity_text, reply_markup=reply_markup)
+        await context.bot.send_message(chat_id=query.message.chat_id, text=activity_text, reply_markup=reply_markup)
     
     elif callback_data == "admin_broadcast":
         broadcast_text = "📢 **Broadcast Message**\n\nTo send a broadcast message, use:\n`/broadcast Your message here`\n\nExample:\n`/broadcast 🚀 New trading signals available!`"
@@ -1423,13 +1423,13 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(broadcast_text, reply_markup=reply_markup, parse_mode='Markdown')
+        await context.bot.send_message(chat_id=query.message.chat_id, text=broadcast_text, reply_markup=reply_markup, parse_mode='Markdown')
     
     elif callback_data == "admin_users":
         users = get_all_active_users()
         
         if not users:
-            await query.edit_message_text("No active users found.")
+            await context.bot.send_message(chat_id=query.message.chat_id, text="No active users found.")
             return
         
         users_text = f"👥 **All Users ({len(users)} total):**\n\n"
@@ -1446,7 +1446,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(users_text, reply_markup=reply_markup)
+        await context.bot.send_message(chat_id=query.message.chat_id, text=users_text, reply_markup=reply_markup)
     
     elif callback_data == "admin_stats":
         users = get_all_active_users()
@@ -1465,7 +1465,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(stats_text, reply_markup=reply_markup)
+        await context.bot.send_message(chat_id=query.message.chat_id, text=stats_text, reply_markup=reply_markup)
     
     elif callback_data == "admin_dashboard":
         # Return to main admin dashboard
@@ -1491,14 +1491,15 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(
-            admin_welcome_text,
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=admin_welcome_text,
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
     
     else:
-        await query.edit_message_text("⚠️ This feature is coming soon!")
+        await context.bot.send_message(chat_id=query.message.chat_id, text="⚠️ This feature is coming soon!")
 
 # Error handler
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
