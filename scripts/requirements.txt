@@ -3,5 +3,5 @@ sqlite3
 asyncio
 logging
 datetime
-tenacity>=8.2.3
-pytz
+pytz==2025.2
+tenacity==9.1.2
