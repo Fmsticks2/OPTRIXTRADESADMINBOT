@@ -290,7 +290,7 @@ class DatabaseManager:
                 ('005_create_error_logs_table', """
                     CREATE TABLE IF NOT EXISTS error_logs (
                         id SERIAL PRIMARY KEY,
-                        error_type VARCHAR(100),
+                        error_type VARCHAR(255),
                         error_message TEXT,
                         stack_trace TEXT,
                         context VARCHAR(255),
