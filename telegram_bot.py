@@ -530,6 +530,99 @@ Only risk 1-2% of your capital per trade"""
         except Exception as e:
             logger.error(f"Error in button callback: {e}")
 
+    async def handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle text messages from users"""
+        try:
+            user_id = update.effective_user.id
+            text = update.message.text.upper()
+            
+            user_data = await get_user_data(user_id)
+            if not user_data:
+                await self.start_command(update, context)
+                return
+            
+            await log_interaction(user_id, "text_message", update.message.text)
+            
+            if text == "UPGRADE":
+                await self._handle_upgrade_request(update, context)
+            elif user_data.get("current_flow") == 'confirmation':
+                # Assume this is a UID
+                await update_user_data(user_id, uid=update.message.text)
+                await update.message.reply_text(
+                    "UID received! Now please send your deposit screenshot."
+                )
+            else:
+                # Default response for unrecognized text
+                await update.message.reply_text(
+                    "I didn't understand that. Please use the menu buttons or type /start to begin."
+                )
+                
+        except Exception as e:
+            logger.error(f"Error in handle_text_message: {e}")
+
+    async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle photo uploads from users"""
+        try:
+            user_id = update.effective_user.id
+            user_data = await get_user_data(user_id)
+            
+            if not user_data:
+                await update.message.reply_text("Please start with /start first.")
+                return
+            
+            await log_interaction(user_id, "photo_upload", "deposit_screenshot")
+            
+            if user_data.get("current_flow") == 'confirmation':
+                # Mark deposit as confirmed
+                await update_user_data(user_id, deposit_confirmed=True, current_flow='completed', verified=True)
+                
+                success_text = f"""🎉 Congratulations! Your deposit has been verified.
+
+Welcome to OPTRIXTRADES Premium! 
+
+You now have access to:
+✅ Daily VIP trading signals
+✅ Premium trading strategies  
+✅ Live trading sessions
+✅ AI trading bot access
+
+Join our premium channel: {self.premium_channel_id}
+
+Your trading journey starts now! 🚀"""
+                
+                await update.message.reply_text(success_text)
+                
+                # Update user state
+                self.user_states[user_id] = True
+            else:
+                await update.message.reply_text("Please complete the registration process first by using /start")
+                
+        except Exception as e:
+            logger.error(f"Error in handle_photo: {e}")
+
+    async def _handle_upgrade_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle upgrade requests from users"""
+        try:
+            user_id = update.effective_user.id
+            await log_interaction(user_id, "upgrade_request")
+            
+            upgrade_text = f"""🔥 UPGRADE REQUEST RECEIVED
+
+For premium upgrade options and full bot access, please contact our support team directly.
+
+Our team will help you unlock:
+🚀 Advanced AI trading algorithms
+💎 VIP-only trading signals  
+📈 Personal trading mentor
+💰 Higher deposit bonuses
+
+Contact: @{self.admin_username}"""
+            
+            await update.message.reply_text(upgrade_text)
+            
+        except Exception as e:
+            logger.error(f"Error in _handle_upgrade_request: {e}")
+
     async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Log errors caused by updates."""
         logger.error("Exception while handling an update:", exc_info=context.error)
