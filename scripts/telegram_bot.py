@@ -228,24 +228,21 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_admin(user_id):
         admin_welcome_text = f"""🔧 **Admin Panel - Welcome {first_name}!**
 
-**Available Admin Commands:**
-• `/verify <user_id>` - Approve user verification
-• `/reject <user_id> [reason]` - Reject user verification  
-• `/queue` - View pending verifications
-• `/broadcast <message>` - Send message to all users
-• `/chathistory <user_id> [limit]` - View chat history
-• `/activity [limit]` - View recent activity
-
-**Bot Status:** ✅ Running
-**Database:** ✅ Connected
+**Bot Status:** ✅ Running | **Database:** ✅ Connected
+**Broker Link:** {BROKER_LINK[:50]}...
 **Premium Group:** {PREMIUM_GROUP_LINK}
 
-🎯 **Quick Actions:**"""
+🎯 **Admin Dashboard:**"""
         
         keyboard = [
-            [InlineKeyboardButton("📋 View Queue", callback_data="admin_queue")],
-            [InlineKeyboardButton("📊 Recent Activity", callback_data="admin_activity")],
-            [InlineKeyboardButton("👥 User Experience", callback_data="get_vip_access")]
+            [InlineKeyboardButton("📋 Pending Queue", callback_data="admin_queue"),
+             InlineKeyboardButton("📊 User Activity", callback_data="admin_activity")],
+            [InlineKeyboardButton("📢 Broadcast Message", callback_data="admin_broadcast"),
+             InlineKeyboardButton("👥 All Users", callback_data="admin_users")],
+            [InlineKeyboardButton("🔍 Search User", callback_data="admin_search"),
+             InlineKeyboardButton("📈 Bot Stats", callback_data="admin_stats")],
+            [InlineKeyboardButton("⚙️ Settings", callback_data="admin_settings"),
+             InlineKeyboardButton("🔄 Restart Bot", callback_data="admin_restart")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
@@ -258,7 +255,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Log admin welcome
         db_manager.log_chat_message(user_id, "bot_response", admin_welcome_text, {
             "action": "admin_welcome",
-            "buttons": ["View Queue", "Recent Activity", "User Experience"]
+            "admin_auto_detected": True,
+            "buttons": ["Pending Queue", "User Activity", "Broadcast Message", "All Users", "Search User", "Bot Stats", "Settings", "Restart Bot"]
         })
         
         return
@@ -970,7 +968,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     
-    if data == "get_vip_access":
+    # Check if it's an admin callback
+    admin_callbacks = [
+        "admin_queue", "admin_activity", "admin_broadcast", "admin_users", 
+        "admin_search", "admin_stats", "admin_settings", "admin_restart", "admin_dashboard"
+    ]
+    
+    if data in admin_callbacks:
+        await handle_admin_callbacks(update, context)
+    elif data == "get_vip_access":
         await activation_instructions(update, context)
     elif data == "request_group_access":
         await handle_group_access_request(update, context)
@@ -986,10 +992,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_contact_support(update, context)
     elif data == "not_interested":
         await handle_not_interested(update, context)
-    elif data == "admin_queue":
-        await handle_admin_queue_callback(update, context)
-    elif data == "admin_activity":
-        await handle_admin_activity_callback(update, context)
     else:
         await query.answer("Unknown action")
 
@@ -1344,6 +1346,159 @@ async def admin_recent_activity_command(update: Update, context: ContextTypes.DE
                 await update.message.reply_text(f"📊 Recent Activity (Part {i+1})\n\n{chunk}")
     else:
         await update.message.reply_text(activity_text)
+
+# Admin callback handlers
+async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle admin-specific callback queries"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    
+    if not is_admin(user_id):
+        await query.edit_message_text("❌ You don't have permission to use this feature.")
+        return
+    
+    callback_data = query.data
+    
+    if callback_data == "admin_queue":
+        pending_requests = get_pending_verifications()
+        
+        if not pending_requests:
+            await query.edit_message_text("✅ No pending verification requests.")
+            return
+        
+        queue_text = "📋 **Pending Verification Queue:**\n\n"
+        
+        for req in pending_requests[:5]:  # Show only first 5
+            req_id, user_id_req, first_name, username, uid, created_at = req
+            username_display = f"@{username}" if username else "No username"
+            queue_text += f"**#{req_id}** - {first_name} ({username_display})\n"
+            queue_text += f"🆔 User ID: `{user_id_req}`\n"
+            queue_text += f"💳 UID: {uid}\n"
+            queue_text += f"⏰ Submitted: {created_at}\n\n"
+        
+        if len(pending_requests) > 5:
+            queue_text += f"... and {len(pending_requests) - 5} more requests\n"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Refresh", callback_data="admin_queue")],
+            [InlineKeyboardButton("⬅️ Back to Dashboard", callback_data="admin_dashboard")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(queue_text, reply_markup=reply_markup, parse_mode='Markdown')
+    
+    elif callback_data == "admin_activity":
+        recent_activity = db_manager.get_recent_activity(10)
+        
+        if not recent_activity:
+            await query.edit_message_text("No recent activity found.")
+            return
+        
+        activity_text = "📊 **Recent Activity (Last 10):**\n\n"
+        
+        for entry in recent_activity:
+            user_id_entry = entry[1]
+            timestamp = entry[2][:16]  # Truncate timestamp
+            message_type = entry[3]
+            content = entry[4][:30] + "..." if len(entry[4]) > 30 else entry[4]
+            
+            activity_text += f"👤 User {user_id_entry} | {timestamp}\n"
+            activity_text += f"📝 {message_type}: {content}\n\n"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Refresh", callback_data="admin_activity")],
+            [InlineKeyboardButton("⬅️ Back to Dashboard", callback_data="admin_dashboard")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(activity_text, reply_markup=reply_markup)
+    
+    elif callback_data == "admin_broadcast":
+        broadcast_text = "📢 **Broadcast Message**\n\nTo send a broadcast message, use:\n`/broadcast Your message here`\n\nExample:\n`/broadcast 🚀 New trading signals available!`"
+        
+        keyboard = [
+            [InlineKeyboardButton("⬅️ Back to Dashboard", callback_data="admin_dashboard")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(broadcast_text, reply_markup=reply_markup, parse_mode='Markdown')
+    
+    elif callback_data == "admin_users":
+        users = get_all_active_users()
+        
+        if not users:
+            await query.edit_message_text("No active users found.")
+            return
+        
+        users_text = f"👥 **All Users ({len(users)} total):**\n\n"
+        
+        for user_id_entry, first_name in users[:10]:  # Show only first 10
+            users_text += f"👤 {first_name} (ID: {user_id_entry})\n"
+        
+        if len(users) > 10:
+            users_text += f"\n... and {len(users) - 10} more users"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Refresh", callback_data="admin_users")],
+            [InlineKeyboardButton("⬅️ Back to Dashboard", callback_data="admin_dashboard")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(users_text, reply_markup=reply_markup)
+    
+    elif callback_data == "admin_stats":
+        users = get_all_active_users()
+        pending = get_pending_verifications()
+        
+        stats_text = f"📈 **Bot Statistics:**\n\n"
+        stats_text += f"👥 Total Users: {len(users)}\n"
+        stats_text += f"⏳ Pending Verifications: {len(pending)}\n"
+        stats_text += f"✅ Bot Status: Running\n"
+        stats_text += f"🔗 Broker Link: Active\n"
+        stats_text += f"📊 Database: Connected"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔄 Refresh", callback_data="admin_stats")],
+            [InlineKeyboardButton("⬅️ Back to Dashboard", callback_data="admin_dashboard")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(stats_text, reply_markup=reply_markup)
+    
+    elif callback_data == "admin_dashboard":
+        # Return to main admin dashboard
+        first_name = query.from_user.first_name or "Admin"
+        
+        admin_welcome_text = f"""🔧 **Admin Panel - Welcome {first_name}!**
+
+**Bot Status:** ✅ Running | **Database:** ✅ Connected
+**Broker Link:** {BROKER_LINK[:50]}...
+**Premium Group:** {PREMIUM_GROUP_LINK}
+
+🎯 **Admin Dashboard:**"""
+        
+        keyboard = [
+            [InlineKeyboardButton("📋 Pending Queue", callback_data="admin_queue"),
+             InlineKeyboardButton("📊 User Activity", callback_data="admin_activity")],
+            [InlineKeyboardButton("📢 Broadcast Message", callback_data="admin_broadcast"),
+             InlineKeyboardButton("👥 All Users", callback_data="admin_users")],
+            [InlineKeyboardButton("🔍 Search User", callback_data="admin_search"),
+             InlineKeyboardButton("📈 Bot Stats", callback_data="admin_stats")],
+            [InlineKeyboardButton("⚙️ Settings", callback_data="admin_settings"),
+             InlineKeyboardButton("🔄 Restart Bot", callback_data="admin_restart")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            admin_welcome_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+    
+    else:
+        await query.edit_message_text("⚠️ This feature is coming soon!")
 
 # Error handler
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
