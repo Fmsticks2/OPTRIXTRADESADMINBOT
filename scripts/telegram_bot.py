@@ -36,7 +36,7 @@ def init_database():
 
 def is_admin(user_id):
     """Check if user is admin"""
-    return user_id == BotConfig.ADMIN_USER_ID
+    return str(user_id) == str(BotConfig.ADMIN_USER_ID)
 
 def get_user_data(user_id):
     """Get user data from database"""
@@ -98,9 +98,7 @@ def log_interaction(user_id, interaction_type, interaction_data=""):
     
     db_manager.execute_query(query, (user_id, interaction_type, interaction_data))
 
-def is_admin(user_id):
-    """Check if user is admin"""
-    return user_id == ADMIN_USER_ID
+# Removed duplicate is_admin function - using the one above
 
 def create_verification_request(user_id, uid, screenshot_file_id):
     """Create a new verification request"""
@@ -429,16 +427,74 @@ Use /verify {user_id} to approve or /reject {user_id} to reject."""
         
         try:
             await context.bot.send_photo(
-                chat_id=ADMIN_USER_ID,
+                chat_id=BotConfig.ADMIN_USER_ID,
                 photo=screenshot_file_id,
                 caption=admin_notification,
                 parse_mode='Markdown'
             )
         except Exception as e:
             logger.error(f"Failed to notify admin: {e}")
+        
+        # Log chat history for photo upload
+        db_manager.log_chat_message(user_id, "user_action", "Uploaded deposit screenshot", {
+            "action_type": "photo_upload",
+            "uid": uid,
+            "file_id": screenshot_file_id
+        })
+        
+        # Log bot response
+        db_manager.log_chat_message(user_id, "bot_response", confirmation_text, {
+            "action": "verification_submitted",
+            "uid": uid
+        })
+        
+        # Update user flow to pending verification
+        update_user_data(user_id, current_flow='pending_verification')
+        
+        # Provide next steps to user
+        next_steps_text = """🎯 **What's Next?**
+
+⏳ **Your verification is being reviewed**
+• Our admin team will check your deposit
+• You'll get notified once approved
+• Usually takes 2-4 hours
+
+🚀 **While you wait:**
+• Join our premium group for trading tips
+• Contact support if you have questions
+
+📞 **Need help?** Contact @{}""".format(BotConfig.ADMIN_USERNAME)
+        
+        keyboard = [
+            [InlineKeyboardButton("🔗 Join Premium Group", callback_data="request_group_access")],
+            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            next_steps_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+        # Log the next steps message
+        db_manager.log_chat_message(user_id, "bot_response", next_steps_text, {
+            "action": "verification_next_steps",
+            "buttons": ["Join Premium Group", "Contact Support"]
+        })
             
     else:
         await update.message.reply_text("Please complete the registration process first by using /start")
+        
+        # Log chat history for invalid photo upload
+        db_manager.log_chat_message(user_id, "user_action", "Uploaded photo outside of flow", {
+            "action_type": "invalid_photo_upload",
+            "current_flow": user_data[3] if user_data else "unknown"
+        })
+        
+        db_manager.log_chat_message(user_id, "bot_response", "Please complete the registration process first by using /start", {
+            "action": "invalid_photo_response"
+        })
 
 # Handle upgrade requests
 async def handle_upgrade_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -636,6 +692,33 @@ Hi {first_name}! Click the link below to join our premium trading group:
     # Update user status to indicate they're in the process of joining
     update_user_data(user_id, current_flow='joining_group')
 
+# New handler for contact support
+async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    log_interaction(user_id, "contact_support")
+    
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_action", "Clicked contact support", {
+        "action_type": "button_click",
+        "button_data": "contact_support"
+    })
+    
+    response_text = f"Please contact our support team: @{BotConfig.ADMIN_USERNAME}"
+    
+    # Send new message instead of editing to preserve chat history
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=response_text
+    )
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", response_text, {
+        "action": "contact_support"
+    })
+
 # New handler for group join confirmation
 async def handle_group_join_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -706,17 +789,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "help_deposit":
         await help_deposit(update, context)
     elif data == "contact_support":
-        await query.answer()
-        user_id = query.from_user.id
-        response_text = f"Please contact our support team: @{BotConfig.ADMIN_USERNAME}"
-        # Send new message instead of editing to preserve chat history
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=response_text
-        )
-        db_manager.log_chat_message(user_id, "bot_response", response_text, {
-            "action": "contact_support"
-        })
+        await handle_contact_support(update, context)
     elif data == "not_interested":
         await handle_not_interested(update, context)
 
