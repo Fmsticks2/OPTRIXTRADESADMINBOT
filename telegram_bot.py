@@ -1,9 +1,10 @@
 import logging
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from datetime import datetime, timedelta
 import pytz
 import re
+import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from telegram import (
@@ -22,18 +23,25 @@ from telegram.ext import (
     filters,
     ConversationHandler,
 )
-import config
+from telegram.error import TelegramError
+
+# Database imports
 from database import (
     initialize_db,
     get_user_data,
     update_user_data,
+    create_user,
+    log_interaction,
+    get_pending_verifications,
     get_all_users,
     delete_user,
+    db_manager
 )
 
 # Enable logging
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
+    level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
@@ -42,6 +50,18 @@ REGISTER_UID, UPLOAD_SCREENSHOT, BROADCAST_MESSAGE, USER_LOOKUP = range(4)
 
 class TradingBot:
     def __init__(self):
+        # Load configuration from environment
+        self.bot_token = os.getenv('BOT_TOKEN')
+        self.broker_link = os.getenv('BROKER_LINK')
+        self.premium_channel_id = os.getenv('PREMIUM_CHANNEL_ID')
+        self.admin_username = os.getenv('ADMIN_USERNAME')
+        self.admin_user_id = int(os.getenv('ADMIN_USER_ID', '0'))
+        
+        # Bot configuration
+        self.webhook_url = os.getenv('WEBHOOK_URL', '')
+        self.webhook_port = int(os.getenv('WEBHOOK_PORT', '8000'))
+        self.webhook_path = os.getenv('WEBHOOK_PATH', '/webhook')
+        
         # Admin keyboard - only shown to admin users
         self.admin_keyboard = [
             [InlineKeyboardButton("📊 Stats", callback_data="stats")],
@@ -68,7 +88,7 @@ class TradingBot:
 
     async def _is_admin(self, user_id: int) -> bool:
         """Check if user is admin"""
-        return str(user_id) == config.ADMIN_USER_ID
+        return user_id == self.admin_user_id
 
     async def _is_verified(self, user_id: int) -> bool:
         """Check if user is verified"""
@@ -85,7 +105,7 @@ class TradingBot:
         wait=wait_exponential(multiplier=1, min=4, max=10),
         retry=retry_if_exception_type(Exception)
     )
-    async def _send_persistent_message(self, chat_id: int, text: str, reply_markup=None, is_new_thread=False):
+    async def _send_persistent_message(self, chat_id: int, text: str, reply_markup=None, parse_mode=None, disable_web_page_preview=False):
         """Send or edit a message while maintaining history"""
         try:
             if chat_id in self.message_history:
@@ -95,7 +115,9 @@ class TradingBot:
                         chat_id=chat_id,
                         message_id=last_message_id,
                         text=text,
-                        reply_markup=reply_markup
+                        reply_markup=reply_markup,
+                        parse_mode=parse_mode,
+                        disable_web_page_preview=disable_web_page_preview
                     )
                     return last_message_id
                 except Exception as edit_error:
@@ -105,7 +127,8 @@ class TradingBot:
                 chat_id=chat_id,
                 text=text,
                 reply_markup=reply_markup,
-                reply_to_message_id=self.message_history.get(chat_id) if not is_new_thread else None
+                parse_mode=parse_mode,
+                disable_web_page_preview=disable_web_page_preview
             )
             self.message_history[chat_id] = new_message.message_id
             return new_message.message_id
@@ -118,6 +141,9 @@ class TradingBot:
         try:
             user = update.effective_user
             user_id = user.id
+            
+            # Log interaction
+            await log_interaction(user_id, "start_command")
             
             # Check admin status
             if await self._is_admin(user_id):
@@ -168,6 +194,11 @@ Unlock VIP trading signals by completing our quick verification process."""
                 parse_mode="Markdown",
                 reply_to_message_id=self.message_history.get(user_id)
             )
+            
+            # Create user in database if not exists
+            if not await get_user_data(user_id):
+                await create_user(user_id, user.first_name, user.username)
+                
         except Exception as e:
             logger.error(f"Error in start_command: {e}")
 
@@ -186,9 +217,9 @@ Unlock VIP trading signals by completing our quick verification process."""
 You have full access to all VIP features."""
                 keyboard = self.verified_user_keyboard
             else:
-                text = """📝 *How It Works:*
+                text = f"""📝 *How It Works:*
 
-1️⃣ *Register* at our broker: [Click Here]({broker_link})
+1️⃣ *Register* at our broker: [Click Here]({self.broker_link})
 2️⃣ *Deposit* $20+ (recommended $100+ for full access)
 3️⃣ *Verify* by sending your UID and deposit proof
 4️⃣ *Get Access* to VIP signals within minutes
@@ -196,7 +227,7 @@ You have full access to all VIP features."""
 *Why we verify:*
 🔒 Prevent signal abuse
 🛡️ Ensure serious traders only
-💎 Maintain signal quality""".format(broker_link=config.BROKER_LINK)
+💎 Maintain signal quality"""
                 keyboard = [
                     [InlineKeyboardButton("🔓 Start Verification", callback_data="get_vip_access")],
                     [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
@@ -285,7 +316,7 @@ To verify your account:
                 )
                 return REGISTER_UID
             
-            await update_user_data(user_id, uid=uid)
+            await update_user_data(user_id, {"uid": uid})
             
             await self._send_persistent_message(
                 chat_id=user_id,
@@ -311,47 +342,30 @@ To verify your account:
                 "verification_date": datetime.now(pytz.utc).isoformat()
             })
             
-            # Simulate verification process
+            # Notify admin
+            if self.admin_user_id:
+                try:
+                    await context.bot.send_message(
+                        chat_id=self.admin_user_id,
+                        text=f"🔄 New verification request from user {user_id}\n\nUID: {update_user_data.get('uid', 'Not provided')}"
+                    )
+                    await context.bot.send_photo(
+                        chat_id=self.admin_user_id,
+                        photo=photo.file_id
+                    )
+                except Exception as e:
+                    logger.error(f"Couldn't notify admin: {e}")
+            
             await self._send_persistent_message(
                 chat_id=user_id,
                 text="🔍 *Verification in Progress...*\n\nWe're reviewing your information. This usually takes 1-2 hours.",
                 parse_mode="Markdown"
             )
             
-            # In a real implementation, you would have actual verification logic here
-            # For demo purposes, we'll auto-verify after a short delay
-            context.job_queue.run_once(
-                self._complete_verification,
-                5,  # 5 seconds delay for demo
-                user_id=user_id
-            )
-            
             return ConversationHandler.END
         except Exception as e:
             logger.error(f"Error in handle_screenshot_upload: {e}")
             return ConversationHandler.END
-
-    async def _complete_verification(self, context: ContextTypes.DEFAULT_TYPE):
-        """Complete verification process"""
-        job = context.job
-        user_id = job.user_id
-        
-        try:
-            await update_user_data(user_id, {
-                "verified": True,
-                "verification_pending": False,
-                "verification_date": datetime.now(pytz.utc).isoformat()
-            })
-            self.user_states[user_id] = True
-            
-            await self.application.bot.send_message(
-                chat_id=user_id,
-                text="🎉 *Verification Complete!*\n\nYou now have full access to:\n- Daily VIP signals\n- Expert strategies\n- Private community",
-                reply_markup=InlineKeyboardMarkup(self.verified_user_keyboard),
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logger.error(f"Error completing verification for user {user_id}: {e}")
 
     async def vip_signals_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /vipsignals command"""
@@ -418,7 +432,7 @@ Only risk 1-2% of your capital per trade"""
 💰 *Deposit:* ${deposit_amount}  
 📅 *Member Since:* {join_date}  
 
-💼 *Broker:* {config.BROKER_NAME}"""
+💼 *Broker Link:* [Click Here]({self.broker_link})"""
             else:
                 text = "❌ *No account information found*\n\nPlease complete registration to create your account."
             
@@ -431,39 +445,11 @@ Only risk 1-2% of your capital per trade"""
                 chat_id=user_id,
                 text=text,
                 reply_markup=reply_markup,
-                parse_mode="Markdown"
+                parse_mode="Markdown",
+                disable_web_page_preview=True
             )
         except Exception as e:
             logger.error(f"Error in my_account_command: {e}")
-
-    async def support_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /support command"""
-        try:
-            user_id = update.effective_user.id
-            
-            text = """🆘 *Support Center*
-
-For assistance, contact @SupportUsername directly or reply to this message.
-
-*Common Issues:*
-1️⃣ Registration help - /signuphelp  
-2️⃣ Verification status - /myaccount  
-3️⃣ Signal questions - /vipsignals  
-
-⏳ *Response Time:* Typically within 24 hours"""
-            
-            reply_markup = InlineKeyboardMarkup([
-                [InlineKeyboardButton("⬅️ Main Menu", callback_data="main_menu")]
-            ])
-            
-            await self._send_persistent_message(
-                chat_id=user_id,
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logger.error(f"Error in support_command: {e}")
 
     async def stats_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /stats command (admin only)"""
@@ -544,125 +530,89 @@ For assistance, contact @SupportUsername directly or reply to this message.
         except Exception as e:
             logger.error(f"Error in button callback: {e}")
 
-    async def handle_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Return to main menu"""
-        try:
-            query = update.callback_query
-            await query.answer()
-            
-            user_id = query.from_user.id
-            
-            if await self._is_admin(user_id):
-                keyboard = self.admin_keyboard
-                text = "👑 *ADMIN MENU*"
-            elif await self._is_verified(user_id):
-                keyboard = self.verified_user_keyboard
-                text = "🏠 *Main Menu*"
-            else:
-                keyboard = self.unverified_user_keyboard
-                text = "🏠 *Main Menu*"
-            
-            await query.edit_message_text(
-                text=text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logger.error(f"Error in handle_main_menu: {e}")
-
-    async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """Cancel and end the conversation."""
-        try:
-            user = update.message.from_user
-            logger.info("User %s canceled the conversation.", user.first_name)
-            
-            is_verified = await self._is_verified(user.id)
-            keyboard = self.verified_user_keyboard if is_verified else self.unverified_user_keyboard
-            
-            await update.message.reply_text(
-                "❌ Operation cancelled.",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-            
-            return ConversationHandler.END
-        except Exception as e:
-            logger.error(f"Error in cancel: {e}")
-            return ConversationHandler.END
-
     async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Log errors caused by updates."""
         logger.error("Exception while handling an update:", exc_info=context.error)
         
-        if update and hasattr(update, "effective_user"):
+        # Notify admin of critical errors
+        if self.admin_user_id:
             try:
-                await update.effective_user.send_message(
-                    "⚠️ *An error occurred*\n\nPlease try again or contact support if the problem persists.",
-                    parse_mode="Markdown"
+                await context.bot.send_message(
+                    chat_id=self.admin_user_id,
+                    text=f"🚨 Bot Error: {str(context.error)[:500]}"
                 )
             except Exception as e:
-                logger.error(f"Couldn't send error message to user: {e}")
+                logger.error(f"Failed to send error notification: {e}")
 
     async def initialize(self):
         """Initialize the bot"""
         await initialize_db()
         logger.info("Database initialized")
 
+    def _setup_handlers(self):
+        """Setup all bot handlers"""
+        # Add handler to track message history
+        self.application.add_handler(MessageHandler(filters.ALL, self._track_messages), group=-1)
+        
+        # Conversation handler for verification flow
+        verification_conv = ConversationHandler(
+            entry_points=[
+                CallbackQueryHandler(self.start_verification, pattern="^start_verification$"),
+                CommandHandler("verify", self.start_verification)
+            ],
+            states={
+                REGISTER_UID: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_uid_confirmation)],
+                UPLOAD_SCREENSHOT: [MessageHandler(filters.PHOTO, self.handle_screenshot_upload)],
+            },
+            fallbacks=[CommandHandler("cancel", self.cancel)],
+        )
+        
+        # Add all handlers
+        self.application.add_handler(CommandHandler("start", self.start_command))
+        self.application.add_handler(CommandHandler("vipsignals", self.vip_signals_command))
+        self.application.add_handler(CommandHandler("myaccount", self.my_account_command))
+        self.application.add_handler(CommandHandler("support", self.support_command))
+        self.application.add_handler(CommandHandler("stats", self.stats_command))
+        self.application.add_handler(CommandHandler("howitworks", self.how_it_works))
+        
+        self.application.add_handler(CallbackQueryHandler(self.button_callback))
+        self.application.add_handler(verification_conv)
+        self.application.add_error_handler(self.error_handler)
+
+    async def start_polling(self):
+        """Start bot in polling mode"""
+        logger.info("🔄 Starting bot in polling mode...")
+        await self.application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+    async def start_webhook(self):
+        """Start bot in webhook mode"""
+        logger.info("🔄 Starting bot in webhook mode...")
+        await self.application.run_webhook(
+            listen="0.0.0.0",
+            port=self.webhook_port,
+            url_path=self.webhook_path,
+            webhook_url=self.webhook_url + self.webhook_path
+        )
+
     async def run(self):
         """Run the bot with all handlers"""
         try:
             await self.initialize()
             
-            self.application = Application.builder().token(config.BOT_TOKEN).build()
-            
-            # Add handler to track message history
-            self.application.add_handler(MessageHandler(filters.ALL, self._track_messages), group=-1)
-            
-            # Conversation handler for verification flow
-            verification_conv = ConversationHandler(
-                entry_points=[
-                    CallbackQueryHandler(self.start_verification, pattern="^start_verification$"),
-                    CommandHandler("verify", self.start_verification)
-                ],
-                states={
-                    REGISTER_UID: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_uid_confirmation)],
-                    UPLOAD_SCREENSHOT: [MessageHandler(filters.PHOTO, self.handle_screenshot_upload)],
-                },
-                fallbacks=[CommandHandler("cancel", self.cancel)],
-            )
-            
-            # Conversation handler for admin broadcast
-            broadcast_conv = ConversationHandler(
-                entry_points=[
-                    CallbackQueryHandler(self.handle_broadcast, pattern="^broadcast$"),
-                    CommandHandler("broadcast", self.handle_broadcast)
-                ],
-                states={
-                    BROADCAST_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_broadcast_message)],
-                },
-                fallbacks=[CommandHandler("cancel", self.cancel)],
-            )
-            
-            # Add all handlers
-            self.application.add_handler(CommandHandler("start", self.start_command))
-            self.application.add_handler(CommandHandler("vipsignals", self.vip_signals_command))
-            self.application.add_handler(CommandHandler("myaccount", self.my_account_command))
-            self.application.add_handler(CommandHandler("support", self.support_command))
-            self.application.add_handler(CommandHandler("stats", self.stats_command))
-            self.application.add_handler(CommandHandler("howitworks", self.how_it_works))
-            
-            self.application.add_handler(CallbackQueryHandler(self.button_callback))
-            self.application.add_handler(verification_conv)
-            self.application.add_handler(broadcast_conv)
-            self.application.add_error_handler(self.error_handler)
+            # Create application
+            self.application = Application.builder().token(self.bot_token).build()
+            self._setup_handlers()
             
             # Start the bot
             logger.info("Bot is running...")
-            await self.application.run_polling()
+            if self.webhook_url:
+                await self.start_webhook()
+            else:
+                await self.start_polling()
         except Exception as e:
             logger.error(f"Error in bot run: {e}")
             raise
 
 if __name__ == "__main__":
     bot = TradingBot()
-    bot.run()
+    asyncio.run(bot.run())
