@@ -2,6 +2,7 @@ import logging
 import asyncio
 import os
 import sys
+import re
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
@@ -170,6 +171,279 @@ def get_all_active_users():
     
     result = db_manager.execute_query(query, (True,), fetch=True)
     return [(user['user_id'], user['first_name']) for user in result] if result else []
+
+# Auto-verification functions
+def validate_uid(uid):
+    """Validate UID format and patterns for auto-verification"""
+    if not uid or not isinstance(uid, str):
+        return False, "UID is required"
+    
+    uid = uid.strip()
+    
+    # Check length requirements
+    if len(uid) < BotConfig.MIN_UID_LENGTH:
+        return False, f"UID too short (minimum {BotConfig.MIN_UID_LENGTH} characters)"
+    
+    if len(uid) > BotConfig.MAX_UID_LENGTH:
+        return False, f"UID too long (maximum {BotConfig.MAX_UID_LENGTH} characters)"
+    
+    # Check for alphanumeric characters only
+    if not re.match(r'^[a-zA-Z0-9]+$', uid):
+        return False, "UID must contain only letters and numbers"
+    
+    # Check for suspicious patterns (test/demo accounts)
+    suspicious_patterns = [
+        r'test',
+        r'demo',
+        r'sample',
+        r'example',
+        r'fake',
+        r'trial',
+        r'temp',
+        r'123456',
+        r'000000',
+        r'111111',
+        r'999999'
+        r'test',
+        r'demo',
+        r'sample',
+        r'example',
+        r'fake',
+        r'trial',
+        r'temp',
+        r'123456',
+        r'000000',
+        r'111111',
+        r'999999',
+    
+    # Sequential patterns
+        r'012345',
+        r'123457',
+        r'234567',
+        r'345678',
+        r'456789',
+        r'567890',
+        r'098765',
+        r'987654',
+    
+    # Repeated patterns
+        r'222222',
+        r'333333',
+        r'444444',
+        r'555555',
+        r'666666',
+        r'777777',
+        r'888888',
+        r'aaaaaa',
+        r'bbbbbb',
+    
+    # Common test/placeholder text
+        r'lorem',
+        r'ipsum',
+        r'placeholder',
+        r'dummy',
+        r'mock',
+        r'stub',
+        r'testing',
+        r'debug',
+        r'dev',
+        r'sandbox',
+    
+    # Default/admin patterns
+        r'admin',
+        r'default',
+        r'guest',
+        r'user',
+        r'anonymous',
+        r'null',
+        r'undefined',
+        r'empty',
+        r'blank',
+    
+    # Keyboard patterns
+        r'qwerty',
+        r'asdfgh',
+        r'zxcvbn',
+        r'qaz',
+        r'wsx',
+        r'edc',
+    
+    # Phone/ID patterns
+        r'555-?0000',
+        r'555-?1234',
+        r'000-?0000',
+        r'123-?4567',
+        
+        # Email patterns
+        r'test@',
+        r'demo@',
+        r'sample@',
+        r'example@',
+        r'fake@',
+        r'noreply@',
+        r'donotreply@',
+        
+        # Date patterns (obviously fake)
+        r'01/01/1900',
+        r'12/31/9999',
+        r'01-01-0001',
+        r'1900-01-01',
+        r'9999-12-31',
+        
+        # Generic/template patterns
+        r'template',
+        r'generic',
+        r'boilerplate',
+        r'prototype',
+        r'draft',
+        r'preliminary',
+        r'provisional',
+        
+        # Development/testing environments
+        r'localhost',
+        r'127\.0\.0\.1',
+        r'dev\..*',
+        r'test\..*',
+        r'staging\..*',
+        r'beta\..*',
+        r'alpha\..*'
+    ]
+    
+    uid_lower = uid.lower()
+    for pattern in suspicious_patterns:
+        if re.search(pattern, uid_lower):
+            return False, f"UID appears to be a test/demo account"
+    
+    # Check for repeated characters (more than 4 in a row)
+    if re.search(r'(.)\1{4,}', uid):
+        return False, "UID contains too many repeated characters"
+    
+    return True, "UID format is valid"
+
+def should_auto_verify(user_id, uid):
+    """Determine if user should be auto-verified based on criteria"""
+    if not BotConfig.AUTO_VERIFY_ENABLED:
+        return False, "Auto-verification is disabled"
+    
+    # Validate UID format
+    is_valid, reason = validate_uid(uid)
+    if not is_valid:
+        return False, reason
+    
+    # Check business hours if required
+    if BotConfig.AUTO_VERIFY_BUSINESS_HOURS_ONLY:
+        current_hour = datetime.now().hour
+        if not (BotConfig.BUSINESS_HOURS_START <= current_hour < BotConfig.BUSINESS_HOURS_END):
+            return False, "Auto-verification only available during business hours"
+    
+    # Check daily auto-approval limit
+    today = datetime.now().date()
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = '''
+            SELECT COUNT(*) as count FROM verification_requests 
+            WHERE status = %s AND auto_verified = %s 
+            AND DATE(created_at) = %s
+        '''
+    else:
+        query = '''
+            SELECT COUNT(*) as count FROM verification_requests 
+            WHERE status = ? AND auto_verified = ? 
+            AND DATE(created_at) = ?
+        '''
+    
+    result = db_manager.execute_query(query, ('approved', True, today), fetch=True)
+    daily_count = result[0]['count'] if result else 0
+    
+    if daily_count >= BotConfig.DAILY_AUTO_APPROVAL_LIMIT:
+        return False, f"Daily auto-approval limit reached ({BotConfig.DAILY_AUTO_APPROVAL_LIMIT})"
+    
+    return True, "All auto-verification criteria met"
+
+async def auto_verify_user(user_id, uid, screenshot_file_id, context):
+    """Automatically verify user and update their status"""
+    try:
+        # Create verification request with auto_verified flag
+        if BotConfig.DATABASE_TYPE == 'postgresql':
+            query = '''
+                INSERT INTO verification_requests (user_id, uid, screenshot_file_id, status, auto_verified, admin_response)
+                VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
+            '''
+            result = db_manager.execute_query(query, (
+                user_id, uid, screenshot_file_id, 'approved', True, 'Auto-verified by system'
+            ), fetch=True)
+            request_id = result[0]['id'] if result else None
+        else:
+            query = '''
+                INSERT INTO verification_requests (user_id, uid, screenshot_file_id, status, auto_verified, admin_response)
+                VALUES (?, ?, ?, ?, ?, ?)
+            '''
+            db_manager.execute_query(query, (
+                user_id, uid, screenshot_file_id, 'approved', True, 'Auto-verified by system'
+            ))
+            request_id = None
+        
+        # Update user status
+        update_user_data(user_id, 
+                         deposit_confirmed=True, 
+                         current_flow='verified',
+                         verification_status='approved')
+        
+        # Get user info for personalized message
+        user_data = get_user_data(user_id)
+        first_name = user_data[2] if user_data else "there"
+        
+        # Send immediate premium access message
+        success_text = f"""🎉 **Verification Approved - Auto-Verified!**
+
+Congratulations {first_name}! Your verification has been automatically approved.
+
+✅ **Status:** Verified
+💳 **UID:** {uid}
+🤖 **Method:** Auto-verification
+
+🔗 **Premium Channels & Groups:**
+• Premium Signals: {PREMIUM_GROUP_LINK}
+• VIP Trading Group: {PREMIUM_GROUP_LINK}
+
+🚀 **You now have access to:**
+• Daily VIP trading signals
+• Expert market analysis
+• Private trader community
+• Exclusive bonuses up to $500
+• Automated trading strategies
+
+**Ready to start trading? Click below to continue!**"""
+        
+        keyboard = [
+            [InlineKeyboardButton("📈 Start Trading", callback_data="start_trading")],
+            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support"),
+             InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Send success message to user
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=success_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+        # Log the auto-verification success message
+        db_manager.log_chat_message(user_id, "bot_response", success_text, {
+            "action": "auto_verification_success",
+            "verification_method": "auto",
+            "uid": uid,
+            "premium_links_provided": True,
+            "buttons": ["Start Trading", "Contact Support", "Main Menu"]
+        })
+        
+        logger.info(f"Auto-verified user {user_id} with UID {uid} and provided premium access")
+        return True, request_id
+        
+    except Exception as e:
+        logger.error(f"Failed to auto-verify user {user_id}: {e}")
+        return False, None
 
 # Command to get user ID for admin setup
 async def get_my_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -415,14 +689,85 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     if text.startswith("UID:") or message_text.isdigit():
         uid = message_text.replace("UID:", "").strip()
         
-        # Update user with UID
-        update_user_data(user_id, uid=uid)
+        # Validate UID format
+        is_valid, validation_message = validate_uid(uid)
         
-        response_text = f"✅ UID received: {uid}\n\n📸 Now please send a screenshot of your deposit to complete verification."
-        await update.message.reply_text(response_text)
-        
-        # Log bot response
-        db_manager.log_chat_message(user_id, "bot_response", response_text, {"uid": uid})
+        if is_valid:
+            # Update user with UID
+            update_user_data(user_id, uid=uid)
+            
+            # Check if auto-verification is possible
+            can_auto_verify, auto_verify_reason = should_auto_verify(user_id, uid)
+            
+            if can_auto_verify:
+                response_text = f"""✅ **UID Received: {uid}**
+
+🤖 **Auto-Verification Status:** Ready for instant approval!
+📸 **Next Step:** Send your deposit screenshot to get automatically verified
+
+⚡ **Benefits of Auto-Verification:**
+• Instant approval (no waiting)
+• Immediate premium access
+• Automated processing
+
+📋 **Your UID meets all criteria:**
+• Length: ✅ Valid ({len(uid)} characters)
+• Format: ✅ Alphanumeric
+• Pattern: ✅ No suspicious patterns detected
+
+🎯 **Ready for screenshot upload!**"""
+            else:
+                response_text = f"""✅ **UID Received: {uid}**
+
+📋 **Verification Status:** Manual review required
+📝 **Reason:** {auto_verify_reason}
+📸 **Next Step:** Send your deposit screenshot for admin review
+
+⏳ **Processing Time:** Usually 2-4 hours
+🔍 **Review Process:** Admin will verify your deposit manually
+
+📋 **Your UID status:**
+• Length: {'✅' if BotConfig.MIN_UID_LENGTH <= len(uid) <= BotConfig.MAX_UID_LENGTH else '❌'} ({len(uid)} characters)
+• Format: {'✅' if re.match(r'^[a-zA-Z0-9]+$', uid) else '❌'} Alphanumeric check
+
+🎯 **Ready for screenshot upload!**"""
+            
+            await update.message.reply_text(response_text, parse_mode='Markdown')
+            
+            # Log bot response
+            db_manager.log_chat_message(user_id, "bot_response", response_text, {
+                "uid": uid,
+                "validation_status": "valid",
+                "auto_verify_eligible": can_auto_verify,
+                "auto_verify_reason": auto_verify_reason
+            })
+        else:
+            # UID validation failed
+            error_response = f"""❌ **Invalid UID Format**
+
+🔍 **Issue:** {validation_message}
+
+📋 **UID Requirements:**
+• Length: {BotConfig.MIN_UID_LENGTH}-{BotConfig.MAX_UID_LENGTH} characters
+• Format: Letters and numbers only
+• No test/demo account patterns
+• No excessive repeated characters
+
+💡 **Examples of valid UIDs:**
+• ABC123456
+• USER789012
+• TRADER456789
+
+🔄 **Please send a valid UID to continue.**"""
+            
+            await update.message.reply_text(error_response, parse_mode='Markdown')
+            
+            # Log validation failure
+            db_manager.log_chat_message(user_id, "bot_response", error_response, {
+                "uid_attempted": uid,
+                "validation_status": "failed",
+                "validation_error": validation_message
+            })
         
     elif text == "UPGRADE":
         await handle_upgrade_request(update, context)
@@ -491,16 +836,47 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         uid = user_data[6] if user_data[6] else "Not provided"
         screenshot_file_id = update.message.photo[-1].file_id
         
+        # Check if user should be auto-verified
+        can_auto_verify, auto_verify_reason = should_auto_verify(user_id, uid)
+        
+        if can_auto_verify:
+            # Auto-verify the user
+            success, request_id = await auto_verify_user(user_id, uid, screenshot_file_id, context)
+            
+            if success:
+                
+                # Auto-verification completed, function handles all messaging and logging
+                return
+            else:
+                logger.error(f"Auto-verification failed for user {user_id}, falling back to manual review")
+        
+        # Manual verification process (original logic)
         # Create verification request
         create_verification_request(user_id, uid, screenshot_file_id)
         
-        # Send confirmation to user
-        confirmation_text = f"""✅ **Screenshot Received Successfully!**
+        # Send confirmation to user with auto-verification status
+        if can_auto_verify:
+            confirmation_text = f"""✅ **Screenshot Received Successfully!**
 
 📋 **Verification Details:**
 • UID: {uid}
 • Screenshot: Uploaded
-• Status: Under Review
+• Status: Under Review (Manual)
+• Reason: Auto-verification temporarily unavailable
+
+⏳ Your verification request has been submitted to our admin team. You'll receive a notification once your deposit is verified.
+
+🕐 **Processing Time:** Usually within 2-4 hours
+
+Thank you for your patience! 🙏"""
+        else:
+            confirmation_text = f"""✅ **Screenshot Received Successfully!**
+
+📋 **Verification Details:**
+• UID: {uid}
+• Screenshot: Uploaded
+• Status: Under Review (Manual)
+• Reason: {auto_verify_reason}
 
 ⏳ Your verification request has been submitted to our admin team. You'll receive a notification once your deposit is verified.
 
@@ -865,9 +1241,7 @@ Step-by-step registration guide:
 4. Complete account verification
 5. Make your first deposit ($20 minimum)
 
-Need personal assistance? Contact @{BotConfig.ADMIN_USERNAME}
-
-[Video tutorial coming soon]"""
+Need personal assistance? Contact @{BotConfig.ADMIN_USERNAME}"""
 
     # Send new message instead of editing to preserve chat history
     await context.bot.send_message(
@@ -904,9 +1278,7 @@ How to make your first deposit:
 5. Complete the transaction
 6. Take a screenshot of confirmation
 
-Need help? Contact @{BotConfig.ADMIN_USERNAME}
-
-[Video tutorial coming soon]"""
+Need help? Contact @{BotConfig.ADMIN_USERNAME}"""
 
     # Send new message instead of editing to preserve chat history
     await context.bot.send_message(
@@ -1312,6 +1684,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_not_interested(update, context)
     elif data == "main_menu":
         await main_menu_callback(update, context)
+    elif data == "start_trading":
+        await start_trading_callback(update, context)
     elif data == "account_menu":
         await account_menu_callback(update, context)
     elif data == "help_menu":
@@ -1498,6 +1872,61 @@ async def help_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode='Markdown'
     )
 
+async def start_trading_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle start trading callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    first_name = query.from_user.first_name or "there"
+    
+    # Log the action
+    log_interaction(user_id, "start_trading")
+    
+    trading_text = f"""📈 **Ready to Start Trading, {first_name}!**
+
+🎯 **Your Trading Journey Begins:**
+
+🔗 **Premium Group Access:**
+• Join: {PREMIUM_GROUP_LINK}
+• Get real-time signals
+• Connect with expert traders
+
+💰 **Trading Platform:**
+• Login to your broker account: {BROKER_LINK}
+• Start with recommended strategies
+• Follow our daily signals
+
+🚀 **Next Steps:**
+1. Join the premium group
+2. Set up your trading dashboard
+3. Start following signals
+4. Track your progress
+
+**Ready to make your first trade?**"""
+    
+    keyboard = [
+        [InlineKeyboardButton("🔗 Join Premium Group", callback_data="request_group_access")],
+        [InlineKeyboardButton("💰 Open Trading Platform", url=BROKER_LINK)],
+        [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support"),
+         InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=trading_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+    
+    # Log the response
+    db_manager.log_chat_message(user_id, "bot_response", trading_text, {
+        "action": "start_trading_guide",
+        "buttons": ["Join Premium Group", "Open Trading Platform", "Contact Support", "Main Menu"]
+    })
+
 async def notification_settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle notification settings callback"""
     query = update.callback_query
@@ -1515,11 +1944,7 @@ async def notification_settings_callback(update: Update, context: ContextTypes.D
 
 ⚠️ **Note:** This feature is currently under development. All notifications are enabled by default to ensure you don't miss important updates.
 
-🔜 **Coming Soon:**
-• Custom notification preferences
-• Quiet hours settings
-• Notification frequency control
-• Channel-specific settings"""
+💡 **Note:** All notifications are currently enabled to ensure you receive important updates."""
     
     keyboard = [
         [InlineKeyboardButton("🔄 Refresh Settings", callback_data="notification_settings")],
@@ -1573,7 +1998,7 @@ async def admin_verify_command(update: Update, context: ContextTypes.DEFAULT_TYP
         # Get user data for notification
         user_data = get_user_data(target_user_id)
         if user_data:
-            # Notify user of approval with action buttons
+            # Notify user of approval with immediate premium access
             success_message = f"""🎉 **Verification Approved!**
 
 Congratulations! Your deposit has been verified by our admin team.
@@ -1589,13 +2014,18 @@ You now have access to:
 🔗 **Premium Channel:** {PREMIUM_CHANNEL_LINK}
 🔗 **Premium Group:** {PREMIUM_GROUP_LINK}
 
+📱 **Next Steps:**
+1. Click the links above to join our premium channels
+2. Start receiving daily trading signals
+3. Access exclusive trading strategies
+
 Your trading journey starts now! 🚀"""
             
             # Create action buttons for approved user
             keyboard = [
-                [InlineKeyboardButton("🔗 Join Premium Group", callback_data="request_group_access")],
                 [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")],
-                [InlineKeyboardButton("🎯 Start Trading", callback_data="get_vip_access")]
+                [InlineKeyboardButton("🎯 Start Trading", callback_data="get_vip_access")],
+                [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -2267,6 +2697,101 @@ async def admin_search_user_command(update: Update, context: ContextTypes.DEFAUL
     
     await update.message.reply_text(user_info, parse_mode='Markdown')
 
+# Admin auto-verification statistics command
+async def admin_auto_verify_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show auto-verification statistics and settings"""
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ Access denied. Admin only.")
+        return
+    
+    try:
+        # Get today's auto-verification stats
+        today = datetime.now().date()
+        if BotConfig.DATABASE_TYPE == 'postgresql':
+            auto_approved_query = '''
+                SELECT COUNT(*) as count FROM verification_requests 
+                WHERE status = %s AND auto_verified = %s 
+                AND DATE(created_at) = %s
+            '''
+            manual_pending_query = '''
+                SELECT COUNT(*) as count FROM verification_requests 
+                WHERE status = %s AND (auto_verified = %s OR auto_verified IS NULL)
+                AND DATE(created_at) = %s
+            '''
+            total_today_query = '''
+                SELECT COUNT(*) as count FROM verification_requests 
+                WHERE DATE(created_at) = %s
+            '''
+        else:
+            auto_approved_query = '''
+                SELECT COUNT(*) as count FROM verification_requests 
+                WHERE status = ? AND auto_verified = ? 
+                AND DATE(created_at) = ?
+            '''
+            manual_pending_query = '''
+                SELECT COUNT(*) as count FROM verification_requests 
+                WHERE status = ? AND (auto_verified = ? OR auto_verified IS NULL)
+                AND DATE(created_at) = ?
+            '''
+            total_today_query = '''
+                SELECT COUNT(*) as count FROM verification_requests 
+                WHERE DATE(created_at) = ?
+            '''
+        
+        auto_approved_result = db_manager.execute_query(auto_approved_query, ('approved', True, today), fetch=True)
+        manual_pending_result = db_manager.execute_query(manual_pending_query, ('pending', False, today), fetch=True)
+        total_today_result = db_manager.execute_query(total_today_query, (today,), fetch=True)
+        
+        auto_approved_count = auto_approved_result[0]['count'] if auto_approved_result else 0
+        manual_pending_count = manual_pending_result[0]['count'] if manual_pending_result else 0
+        total_today_count = total_today_result[0]['count'] if total_today_result else 0
+        
+        # Calculate percentages
+        auto_percentage = (auto_approved_count / total_today_count * 100) if total_today_count > 0 else 0
+        
+        # Get current hour for business hours check
+        current_hour = datetime.now().hour
+        is_business_hours = BotConfig.BUSINESS_HOURS_START <= current_hour < BotConfig.BUSINESS_HOURS_END
+        
+        stats_text = f"""🤖 **AUTO-VERIFICATION STATISTICS**
+
+📊 **Today's Performance ({today}):**
+• Total Verifications: {total_today_count}
+• Auto-Approved: {auto_approved_count} ({auto_percentage:.1f}%)
+• Manual Pending: {manual_pending_count}
+• Daily Limit: {auto_approved_count}/{BotConfig.DAILY_AUTO_APPROVAL_LIMIT}
+
+⚙️ **Current Settings:**
+• Status: {'🟢 Enabled' if BotConfig.AUTO_VERIFY_ENABLED else '🔴 Disabled'}
+• UID Length: {BotConfig.MIN_UID_LENGTH}-{BotConfig.MAX_UID_LENGTH} characters
+• Daily Limit: {BotConfig.DAILY_AUTO_APPROVAL_LIMIT} approvals
+• Business Hours Only: {'Yes' if BotConfig.AUTO_VERIFY_BUSINESS_HOURS_ONLY else 'No'}
+• Business Hours: {BotConfig.BUSINESS_HOURS_START}:00-{BotConfig.BUSINESS_HOURS_END}:00
+• Current Time Status: {'🟢 Business Hours' if is_business_hours else '🔴 Outside Business Hours'}
+
+🔔 **Notifications:**
+• Auto-Approval Alerts: {'On' if BotConfig.NOTIFY_ON_AUTO_APPROVAL else 'Off'}
+• Manual Review Alerts: {'On' if BotConfig.NOTIFY_ON_MANUAL_NEEDED else 'Off'}
+• Rejection Alerts: {'On' if BotConfig.NOTIFY_ON_REJECTION else 'Off'}
+
+📋 **Validation Criteria:**
+• Alphanumeric characters only ✅
+• No test/demo patterns ✅
+• No excessive repetition ✅
+• Length requirements ✅
+• Business hours check {'✅' if not BotConfig.AUTO_VERIFY_BUSINESS_HOURS_ONLY or is_business_hours else '❌'}
+• Daily limit check {'✅' if auto_approved_count < BotConfig.DAILY_AUTO_APPROVAL_LIMIT else '❌'}
+
+💡 **System Status:** {'🟢 Ready for Auto-Verification' if BotConfig.AUTO_VERIFY_ENABLED and (not BotConfig.AUTO_VERIFY_BUSINESS_HOURS_ONLY or is_business_hours) and auto_approved_count < BotConfig.DAILY_AUTO_APPROVAL_LIMIT else '🟡 Limited/Disabled'}"""
+        
+        await update.message.reply_text(stats_text, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error getting auto-verification stats: {e}")
+        await update.message.reply_text(f"❌ Error retrieving auto-verification statistics: {str(e)}")
+
 # Error handler
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Exception while handling an update: {context.error}")
@@ -2291,6 +2816,7 @@ def main():
     application.add_handler(CommandHandler("chathistory", admin_chat_history_command))
     application.add_handler(CommandHandler("activity", admin_recent_activity_command))
     application.add_handler(CommandHandler("searchuser", admin_search_user_command))
+    application.add_handler(CommandHandler("autostats", admin_auto_verify_stats_command))
     
     # Add callback and message handlers
     application.add_handler(CallbackQueryHandler(button_callback))
@@ -2308,7 +2834,6 @@ def main():
     print(f"👨‍💼 Admin User ID: {ADMIN_USER_ID}")
     print("\n📋 Available Commands:")
     print("• /start - Start the bot")
-    print("• /menu - Access main menu")
     print("• /getmyid - Get your Telegram user ID (for admin setup)")
     print("\n📋 Available Admin Commands:")
     print("• /verify <user_id> - Approve user verification")
@@ -2317,6 +2842,7 @@ def main():
     print("• /broadcast <message> - Send message to all users")
     print("• /chathistory <user_id> [limit] - View chat history for user")
     print("• /activity [limit] - View recent activity across all users")
+    print("• /autostats - View auto-verification statistics and settings")
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 

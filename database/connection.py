@@ -37,11 +37,15 @@ class DatabaseManager:
         self.sqlite_path = os.getenv('SQLITE_DATABASE_PATH', 'trading_bot.db')
         self.is_initialized = False
         
-        # Determine database type based on actual configuration
-        if self.database_url and ('postgresql://' in self.database_url or 'postgres://' in self.database_url):
-            self.db_type = 'postgresql'
-        else:
-            self.db_type = 'sqlite'
+        # Determine database type based on DATABASE_TYPE config first
+        self.db_type = os.getenv('DATABASE_TYPE', 'sqlite').lower()
+        
+        # Fallback to URL-based detection if DATABASE_TYPE not set
+        if self.db_type not in ['postgresql', 'sqlite']:
+            if self.database_url and ('postgresql://' in self.database_url or 'postgres://' in self.database_url):
+                self.db_type = 'postgresql'
+            else:
+                self.db_type = 'sqlite'
         
     async def initialize(self):
         """Initialize database connection"""

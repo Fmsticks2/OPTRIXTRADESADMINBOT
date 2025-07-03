@@ -23,13 +23,18 @@ class DatabaseManager:
     def get_connection(self):
         """Get database connection based on configuration"""
         if self.db_type == 'postgresql':
-            return psycopg2.connect(
-                host=BotConfig.POSTGRES_HOST,
-                port=BotConfig.POSTGRES_PORT,
-                database=BotConfig.POSTGRES_DB,
-                user=BotConfig.POSTGRES_USER,
-                password=BotConfig.POSTGRES_PASSWORD
-            )
+            try:
+                return psycopg2.connect(
+                    host=BotConfig.POSTGRES_HOST,
+                    port=BotConfig.POSTGRES_PORT,
+                    database=BotConfig.POSTGRES_DB,
+                    user=BotConfig.POSTGRES_USER,
+                    password=BotConfig.POSTGRES_PASSWORD
+                )
+            except Exception as e:
+                logger.warning(f"PostgreSQL connection failed: {e}. Falling back to SQLite.")
+                self.db_type = 'sqlite'
+                return sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
         else:
             return sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
     
