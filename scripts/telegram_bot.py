@@ -186,9 +186,50 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Log chat history
     db_manager.log_chat_message(user_id, "command", "/start", {
         "username": username,
-        "first_name": first_name
+        "first_name": first_name,
+        "is_admin": is_admin(user_id)
     })
     
+    # Check if user is admin and provide different response
+    if is_admin(user_id):
+        admin_welcome_text = f"""🔧 **Admin Panel - Welcome {first_name}!**
+
+**Available Admin Commands:**
+• `/verify <user_id>` - Approve user verification
+• `/reject <user_id> [reason]` - Reject user verification  
+• `/queue` - View pending verifications
+• `/broadcast <message>` - Send message to all users
+• `/chathistory <user_id> [limit]` - View chat history
+• `/activity [limit]` - View recent activity
+
+**Bot Status:** ✅ Running
+**Database:** ✅ Connected
+**Premium Group:** {PREMIUM_GROUP_LINK}
+
+🎯 **Quick Actions:**"""
+        
+        keyboard = [
+            [InlineKeyboardButton("📋 View Queue", callback_data="admin_queue")],
+            [InlineKeyboardButton("📊 Recent Activity", callback_data="admin_activity")],
+            [InlineKeyboardButton("👥 User Experience", callback_data="get_vip_access")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            admin_welcome_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+        # Log admin welcome
+        db_manager.log_chat_message(user_id, "bot_response", admin_welcome_text, {
+            "action": "admin_welcome",
+            "buttons": ["View Queue", "Recent Activity", "User Experience"]
+        })
+        
+        return
+    
+    # Regular user welcome
     welcome_text = f"""Heyy {first_name}! 👋
 
 Welcome to OPTRIXTRADES
@@ -660,7 +701,7 @@ async def handle_group_access_request(update: Update, context: ContextTypes.DEFA
 
 Hi {first_name}! Click the link below to join our premium trading group:
 
-🔗 **Group Link:** {BotConfig.PREMIUM_GROUP_LINK}
+🔗 **Group Link:** {PREMIUM_GROUP_LINK}
 
 ✅ **What you'll get:**
 • Real-time trading signals
@@ -685,12 +726,86 @@ Hi {first_name}! Click the link below to join our premium trading group:
     # Log bot response
     db_manager.log_chat_message(user_id, "bot_response", join_text, {
         "action": "premium_group_join_instructions",
-        "group_link": BotConfig.PREMIUM_GROUP_LINK,
+        "group_link": PREMIUM_GROUP_LINK,
         "buttons": ["I've Joined the Group"]
     })
     
     # Update user status to indicate they're in the process of joining
     update_user_data(user_id, current_flow='joining_group')
+
+# Admin callback handlers
+async def handle_admin_queue_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if not is_admin(user_id):
+        await query.edit_message_text("❌ You don't have permission to use this command.")
+        return
+    
+    pending_requests = get_pending_verifications()
+    
+    if not pending_requests:
+        await query.edit_message_text("✅ No pending verification requests.")
+        return
+    
+    queue_text = "📋 **Pending Verification Queue:**\n\n"
+    
+    for req in pending_requests:
+        req_id, user_id_req, first_name, username, uid, created_at = req
+        username_display = f"@{username}" if username else "No username"
+        queue_text += f"**#{req_id}** - {first_name} ({username_display})\n"
+        queue_text += f"🆔 User ID: `{user_id_req}`\n"
+        queue_text += f"💳 UID: {uid}\n"
+        queue_text += f"⏰ Submitted: {created_at}\n"
+        queue_text += f"**Commands:** `/verify {user_id_req}` | `/reject {user_id_req}`\n\n"
+    
+    await query.edit_message_text(queue_text, parse_mode='Markdown')
+
+async def handle_admin_activity_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if not is_admin(user_id):
+        await query.edit_message_text("❌ You don't have permission to use this command.")
+        return
+    
+    # Get recent activity from chat history
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        activity_query = '''
+            SELECT ch.user_id, u.first_name, ch.message_type, ch.message_content, ch.created_at
+            FROM chat_history ch
+            JOIN users u ON ch.user_id = u.user_id
+            ORDER BY ch.created_at DESC
+            LIMIT %s
+        '''
+    else:
+        activity_query = '''
+            SELECT ch.user_id, u.first_name, ch.message_type, ch.message_content, ch.created_at
+            FROM chat_history ch
+            JOIN users u ON ch.user_id = u.user_id
+            ORDER BY ch.created_at DESC
+            LIMIT ?
+        '''
+    
+    recent_activity = db_manager.execute_query(activity_query, (10,), fetch=True)
+    
+    if not recent_activity:
+        await query.edit_message_text("📊 No recent activity found.")
+        return
+    
+    activity_text = "📊 **Recent Activity (Last 10):**\n\n"
+    
+    for activity in recent_activity:
+        user_id_act, first_name, msg_type, msg_content, created_at = activity
+        # Truncate long messages
+        content_preview = msg_content[:50] + "..." if len(msg_content) > 50 else msg_content
+        activity_text += f"👤 {first_name} (`{user_id_act}`)\n"
+        activity_text += f"📝 {msg_type}: {content_preview}\n"
+        activity_text += f"⏰ {created_at}\n\n"
+    
+    await query.edit_message_text(activity_text, parse_mode='Markdown')
 
 # New handler for contact support
 async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -792,6 +907,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_contact_support(update, context)
     elif data == "not_interested":
         await handle_not_interested(update, context)
+    elif data == "admin_queue":
+        await handle_admin_queue_callback(update, context)
+    elif data == "admin_activity":
+        await handle_admin_activity_callback(update, context)
+    else:
+        await query.answer("Unknown action")
 
 # Admin Commands
 async def admin_verify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
