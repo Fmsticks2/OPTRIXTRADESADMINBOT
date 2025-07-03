@@ -9,7 +9,7 @@
 | `UPGRADE` | Request premium upgrade information |
 | UID + Screenshot | Send your broker UID followed by deposit screenshot for verification |
 
-## Admin Commands
+## Admin Commandsthen for the verification, the bot
 
 | Command | Description |
 |---------|-------------|

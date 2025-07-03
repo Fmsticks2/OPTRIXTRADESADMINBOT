@@ -599,21 +599,74 @@ async def handle_group_access_request(update: Update, context: ContextTypes.DEFA
         "first_name": first_name
     })
     
-    # Simulate automatic addition to group (in real implementation, you'd use bot.add_chat_member)
-    success_text = f"""🎉 **Welcome to OPTRIXTRADES Premium Group!**
+    # Provide group link for user to join manually
+    join_text = f"""🎯 **Join OPTRIXTRADES Premium Group**
 
-Hi {first_name}! You've been successfully added to our premium trading group.
+Hi {first_name}! Click the link below to join our premium trading group:
 
-🔗 **Group Link:** {PREMIUM_GROUP_LINK}
+🔗 **Group Link:** {BotConfig.PREMIUM_GROUP_LINK}
 
-✅ **What you get:**
+✅ **What you'll get:**
 • Real-time trading signals
 • Market analysis and insights
 • Direct access to our trading experts
 • Exclusive trading strategies
 • Community support
 
-🚀 **Ready to start your trading journey?**"""
+📱 **After joining the group, click the button below to confirm your membership and continue your trading journey!**"""
+    
+    keyboard = [[InlineKeyboardButton("✅ I've Joined the Group", callback_data="confirm_group_joined")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Send new message instead of editing to preserve chat history
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=join_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", join_text, {
+        "action": "premium_group_join_instructions",
+        "group_link": BotConfig.PREMIUM_GROUP_LINK,
+        "buttons": ["I've Joined the Group"]
+    })
+    
+    # Update user status to indicate they're in the process of joining
+    update_user_data(user_id, current_flow='joining_group')
+
+# New handler for group join confirmation
+async def handle_group_join_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    first_name = query.from_user.first_name or "there"
+    username = query.from_user.username or ""
+    
+    log_interaction(user_id, "group_join_confirmed")
+    
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_action", "Confirmed group membership", {
+        "action_type": "group_join_confirmation",
+        "username": username,
+        "first_name": first_name
+    })
+    
+    # Send welcome confirmation message
+    welcome_text = f"""🎉 **Welcome to OPTRIXTRADES Premium Group!**
+
+Hi {first_name}! Thank you for joining our premium trading group.
+
+🚀 **You now have access to:**
+• Real-time trading signals
+• Market analysis and insights
+• Direct access to our trading experts
+• Exclusive trading strategies
+• Community support
+
+✨ **Ready to start your trading journey?**"""
     
     keyboard = [[InlineKeyboardButton("🚀 Start Trading Journey", callback_data="get_vip_access")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -621,19 +674,18 @@ Hi {first_name}! You've been successfully added to our premium trading group.
     # Send new message instead of editing to preserve chat history
     await context.bot.send_message(
         chat_id=user_id,
-        text=success_text,
+        text=welcome_text,
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", success_text, {
-        "action": "premium_group_welcome",
-        "group_link": PREMIUM_GROUP_LINK,
+    db_manager.log_chat_message(user_id, "bot_response", welcome_text, {
+        "action": "premium_group_welcome_confirmation",
         "buttons": ["Start Trading Journey"]
     })
     
-    # Update user status
+    # Update user status to group member
     update_user_data(user_id, current_flow='group_member')
 
 # Callback query handler
@@ -645,6 +697,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await activation_instructions(update, context)
     elif data == "request_group_access":
         await handle_group_access_request(update, context)
+    elif data == "confirm_group_joined":
+        await handle_group_join_confirmation(update, context)
     elif data == "registered":
         await registration_confirmation(update, context)
     elif data == "help_signup":
