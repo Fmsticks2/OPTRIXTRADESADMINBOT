@@ -9,7 +9,9 @@ from .connection import (
     create_user, 
     log_interaction,
     initialize_db,
-    get_db_session
+    cleanup_db,
+    health_check,
+    get_pending_verifications
 )
 
 __all__ = [
@@ -19,5 +21,7 @@ __all__ = [
     'create_user', 
     'log_interaction',
     'initialize_db',
-    'get_db_session'
+    'cleanup_db',
+    'health_check',
+    'get_pending_verifications'
 ]
