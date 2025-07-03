@@ -34,6 +34,8 @@ class DatabaseManager:
             except Exception as e:
                 logger.warning(f"PostgreSQL connection failed: {e}. Falling back to SQLite.")
                 self.db_type = 'sqlite'
+                # Update the global config to reflect the actual database type being used
+                BotConfig.DATABASE_TYPE = 'sqlite'
                 return sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
         else:
             return sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
@@ -87,8 +89,11 @@ class DatabaseManager:
                         user_id BIGINT PRIMARY KEY,
                         username VARCHAR(255),
                         first_name VARCHAR(255),
+                        current_flow VARCHAR(50) DEFAULT 'welcome',
+                        deposit_confirmed BOOLEAN DEFAULT FALSE,
                         uid VARCHAR(50),
                         deposit_screenshot VARCHAR(500),
+                        is_active BOOLEAN DEFAULT TRUE,
                         verification_status VARCHAR(20) DEFAULT 'pending',
                         premium_access BOOLEAN DEFAULT FALSE,
                         group_access BOOLEAN DEFAULT FALSE,
@@ -112,6 +117,7 @@ class DatabaseManager:
                         uid VARCHAR(50),
                         screenshot_file_id VARCHAR(500),
                         status VARCHAR(20) DEFAULT 'pending',
+                        auto_verified BOOLEAN DEFAULT FALSE,
                         admin_response TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -147,8 +153,11 @@ class DatabaseManager:
                         user_id INTEGER PRIMARY KEY,
                         username TEXT,
                         first_name TEXT,
+                        current_flow TEXT DEFAULT 'welcome',
+                        deposit_confirmed INTEGER DEFAULT 0,
                         uid TEXT,
                         deposit_screenshot TEXT,
+                        is_active INTEGER DEFAULT 1,
                         verification_status TEXT DEFAULT 'pending',
                         premium_access INTEGER DEFAULT 0,
                         group_access INTEGER DEFAULT 0,
@@ -172,6 +181,7 @@ class DatabaseManager:
                         uid TEXT,
                         screenshot_file_id TEXT,
                         status TEXT DEFAULT 'pending',
+                        auto_verified INTEGER DEFAULT 0,
                         admin_response TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
