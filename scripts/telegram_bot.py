@@ -229,10 +229,16 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     update_user_data(user_id, current_flow='activation')
     log_interaction(user_id, "activation_instructions")
     
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_action", "Clicked Get Free VIP Access", {
+        "action_type": "button_click",
+        "button_data": "get_vip_access"
+    })
+    
     activation_text = f"""To activate your free access and join our VIP Signal Channel, follow these steps:
 
 1️⃣ Click the link below to register with our official broker partner
-{BROKER_LINK}
+{BotConfig.BROKER_LINK}
 
 2️⃣ Deposit $20 or more
 
@@ -257,7 +263,17 @@ The more you deposit, the more powerful your AI access:
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(activation_text, reply_markup=reply_markup)
+    # Send new message instead of editing to preserve chat history
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=activation_text,
+        reply_markup=reply_markup
+    )
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", activation_text, {
+        "buttons": ["I've Registered", "Need help signing up", "Need support making a deposit"]
+    })
     
     # Send second part of message
     second_part = """Why is it free?
@@ -268,6 +284,9 @@ Want to unlock even higher-tier bonuses or full bot access?
 Send "UPGRADE" """
 
     await context.bot.send_message(chat_id=query.from_user.id, text=second_part)
+    
+    # Log second part
+    db_manager.log_chat_message(user_id, "bot_response", second_part)
 
 # Flow 3: Confirmation
 async def registration_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -278,15 +297,33 @@ async def registration_confirmation(update: Update, context: ContextTypes.DEFAUL
     update_user_data(user_id, current_flow='confirmation', registration_status='registered')
     log_interaction(user_id, "registration_confirmation")
     
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_action", "Clicked I've Registered", {
+        "action_type": "button_click",
+        "button_data": "registered"
+    })
+    
     confirmation_text = """Send in your UID and deposit screenshot to gain access to OPTRIXTRADES premium signal channel.
 
 BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Get early access now into our premium channel - only limited slots are available! 🚀"""
 
-    await query.edit_message_text(confirmation_text)
+    # Send new message instead of editing to preserve chat history
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=confirmation_text
+    )
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", confirmation_text)
+    
+    instruction_text = "Please send your UID and deposit screenshot as separate messages."
     await context.bot.send_message(
         chat_id=user_id, 
-        text="Please send your UID and deposit screenshot as separate messages."
+        text=instruction_text
     )
+    
+    # Log instruction
+    db_manager.log_chat_message(user_id, "bot_response", instruction_text)
 
 # Handle text messages (UID, UPGRADE, etc.)
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -408,6 +445,11 @@ async def handle_upgrade_request(update: Update, context: ContextTypes.DEFAULT_T
     user_id = update.effective_user.id
     log_interaction(user_id, "upgrade_request")
     
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_message", "UPGRADE", {
+        "action_type": "upgrade_request"
+    })
+    
     upgrade_text = f"""🔥 UPGRADE REQUEST RECEIVED
 
 For premium upgrade options and full bot access, please contact our support team directly.
@@ -421,35 +463,64 @@ Our team will help you unlock:
 Contact: @{ADMIN_USERNAME}"""
 
     await update.message.reply_text(upgrade_text)
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", upgrade_text, {
+        "action": "upgrade_response",
+        "admin_contact": ADMIN_USERNAME
+    })
 
 # Help handlers
 async def help_signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    log_interaction(query.from_user.id, "help_signup")
+    user_id = query.from_user.id
+    log_interaction(user_id, "help_signup")
+    
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_action", "Requested signup help", {
+        "action_type": "button_click",
+        "button_data": "help_signup"
+    })
     
     help_text = f"""📹 SIGNUP HELP
 
 Step-by-step registration guide:
 
-1. Click this link: {BROKER_LINK}
+1. Click this link: {BotConfig.BROKER_LINK}
 2. Fill in your personal details
 3. Verify your email address
 4. Complete account verification
 5. Make your first deposit ($20 minimum)
 
-Need personal assistance? Contact @{ADMIN_USERNAME}
+Need personal assistance? Contact @{BotConfig.ADMIN_USERNAME}
 
 [Video tutorial coming soon]"""
 
-    await query.edit_message_text(help_text)
+    # Send new message instead of editing to preserve chat history
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=help_text
+    )
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", help_text, {
+        "action": "signup_help"
+    })
 
 async def help_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    log_interaction(query.from_user.id, "help_deposit")
+    user_id = query.from_user.id
+    log_interaction(user_id, "help_deposit")
+    
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_action", "Requested deposit help", {
+        "action_type": "button_click",
+        "button_data": "help_deposit"
+    })
     
     help_text = f"""💳 DEPOSIT HELP
 
@@ -462,11 +533,20 @@ How to make your first deposit:
 5. Complete the transaction
 6. Take a screenshot of confirmation
 
-Need help? Contact @{ADMIN_USERNAME}
+Need help? Contact @{BotConfig.ADMIN_USERNAME}
 
 [Video tutorial coming soon]"""
 
-    await query.edit_message_text(help_text)
+    # Send new message instead of editing to preserve chat history
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=help_text
+    )
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", help_text, {
+        "action": "deposit_help"
+    })
 
 # Add this after the existing callback handlers, before the button_callback function
 
@@ -478,13 +558,28 @@ async def handle_not_interested(update: Update, context: ContextTypes.DEFAULT_TY
     update_user_data(user_id, is_active=False)
     log_interaction(user_id, "not_interested")
     
+    # Log chat history
+    db_manager.log_chat_message(user_id, "user_action", "Clicked not interested", {
+        "action_type": "button_click",
+        "button_data": "not_interested"
+    })
+    
     farewell_text = """Alright, no problem! 👋
 
 Feel free to reach us at any time @Optrixtradesadmin if you change your mind.
 
 We'll be here when you're ready to start your trading journey! 🚀"""
 
-    await query.edit_message_text(farewell_text)
+    # Send new message instead of editing to preserve chat history
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=farewell_text
+    )
+    
+    # Log bot response
+    db_manager.log_chat_message(user_id, "bot_response", farewell_text, {
+        "action": "not_interested_farewell"
+    })
 
 # New handler for group access request
 async def handle_group_access_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -523,7 +618,13 @@ Hi {first_name}! You've been successfully added to our premium trading group.
     keyboard = [[InlineKeyboardButton("🚀 Start Trading Journey", callback_data="get_vip_access")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(success_text, reply_markup=reply_markup, parse_mode='Markdown')
+    # Send new message instead of editing to preserve chat history
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=success_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
     
     # Log bot response
     db_manager.log_chat_message(user_id, "bot_response", success_text, {
@@ -552,7 +653,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await help_deposit(update, context)
     elif data == "contact_support":
         await query.answer()
-        await query.edit_message_text(f"Please contact our support team: @{ADMIN_USERNAME}")
+        user_id = query.from_user.id
+        response_text = f"Please contact our support team: @{BotConfig.ADMIN_USERNAME}"
+        # Send new message instead of editing to preserve chat history
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=response_text
+        )
+        db_manager.log_chat_message(user_id, "bot_response", response_text, {
+            "action": "contact_support"
+        })
     elif data == "not_interested":
         await handle_not_interested(update, context)
 
