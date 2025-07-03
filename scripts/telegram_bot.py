@@ -1,10 +1,16 @@
 import logging
 import sqlite3
 import asyncio
-from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 import os
+import sys
+from datetime import datetime, timedelta
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram.error import TelegramError
+
+# Add parent directory to path to import config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import BotConfig
 
 # Configure logging
 logging.basicConfig(
@@ -13,16 +19,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Bot Configuration - Updated with your actual values
-BOT_TOKEN = "7560905481:AAFm1Ra0zAknomOhXvjsR4kkruurz_O033s"
-BROKER_LINK = "https://affiliate.iqbroker.com/redir/?aff=755757&aff_model=revenue&afftrack="
-PREMIUM_CHANNEL_ID = "-1001002557285297"  # Added -100 prefix for supergroup
-PREMIUM_CHANNEL_LINK = f"https://t.me/c/1002557285297"
-ADMIN_USERNAME = "Optrixtradesadmin"
+# Bot Configuration from environment variables
+BOT_TOKEN = BotConfig.BOT_TOKEN
+BROKER_LINK = BotConfig.BROKER_LINK
+PREMIUM_CHANNEL_ID = BotConfig.PREMIUM_CHANNEL_ID
+PREMIUM_CHANNEL_LINK = f"https://t.me/c/{BotConfig.PREMIUM_CHANNEL_ID.replace('-100', '')}"
+PREMIUM_GROUP_LINK = "https://t.me/+LTnKwBO54DRiOTNk"  # Premium group link
+ADMIN_USERNAME = BotConfig.ADMIN_USERNAME
+ADMIN_USER_ID = int(BotConfig.ADMIN_USER_ID) if BotConfig.ADMIN_USER_ID.isdigit() else 123456789
 
 # Database setup
 def init_database():
-    conn = sqlite3.connect('trading_bot.db')
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -52,11 +60,37 @@ def init_database():
         )
     ''')
     
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS verification_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            uid TEXT,
+            screenshot_file_id TEXT,
+            status TEXT DEFAULT 'pending',
+            admin_response TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS broadcast_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_text TEXT,
+            total_users INTEGER,
+            successful_sends INTEGER DEFAULT 0,
+            failed_sends INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
 def get_user_data(user_id):
-    conn = sqlite3.connect('trading_bot.db')
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
     user = cursor.fetchone()
@@ -64,7 +98,7 @@ def get_user_data(user_id):
     return user
 
 def update_user_data(user_id, **kwargs):
-    conn = sqlite3.connect('trading_bot.db')
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
     cursor = conn.cursor()
     
     # Update last_interaction
@@ -79,7 +113,7 @@ def update_user_data(user_id, **kwargs):
     conn.close()
 
 def create_user(user_id, username, first_name):
-    conn = sqlite3.connect('trading_bot.db')
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -91,7 +125,7 @@ def create_user(user_id, username, first_name):
     conn.close()
 
 def log_interaction(user_id, interaction_type, interaction_data=""):
-    conn = sqlite3.connect('trading_bot.db')
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -101,6 +135,68 @@ def log_interaction(user_id, interaction_type, interaction_data=""):
     
     conn.commit()
     conn.close()
+
+def is_admin(user_id):
+    """Check if user is admin"""
+    return user_id == ADMIN_USER_ID
+
+def create_verification_request(user_id, uid, screenshot_file_id):
+    """Create a new verification request"""
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO verification_requests (user_id, uid, screenshot_file_id)
+        VALUES (?, ?, ?)
+    ''', (user_id, uid, screenshot_file_id))
+    
+    conn.commit()
+    conn.close()
+
+def get_pending_verifications():
+    """Get all pending verification requests"""
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT vr.id, vr.user_id, u.first_name, u.username, vr.uid, vr.created_at
+        FROM verification_requests vr
+        JOIN users u ON vr.user_id = u.user_id
+        WHERE vr.status = 'pending'
+        ORDER BY vr.created_at ASC
+    ''')
+    
+    requests = cursor.fetchall()
+    conn.close()
+    return requests
+
+def update_verification_status(request_id, status, admin_response=""):
+    """Update verification request status"""
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        UPDATE verification_requests 
+        SET status = ?, admin_response = ?, updated_at = ?
+        WHERE id = ?
+    ''', (status, admin_response, datetime.now(), request_id))
+    
+    conn.commit()
+    conn.close()
+
+def get_all_active_users():
+    """Get all active users for broadcasting"""
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT user_id, first_name FROM users 
+        WHERE is_active = TRUE
+    ''')
+    
+    users = cursor.fetchall()
+    conn.close()
+    return users
 
 # Flow 1: Welcome & Hook
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -127,9 +223,12 @@ Here's what you get as a member:
 ✅ Exclusive signup bonuses (up to $500)
 ✅ Automated trading bot – trade while you sleep
 
-Tap below to activate your free VIP access and get started."""
+Choose your next step:"""
 
-    keyboard = [[InlineKeyboardButton("➡️ Get Free VIP Access", callback_data="get_vip_access")]]
+    keyboard = [
+        [InlineKeyboardButton("🚀 Request Premium Group Access", callback_data="request_group_access")],
+        [InlineKeyboardButton("➡️ Get Free VIP Access", callback_data="get_vip_access")]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(welcome_text, reply_markup=reply_markup)
@@ -235,24 +334,50 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     log_interaction(user_id, "photo_upload", "deposit_screenshot")
     
     if user_data[3] == 'confirmation':  # current_flow is confirmation
-        # Mark deposit as confirmed (in real implementation, you'd verify this)
-        update_user_data(user_id, deposit_confirmed=True, current_flow='completed')
+        # Get the user's UID from database
+        uid = user_data[6] if user_data[6] else "Not provided"
+        screenshot_file_id = update.message.photo[-1].file_id
         
-        success_text = f"""🎉 Congratulations! Your deposit has been verified.
+        # Create verification request
+        create_verification_request(user_id, uid, screenshot_file_id)
+        
+        # Send confirmation to user
+        confirmation_text = f"""✅ **Screenshot Received Successfully!**
 
-Welcome to OPTRIXTRADES Premium! 
+📋 **Verification Details:**
+• UID: {uid}
+• Screenshot: Uploaded
+• Status: Under Review
 
-You now have access to:
-✅ Daily VIP trading signals
-✅ Premium trading strategies  
-✅ Live trading sessions
-✅ AI trading bot access
+⏳ Your verification request has been submitted to our admin team. You'll receive a notification once your deposit is verified.
 
-Join our premium channel: {PREMIUM_CHANNEL_LINK}
+🕐 **Processing Time:** Usually within 2-4 hours
 
-Your trading journey starts now! 🚀"""
+Thank you for your patience! 🙏"""
+        
+        await update.message.reply_text(confirmation_text, parse_mode='Markdown')
+        
+        # Notify admin about new verification request
+        admin_notification = f"""🔔 **NEW VERIFICATION REQUEST**
 
-        await update.message.reply_text(success_text)
+👤 **User:** {user_data[2]} (@{user_data[1] or 'No username'})
+🆔 **User ID:** {user_id}
+💳 **UID:** {uid}
+📸 **Screenshot:** Uploaded
+⏰ **Time:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Use /verify {user_id} to approve or /reject {user_id} to reject."""
+        
+        try:
+            await context.bot.send_photo(
+                chat_id=ADMIN_USER_ID,
+                photo=screenshot_file_id,
+                caption=admin_notification,
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify admin: {e}")
+            
     else:
         await update.message.reply_text("Please complete the registration process first by using /start")
 
@@ -339,6 +464,40 @@ We'll be here when you're ready to start your trading journey! 🚀"""
 
     await query.edit_message_text(farewell_text)
 
+# New handler for group access request
+async def handle_group_access_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    first_name = query.from_user.first_name or "there"
+    
+    log_interaction(user_id, "group_access_request")
+    
+    # Simulate automatic addition to group (in real implementation, you'd use bot.add_chat_member)
+    success_text = f"""🎉 **Welcome to OPTRIXTRADES Premium Group!**
+
+Hi {first_name}! You've been successfully added to our premium trading group.
+
+🔗 **Group Link:** {PREMIUM_GROUP_LINK}
+
+✅ **What you get:**
+• Real-time trading signals
+• Market analysis and insights
+• Direct access to our trading experts
+• Exclusive trading strategies
+• Community support
+
+🚀 **Ready to start your trading journey?**"""
+    
+    keyboard = [[InlineKeyboardButton("🚀 Start Trading Journey", callback_data="get_vip_access")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(success_text, reply_markup=reply_markup, parse_mode='Markdown')
+    
+    # Update user status
+    update_user_data(user_id, current_flow='group_member')
+
 # Callback query handler
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -346,6 +505,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if data == "get_vip_access":
         await activation_instructions(update, context)
+    elif data == "request_group_access":
+        await handle_group_access_request(update, context)
     elif data == "registered":
         await registration_confirmation(update, context)
     elif data == "help_signup":
@@ -358,6 +519,232 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "not_interested":
         await handle_not_interested(update, context)
 
+# Admin Commands
+async def admin_verify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to verify a user"""
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ You don't have permission to use this command.")
+        return
+    
+    if not context.args:
+        await update.message.reply_text("Usage: /verify <user_id>")
+        return
+    
+    try:
+        target_user_id = int(context.args[0])
+        
+        # Update user as verified
+        update_user_data(target_user_id, deposit_confirmed=True, current_flow='completed')
+        
+        # Update verification request status
+        conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE verification_requests 
+            SET status = 'approved', admin_response = 'Manually approved by admin', updated_at = ?
+            WHERE user_id = ? AND status = 'pending'
+        ''', (datetime.now(), target_user_id))
+        conn.commit()
+        conn.close()
+        
+        # Get user data for notification
+        user_data = get_user_data(target_user_id)
+        if user_data:
+            # Notify user of approval
+            success_message = f"""🎉 **Verification Approved!**
+
+Congratulations! Your deposit has been verified by our admin team.
+
+**Welcome to OPTRIXTRADES Premium!**
+
+You now have access to:
+✅ Daily VIP trading signals
+✅ Premium trading strategies
+✅ Live trading sessions
+✅ AI trading bot access
+
+🔗 **Premium Channel:** {PREMIUM_CHANNEL_LINK}
+🔗 **Premium Group:** {PREMIUM_GROUP_LINK}
+
+Your trading journey starts now! 🚀"""
+            
+            try:
+                await context.bot.send_message(
+                    chat_id=target_user_id,
+                    text=success_message,
+                    parse_mode='Markdown'
+                )
+                await update.message.reply_text(f"✅ User {target_user_id} ({user_data[2]}) has been verified and notified.")
+            except Exception as e:
+                await update.message.reply_text(f"✅ User {target_user_id} verified, but notification failed: {e}")
+        else:
+            await update.message.reply_text(f"✅ User {target_user_id} verified, but user data not found.")
+            
+    except ValueError:
+        await update.message.reply_text("❌ Invalid user ID. Please provide a numeric user ID.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error verifying user: {e}")
+
+async def admin_reject_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to reject a user verification"""
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ You don't have permission to use this command.")
+        return
+    
+    if not context.args:
+        await update.message.reply_text("Usage: /reject <user_id> [reason]")
+        return
+    
+    try:
+        target_user_id = int(context.args[0])
+        reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Verification rejected by admin"
+        
+        # Update verification request status
+        conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE verification_requests 
+            SET status = 'rejected', admin_response = ?, updated_at = ?
+            WHERE user_id = ? AND status = 'pending'
+        ''', (reason, datetime.now(), target_user_id))
+        conn.commit()
+        conn.close()
+        
+        # Get user data for notification
+        user_data = get_user_data(target_user_id)
+        if user_data:
+            # Notify user of rejection
+            rejection_message = f"""❌ **Verification Rejected**
+
+Unfortunately, your verification request has been rejected.
+
+**Reason:** {reason}
+
+📞 **Need Help?**
+Please contact our support team for assistance: @{ADMIN_USERNAME}
+
+You can resubmit your verification with the correct information."""
+            
+            try:
+                await context.bot.send_message(
+                    chat_id=target_user_id,
+                    text=rejection_message,
+                    parse_mode='Markdown'
+                )
+                await update.message.reply_text(f"❌ User {target_user_id} ({user_data[2]}) verification rejected and notified.")
+            except Exception as e:
+                await update.message.reply_text(f"❌ User {target_user_id} rejected, but notification failed: {e}")
+        else:
+            await update.message.reply_text(f"❌ User {target_user_id} rejected, but user data not found.")
+            
+    except ValueError:
+        await update.message.reply_text("❌ Invalid user ID. Please provide a numeric user ID.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error rejecting user: {e}")
+
+async def admin_queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to view pending verifications"""
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ You don't have permission to use this command.")
+        return
+    
+    pending_requests = get_pending_verifications()
+    
+    if not pending_requests:
+        await update.message.reply_text("✅ No pending verification requests.")
+        return
+    
+    queue_text = "📋 **Pending Verification Queue:**\n\n"
+    
+    for req in pending_requests:
+        req_id, user_id_req, first_name, username, uid, created_at = req
+        username_display = f"@{username}" if username else "No username"
+        queue_text += f"**#{req_id}** - {first_name} ({username_display})\n"
+        queue_text += f"🆔 User ID: `{user_id_req}`\n"
+        queue_text += f"💳 UID: {uid}\n"
+        queue_text += f"⏰ Submitted: {created_at}\n"
+        queue_text += f"**Commands:** `/verify {user_id_req}` | `/reject {user_id_req}`\n\n"
+    
+    await update.message.reply_text(queue_text, parse_mode='Markdown')
+
+async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command to broadcast message to all users"""
+    user_id = update.effective_user.id
+    
+    if not is_admin(user_id):
+        await update.message.reply_text("❌ You don't have permission to use this command.")
+        return
+    
+    if not context.args:
+        await update.message.reply_text("Usage: /broadcast <message>\n\nExample: /broadcast Hello everyone! New signals are available.")
+        return
+    
+    message_text = " ".join(context.args)
+    users = get_all_active_users()
+    
+    if not users:
+        await update.message.reply_text("❌ No active users found for broadcasting.")
+        return
+    
+    # Create broadcast record
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO broadcast_messages (message_text, total_users)
+        VALUES (?, ?)
+    ''', (message_text, len(users)))
+    broadcast_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    
+    successful_sends = 0
+    failed_sends = 0
+    
+    # Send broadcast message
+    status_message = await update.message.reply_text(f"📡 Broadcasting to {len(users)} users...")
+    
+    for user_id_target, first_name in users:
+        try:
+            await context.bot.send_message(
+                chat_id=user_id_target,
+                text=f"📢 **OPTRIXTRADES Announcement**\n\n{message_text}",
+                parse_mode='Markdown'
+            )
+            successful_sends += 1
+        except Exception as e:
+            failed_sends += 1
+            logger.error(f"Failed to send broadcast to {user_id_target}: {e}")
+    
+    # Update broadcast record
+    conn = sqlite3.connect(BotConfig.SQLITE_DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE broadcast_messages 
+        SET successful_sends = ?, failed_sends = ?, completed_at = ?
+        WHERE id = ?
+    ''', (successful_sends, failed_sends, datetime.now(), broadcast_id))
+    conn.commit()
+    conn.close()
+    
+    # Send delivery confirmation to admin
+    confirmation_text = f"""✅ **Broadcast Complete!**
+
+📊 **Delivery Report:**
+• Total Users: {len(users)}
+• Successful: {successful_sends}
+• Failed: {failed_sends}
+• Success Rate: {(successful_sends/len(users)*100):.1f}%
+
+📝 **Message:** {message_text[:100]}{'...' if len(message_text) > 100 else ''}"""
+    
+    await status_message.edit_text(confirmation_text, parse_mode='Markdown')
+
 # Error handler
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Exception while handling an update: {context.error}")
@@ -369,8 +756,16 @@ def main():
     # Create application
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # Add handlers
+    # Add user command handlers
     application.add_handler(CommandHandler("start", start_command))
+    
+    # Add admin command handlers
+    application.add_handler(CommandHandler("verify", admin_verify_command))
+    application.add_handler(CommandHandler("reject", admin_reject_command))
+    application.add_handler(CommandHandler("queue", admin_queue_command))
+    application.add_handler(CommandHandler("broadcast", admin_broadcast_command))
+    
+    # Add callback and message handlers
     application.add_handler(CallbackQueryHandler(button_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
@@ -381,6 +776,13 @@ def main():
     print(f"📱 Bot Token: {BOT_TOKEN[:10]}...")
     print(f"🔗 Broker Link: {BROKER_LINK}")
     print(f"📢 Premium Channel: {PREMIUM_CHANNEL_ID}")
+    print(f"🔗 Premium Group: {PREMIUM_GROUP_LINK}")
+    print(f"👨‍💼 Admin User ID: {ADMIN_USER_ID}")
+    print("\n📋 Available Admin Commands:")
+    print("• /verify <user_id> - Approve user verification")
+    print("• /reject <user_id> [reason] - Reject user verification")
+    print("• /queue - View pending verifications")
+    print("• /broadcast <message> - Send message to all users")
     
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
