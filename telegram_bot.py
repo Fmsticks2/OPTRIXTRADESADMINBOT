@@ -2045,27 +2045,7 @@ Thank you for your patience! 🙏"""
         except Exception as e:
             logger.error(f"Error in handle_photo: {e}")
     
-    async def handle_contact_support(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle contact support callback"""
-        query = update.callback_query
-        await query.answer()
-        
-        user_id = query.from_user.id
-        await log_interaction(user_id, "contact_support")
-        
-        # Log chat history
-        await db_manager.log_chat_message(user_id, "user_action", "Clicked contact support", {
-            "action_type": "button_click",
-            "button_data": "contact_support"
-        })
-        
-        response_text = f"Please contact our support team: @{BotConfig.ADMIN_USERNAME}"
-        
-        # Send new message instead of editing to preserve chat history
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=response_text
-        )
+
     
     async def handle_verification_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle verification help callback"""
@@ -4152,6 +4132,9 @@ How to make your first deposit:
         self.application.add_handler(CommandHandler("autostats", self.admin_auto_verify_stats_command))
         self.application.add_handler(CommandHandler("chathistory", admin_chat_history_command))
         
+        # Specific callback handlers
+        self.application.add_handler(CallbackQueryHandler(self.contact_support, pattern='^contact_support$'))
+
         self.application.add_handler(CallbackQueryHandler(self.button_callback))
         self.application.add_handler(verification_conv)
         self.application.add_handler(admin_conv)
