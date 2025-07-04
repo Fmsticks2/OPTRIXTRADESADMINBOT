@@ -55,7 +55,7 @@ class WebhookServer:
                 "webhook_enabled": True
             }
         
-        @app.post(f"/webhook/{config.BOT_TOKEN}/webhook")
+        @app.post(f"/webhook/{config.BOT_TOKEN}")
         async def webhook_handler(request: Request, background_tasks: BackgroundTasks):
             """Handle incoming webhook updates from Telegram"""
             try:
