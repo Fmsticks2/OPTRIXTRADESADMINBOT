@@ -1633,11 +1633,11 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
             uid = user_data.get('uid', 'Not provided') if user_data else 'Not provided'
             
             # Store photo file_id for verification
-            await update_user_data(user_id, {
-                "screenshot_id": photo.file_id,
-                "verification_pending": True,
-                "verification_date": datetime.now(pytz.utc).isoformat()
-            })
+            await update_user_data(user_id, 
+                screenshot_id=photo.file_id,
+                verification_pending=True,
+                verification_date=datetime.now(pytz.utc).isoformat()
+            )
             
             # Check if user should be auto-verified
             can_auto_verify, auto_verify_reason = should_auto_verify(user_id, uid)
