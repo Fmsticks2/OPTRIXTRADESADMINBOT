@@ -1929,8 +1929,11 @@ A: $20 minimum (recommended $100+ for full access)
             
             # Process as verification document
             try:
-                from database.connection import create_verification_request
-                await create_verification_request(user_id, uid, document.file_id)
+                # Import the create_verification_request function
+                from database import create_verification_request
+                
+                # Create verification request using the existing function
+                request_id = await create_verification_request(user_id, uid, document.file_id)
                 
                 confirmation_text = f"""✅ **Document Received Successfully!**
 
@@ -2158,12 +2161,64 @@ How to make your first deposit:
     async def start_webhook(self):
         """Start bot in webhook mode"""
         logger.info("🔄 Starting bot in webhook mode...")
-        await self.application.run_webhook(
-            listen="0.0.0.0",
-            port=self.webhook_port,
-            url_path=self.webhook_path,
-            webhook_url=self.webhook_url + self.webhook_path
+        # Initialize the application
+        await self.application.initialize()
+        await self.application.start()
+        
+        # Set webhook
+        await self.application.bot.set_webhook(
+            url=self.webhook_url + self.webhook_path,
+            allowed_updates=["message", "callback_query"]
         )
+        
+        # Start webhook server using the application's built-in method
+        from aiohttp import web
+        import telegram
+        
+        # Create webhook handler
+        async def webhook_handler(request):
+            """Handle incoming webhook requests"""
+            try:
+                data = await request.json()
+                update = telegram.Update.de_json(data, self.application.bot)
+                if update:
+                    await self.application.update_queue.put(update)
+                return web.Response(status=200)
+            except Exception as e:
+                logger.error(f"Error processing webhook: {e}")
+                return web.Response(status=500)
+        
+        # Create and start the web server
+        app = web.Application()
+        app.router.add_post(self.webhook_path, webhook_handler)
+        
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", self.webhook_port)
+        await site.start()
+        
+        logger.info("✅ Webhook server started successfully")
+        
+        # Keep the application running
+        try:
+            import signal
+            import asyncio
+            
+            def signal_handler(signum, frame):
+                logger.info("Received shutdown signal")
+                
+            signal.signal(signal.SIGINT, signal_handler)
+            signal.signal(signal.SIGTERM, signal_handler)
+            
+            # Keep running until interrupted
+            while True:
+                await asyncio.sleep(1)
+                
+        except KeyboardInterrupt:
+            logger.info("Shutting down webhook server...")
+            await runner.cleanup()
+            await self.application.stop()
+            await self.application.shutdown()
 
     async def run(self):
         """Run the bot with all handlers"""
@@ -2186,4 +2241,16 @@ How to make your first deposit:
 
 if __name__ == "__main__":
     bot = TradingBot()
-    asyncio.run(bot.run())
+    try:
+        asyncio.run(bot.run())
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+    except RuntimeError as e:
+        if "Cannot close a running event loop" in str(e):
+            logger.info("Bot stopped gracefully")
+        else:
+            logger.error(f"Runtime error: {e}")
+            raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise
