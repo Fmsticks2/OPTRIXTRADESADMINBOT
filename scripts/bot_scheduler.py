@@ -19,17 +19,17 @@ BOT_TOKEN = BotConfig.BOT_TOKEN
 BROKER_LINK = BotConfig.BROKER_LINK
 ADMIN_USERNAME = BotConfig.ADMIN_USERNAME
 
-def update_user_follow_up_day(user_id, day):
+async def update_user_follow_up_day(user_id, day):
     try:
         if BotConfig.DATABASE_TYPE == 'postgresql':
             query = 'UPDATE users SET follow_up_day = %s, last_interaction = CURRENT_TIMESTAMP WHERE user_id = %s'
         else:
             query = 'UPDATE users SET follow_up_day = ?, last_interaction = CURRENT_TIMESTAMP WHERE user_id = ?'
-        db_manager.execute_query(query, (day, user_id))
+        await db_manager.execute_query(query, (day, user_id))
     except Exception as e:
         logger.error(f"Error updating follow-up day for user {user_id}: {e}")
 
-def log_interaction(user_id, interaction_type, interaction_data=""):
+async def log_interaction(user_id, interaction_type, interaction_data=""):
     try:
         if BotConfig.DATABASE_TYPE == 'postgresql':
             query = '''
@@ -41,7 +41,7 @@ def log_interaction(user_id, interaction_type, interaction_data=""):
                 INSERT INTO interactions (user_id, interaction_type, interaction_data)
                 VALUES (?, ?, ?)
             '''
-        db_manager.execute_query(query, (user_id, interaction_type, interaction_data))
+        await db_manager.execute_query(query, (user_id, interaction_type, interaction_data))
     except Exception as e:
         logger.error(f"Error logging interaction for user {user_id}: {e}")
 
@@ -67,7 +67,7 @@ async def send_follow_up_messages():
             AND is_active = TRUE
         '''
     
-    day_2_users = db_manager.execute_query(query2, (day_2_cutoff,), fetch=True) or []
+    day_2_users = await db_manager.execute_query(query2, (day_2_cutoff,), fetch=True) or []
     
     for user_id, first_name in day_2_users:
         try:
@@ -86,8 +86,8 @@ Don't miss your shot! 🎯"""
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup)
-            update_user_follow_up_day(user_id, 2)
-            log_interaction(user_id, "follow_up_2")
+            await update_user_follow_up_day(user_id, 2)
+            await log_interaction(user_id, "follow_up_2")
             
         except Exception as e:
             logger.error(f"Failed to send follow-up 2 to user {user_id}: {e}")
@@ -111,7 +111,7 @@ Don't miss your shot! 🎯"""
             AND is_active = TRUE
         '''
     
-    day_3_users = db_manager.execute_query(query3, (day_3_cutoff,), fetch=True) or []
+    day_3_users = await db_manager.execute_query(query3, (day_3_cutoff,), fetch=True) or []
     
     for user_id, first_name in day_3_users:
         try:
@@ -134,8 +134,8 @@ And yes, it's still 100% free when you use our broker link! 🆓"""
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup)
-            update_user_follow_up_day(user_id, 3)
-            log_interaction(user_id, "follow_up_3")
+            await update_user_follow_up_day(user_id, 3)
+            await log_interaction(user_id, "follow_up_3")
             
         except Exception as e:
             logger.error(f"Failed to send follow-up 3 to user {user_id}: {e}")
@@ -159,7 +159,7 @@ And yes, it's still 100% free when you use our broker link! 🆓"""
             AND is_active = TRUE
         '''
     
-    day_4_users = db_manager.execute_query(query4, (day_4_cutoff,), fetch=True) or []
+    day_4_users = await db_manager.execute_query(query4, (day_4_cutoff,), fetch=True) or []
     
     for user_id, first_name in day_4_users:
         try:
@@ -176,8 +176,8 @@ Even if you don't have a big budget right now, we'll guide you to start small an
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup)
-            update_user_follow_up_day(user_id, 4)
-            log_interaction(user_id, "follow_up_4")
+            await update_user_follow_up_day(user_id, 4)
+            await log_interaction(user_id, "follow_up_4")
             
         except Exception as e:
             logger.error(f"Failed to send follow-up 4 to user {user_id}: {e}")
@@ -201,7 +201,7 @@ Even if you don't have a big budget right now, we'll guide you to start small an
             AND is_active = TRUE
         '''
     
-    day_5_users = db_manager.execute_query(query5, (day_5_cutoff,), fetch=True) or []
+    day_5_users = await db_manager.execute_query(query5, (day_5_cutoff,), fetch=True) or []
     
     for user_id, first_name in day_5_users:
         try:
@@ -218,8 +218,8 @@ Want in? 🤔"""
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup)
-            update_user_follow_up_day(user_id, 5)
-            log_interaction(user_id, "follow_up_5")
+            await update_user_follow_up_day(user_id, 5)
+            await log_interaction(user_id, "follow_up_5")
             
         except Exception as e:
             logger.error(f"Failed to send follow-up 5 to user {user_id}: {e}")

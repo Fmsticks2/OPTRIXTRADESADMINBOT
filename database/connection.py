@@ -237,6 +237,11 @@ class DatabaseManager:
                     CREATE INDEX IF NOT EXISTS idx_users_last_interaction ON users (last_interaction);
                     CREATE INDEX IF NOT EXISTS idx_user_interactions_user_id ON user_interactions (user_id);
                     CREATE INDEX IF NOT EXISTS idx_verification_requests_status ON verification_requests (status);
+                '''),
+                ('005_add_verification_columns', '''
+                    ALTER TABLE verification_requests ADD COLUMN auto_verified BOOLEAN DEFAULT FALSE;
+                    ALTER TABLE verification_requests ADD COLUMN admin_response TEXT;
+                    ALTER TABLE verification_requests ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
                 ''')
             ]
         else:
@@ -444,6 +449,51 @@ async def get_pending_verifications() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error getting pending verifications: {e}")
         return []
+
+async def create_verification_request(user_id: int, uid: str, screenshot_file_id: str) -> Optional[int]:
+    """Create a new verification request"""
+    try:
+        if db_manager.db_type == 'postgresql':
+            query = '''
+                INSERT INTO verification_requests (user_id, uid, screenshot_file_id, status, created_at, updated_at)
+                VALUES ($1, $2, $3, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id
+            '''
+            result = await db_manager.execute(query, user_id, uid, screenshot_file_id, fetch='one')
+            return result['id'] if result else None
+        else:
+            query = '''
+                INSERT INTO verification_requests (user_id, uid, screenshot_file_id, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            '''
+            await db_manager.execute(query, user_id, uid, screenshot_file_id)
+            # For SQLite, get the last insert rowid
+            result = await db_manager.execute('SELECT last_insert_rowid() as id', fetch='one')
+            return result['id'] if result else None
+    except Exception as e:
+        logger.error(f"Error creating verification request: {e}")
+        return None
+
+async def update_verification_status(request_id: int, status: str, admin_response: str = "") -> bool:
+    """Update verification request status"""
+    try:
+        if db_manager.db_type == 'postgresql':
+            query = '''
+                UPDATE verification_requests 
+                SET status = $1, admin_response = $2, updated_at = CURRENT_TIMESTAMP
+                WHERE id = $3
+            '''
+        else:
+            query = '''
+                UPDATE verification_requests 
+                SET status = ?, admin_response = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            '''
+        
+        await db_manager.execute(query, status, admin_response, request_id)
+        return True
+    except Exception as e:
+        logger.error(f"Error updating verification status: {e}")
+        return False
 
 # Convenience functions
 async def initialize_db():

@@ -38,17 +38,17 @@ def is_admin(user_id):
     """Check if user is admin"""
     return str(user_id) == str(BotConfig.ADMIN_USER_ID)
 
-def get_user_data(user_id):
+async def get_user_data(user_id):
     """Get user data from database"""
     if BotConfig.DATABASE_TYPE == 'postgresql':
         query = 'SELECT * FROM users WHERE user_id = %s'
     else:
         query = 'SELECT * FROM users WHERE user_id = ?'
     
-    result = db_manager.execute_query(query, (user_id,), fetch=True)
+    result = await db_manager.execute_query(query, (user_id,), fetch=True)
     return result[0] if result else None
 
-def update_user_data(user_id, **kwargs):
+async def update_user_data(user_id, **kwargs):
     """Update user data in database"""
     if not kwargs:
         return
@@ -62,9 +62,9 @@ def update_user_data(user_id, **kwargs):
     else:
         query = f"UPDATE users SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?"
     
-    db_manager.execute_query(query, values)
+    await db_manager.execute_query(query, values)
 
-def create_user(user_id, username, first_name):
+async def create_user(user_id, username, first_name):
     """Create new user in database"""
     if BotConfig.DATABASE_TYPE == 'postgresql':
         query = '''
@@ -81,9 +81,9 @@ def create_user(user_id, username, first_name):
             VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         '''
     
-    db_manager.execute_query(query, (user_id, username, first_name))
+    await db_manager.execute_query(query, (user_id, username, first_name))
 
-def log_interaction(user_id, interaction_type, interaction_data=""):
+async def log_interaction(user_id, interaction_type, interaction_data=""):
     """Log user interaction"""
     if BotConfig.DATABASE_TYPE == 'postgresql':
         query = '''
@@ -96,29 +96,29 @@ def log_interaction(user_id, interaction_type, interaction_data=""):
             VALUES (?, ?, ?)
         '''
     
-    db_manager.execute_query(query, (user_id, interaction_type, interaction_data))
+    await db_manager.execute_query(query, (user_id, interaction_type, interaction_data))
 
 # Removed duplicate is_admin function - using the one above
 
-def create_verification_request(user_id, uid, screenshot_file_id):
+async def create_verification_request(user_id, uid, screenshot_file_id):
     """Create a new verification request"""
     if BotConfig.DATABASE_TYPE == 'postgresql':
         query = '''
             INSERT INTO verification_requests (user_id, uid, screenshot_file_id)
             VALUES (%s, %s, %s) RETURNING id
         '''
-        result = db_manager.execute_query(query, (user_id, uid, screenshot_file_id), fetch=True)
+        result = await db_manager.execute_query(query, (user_id, uid, screenshot_file_id), fetch=True)
         return result[0]['id'] if result else None
     else:
         query = '''
             INSERT INTO verification_requests (user_id, uid, screenshot_file_id)
             VALUES (?, ?, ?)
         '''
-        db_manager.execute_query(query, (user_id, uid, screenshot_file_id))
+        await db_manager.execute_query(query, (user_id, uid, screenshot_file_id))
         # For SQLite, we'd need to get the last insert rowid differently
         return None
 
-def get_pending_verifications():
+async def get_pending_verifications():
     """Get all pending verification requests"""
     if BotConfig.DATABASE_TYPE == 'postgresql':
         query = '''
@@ -137,9 +137,9 @@ def get_pending_verifications():
             ORDER BY vr.created_at ASC
         '''
     
-    return db_manager.execute_query(query, ('pending',), fetch=True)
+    return await db_manager.execute_query(query, ('pending',), fetch=True)
 
-def update_verification_status(request_id, status, admin_response=""):
+async def update_verification_status(request_id, status, admin_response=""):
     """Update verification request status"""
     if BotConfig.DATABASE_TYPE == 'postgresql':
         query = '''
@@ -154,9 +154,9 @@ def update_verification_status(request_id, status, admin_response=""):
             WHERE id = ?
         '''
     
-    db_manager.execute_query(query, (status, admin_response, request_id))
+    await db_manager.execute_query(query, (status, admin_response, request_id))
 
-def get_all_active_users():
+async def get_all_active_users():
     """Get all active users for broadcasting"""
     if BotConfig.DATABASE_TYPE == 'postgresql':
         query = '''
@@ -169,7 +169,7 @@ def get_all_active_users():
             WHERE is_active = ?
         '''
     
-    result = db_manager.execute_query(query, (True,), fetch=True)
+    result = await db_manager.execute_query(query, (True,), fetch=True)
     return [(user['user_id'], user['first_name']) for user in result] if result else []
 
 # Auto-verification functions
@@ -193,17 +193,6 @@ def validate_uid(uid):
     
     # Check for suspicious patterns (test/demo accounts)
     suspicious_patterns = [
-        r'test',
-        r'demo',
-        r'sample',
-        r'example',
-        r'fake',
-        r'trial',
-        r'temp',
-        r'123456',
-        r'000000',
-        r'111111',
-        r'999999'
         r'test',
         r'demo',
         r'sample',
@@ -351,7 +340,7 @@ def should_auto_verify(user_id, uid):
             AND DATE(created_at) = ?
         '''
     
-    result = db_manager.execute_query(query, ('approved', True, today), fetch=True)
+    result = await db_manager.execute_query(query, ('approved', True, today), fetch=True)
     daily_count = result[0]['count'] if result else 0
     
     if daily_count >= BotConfig.DAILY_AUTO_APPROVAL_LIMIT:
@@ -368,7 +357,7 @@ async def auto_verify_user(user_id, uid, screenshot_file_id, context):
                 INSERT INTO verification_requests (user_id, uid, screenshot_file_id, status, auto_verified, admin_response)
                 VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
             '''
-            result = db_manager.execute_query(query, (
+            result = await db_manager.execute_query(query, (
                 user_id, uid, screenshot_file_id, 'approved', True, 'Auto-verified by system'
             ), fetch=True)
             request_id = result[0]['id'] if result else None
@@ -377,19 +366,19 @@ async def auto_verify_user(user_id, uid, screenshot_file_id, context):
                 INSERT INTO verification_requests (user_id, uid, screenshot_file_id, status, auto_verified, admin_response)
                 VALUES (?, ?, ?, ?, ?, ?)
             '''
-            db_manager.execute_query(query, (
+            await db_manager.execute_query(query, (
                 user_id, uid, screenshot_file_id, 'approved', True, 'Auto-verified by system'
             ))
             request_id = None
         
         # Update user status
-        update_user_data(user_id, 
+        await update_user_data(user_id, 
                          deposit_confirmed=True, 
                          current_flow='verified',
                          verification_status='approved')
         
         # Get user info for personalized message
-        user_data = get_user_data(user_id)
+        user_data = await get_user_data(user_id)
         first_name = user_data[2] if user_data else "there"
         
         # Send immediate premium access message
@@ -430,7 +419,7 @@ Congratulations {first_name}! Your verification has been automatically approved.
         )
         
         # Log the auto-verification success message
-        db_manager.log_chat_message(user_id, "bot_response", success_text, {
+        await db_manager.log_chat_message(user_id, "bot_response", success_text, {
             "action": "auto_verification_success",
             "verification_method": "auto",
             "uid": uid,
@@ -468,13 +457,13 @@ async def get_my_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(id_info_text, parse_mode='Markdown')
     
     # Log the ID request
-    db_manager.log_chat_message(user_id, "command", "/getmyid", {
+    await db_manager.log_chat_message(user_id, "command", "/getmyid", {
         "username": username,
         "first_name": first_name,
         "current_admin_status": is_admin(user_id)
     })
     
-    db_manager.log_chat_message(user_id, "bot_response", id_info_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", id_info_text, {
         "action": "user_id_info",
         "user_id_revealed": user_id
     })
@@ -487,11 +476,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     first_name = user.first_name or "there"
     
     # Create or update user
-    create_user(user_id, username, first_name)
-    log_interaction(user_id, "start_command")
+    await create_user(user_id, username, first_name)
+    await log_interaction(user_id, "start_command")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "command", "/start", {
+    await db_manager.log_chat_message(user_id, "command", "/start", {
         "username": username,
         "first_name": first_name,
         "is_admin": is_admin(user_id)
@@ -526,7 +515,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         # Log admin welcome
-        db_manager.log_chat_message(user_id, "bot_response", admin_welcome_text, {
+        await db_manager.log_chat_message(user_id, "bot_response", admin_welcome_text, {
             "action": "admin_welcome",
             "admin_auto_detected": True,
             "buttons": ["Pending Queue", "User Activity", "Broadcast Message", "All Users", "Search User", "Bot Stats", "Settings", "Restart Bot"]
@@ -560,7 +549,7 @@ Choose your next step:"""
     await update.message.reply_text(welcome_text, reply_markup=reply_markup)
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", welcome_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", welcome_text, {
         "buttons": ["Request Premium Group Access", "Get Free VIP Access"]
     })
 
@@ -570,11 +559,11 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     
     user_id = query.from_user.id
-    update_user_data(user_id, current_flow='activation')
-    log_interaction(user_id, "activation_instructions")
+    await update_user_data(user_id, current_flow='activation')
+    await log_interaction(user_id, "activation_instructions")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_action", "Clicked Get Free VIP Access", {
+    await db_manager.log_chat_message(user_id, "user_action", "Clicked Get Free VIP Access", {
         "action_type": "button_click",
         "button_data": "get_vip_access"
     })
@@ -615,7 +604,7 @@ The more you deposit, the more powerful your AI access:
     )
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", activation_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", activation_text, {
         "buttons": ["I've Registered", "Need help signing up", "Need support making a deposit"]
     })
     
@@ -630,7 +619,7 @@ Send "UPGRADE" """
     await context.bot.send_message(chat_id=query.from_user.id, text=second_part)
     
     # Log second part
-    db_manager.log_chat_message(user_id, "bot_response", second_part)
+    await db_manager.log_chat_message(user_id, "bot_response", second_part)
 
 # Flow 3: Confirmation
 async def registration_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -638,11 +627,11 @@ async def registration_confirmation(update: Update, context: ContextTypes.DEFAUL
     await query.answer()
     
     user_id = query.from_user.id
-    update_user_data(user_id, current_flow='confirmation', registration_status='registered')
-    log_interaction(user_id, "registration_confirmation")
+    await update_user_data(user_id, current_flow='confirmation', registration_status='registered')
+    await log_interaction(user_id, "registration_confirmation")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_action", "Clicked I've Registered", {
+    await db_manager.log_chat_message(user_id, "user_action", "Clicked I've Registered", {
         "action_type": "button_click",
         "button_data": "registered"
     })
@@ -658,7 +647,7 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
     )
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", confirmation_text)
+    await db_manager.log_chat_message(user_id, "bot_response", confirmation_text)
     
     instruction_text = "Please send your UID and deposit screenshot as separate messages."
     await context.bot.send_message(
@@ -667,7 +656,7 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
     )
     
     # Log instruction
-    db_manager.log_chat_message(user_id, "bot_response", instruction_text)
+    await db_manager.log_chat_message(user_id, "bot_response", instruction_text)
 
 # Handle text messages (UID, UPGRADE, etc.)
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -675,15 +664,15 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     message_text = update.message.text.strip()
     text = message_text.upper()
     
-    user_data = get_user_data(user_id)
+    user_data = await get_user_data(user_id)
     if not user_data:
         await start_command(update, context)
         return
     
-    log_interaction(user_id, "text_message", message_text)
+    await log_interaction(user_id, "text_message", message_text)
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_message", message_text)
+    await db_manager.log_chat_message(user_id, "user_message", message_text)
     
     # Handle UID submission
     if text.startswith("UID:") or message_text.isdigit():
@@ -694,7 +683,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         if is_valid:
             # Update user with UID
-            update_user_data(user_id, uid=uid)
+            await update_user_data(user_id, uid=uid)
             
             # Check if auto-verification is possible
             can_auto_verify, auto_verify_reason = should_auto_verify(user_id, uid)
@@ -735,7 +724,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text(response_text, parse_mode='Markdown')
             
             # Log bot response
-            db_manager.log_chat_message(user_id, "bot_response", response_text, {
+            await db_manager.log_chat_message(user_id, "bot_response", response_text, {
                 "uid": uid,
                 "validation_status": "valid",
                 "auto_verify_eligible": can_auto_verify,
@@ -763,7 +752,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text(error_response, parse_mode='Markdown')
             
             # Log validation failure
-            db_manager.log_chat_message(user_id, "bot_response", error_response, {
+            await db_manager.log_chat_message(user_id, "bot_response", error_response, {
                 "uid_attempted": uid,
                 "validation_status": "failed",
                 "validation_error": validation_message
@@ -773,12 +762,12 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await handle_upgrade_request(update, context)
     elif user_data[3] == 'confirmation':  # current_flow is confirmation
         # Assume this is a UID
-        update_user_data(user_id, uid=message_text)
+        await update_user_data(user_id, uid=message_text)
         response_text = "UID received! Now please send your deposit screenshot."
         await update.message.reply_text(response_text)
         
         # Log bot response
-        db_manager.log_chat_message(user_id, "bot_response", response_text, {"uid": message_text})
+        await db_manager.log_chat_message(user_id, "bot_response", response_text, {"uid": message_text})
     else:
         # Default response for unrecognized messages
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -792,14 +781,14 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(response_text, reply_markup=reply_markup)
         
         # Log bot response
-        db_manager.log_chat_message(user_id, "bot_response", response_text, {
+        await db_manager.log_chat_message(user_id, "bot_response", response_text, {
             "buttons": ["Contact Support", "Get Help"]
         })
 
 # Handle photo messages (deposit screenshots)
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    user_data = get_user_data(user_id)
+    user_data = await get_user_data(user_id)
     
     # Check if user is admin first
     if is_admin(user_id):
@@ -819,7 +808,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(admin_photo_text, parse_mode='Markdown')
         
         # Log admin photo upload
-        db_manager.log_chat_message(user_id, "admin_action", "Admin uploaded photo", {
+        await db_manager.log_chat_message(user_id, "admin_action", "Admin uploaded photo", {
             "action_type": "admin_photo_upload",
             "file_id": update.message.photo[-1].file_id
         })
@@ -829,7 +818,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Please start with /start first.")
         return
     
-    log_interaction(user_id, "photo_upload", "deposit_screenshot")
+    await log_interaction(user_id, "photo_upload", "deposit_screenshot")
     
     if user_data[3] == 'confirmation':  # current_flow is confirmation
         # Get the user's UID from database
@@ -852,7 +841,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Manual verification process (original logic)
         # Create verification request
-        create_verification_request(user_id, uid, screenshot_file_id)
+        from database.connection import create_verification_request as async_create_verification_request
+        await async_create_verification_request(user_id, uid, screenshot_file_id)
         
         # Send confirmation to user with auto-verification status
         if can_auto_verify:
@@ -908,20 +898,20 @@ Use /verify {user_id} to approve or /reject {user_id} to reject."""
             logger.error(f"Failed to notify admin: {e}")
         
         # Log chat history for photo upload
-        db_manager.log_chat_message(user_id, "user_action", "Uploaded deposit screenshot", {
+        await db_manager.log_chat_message(user_id, "user_action", "Uploaded deposit screenshot", {
             "action_type": "photo_upload",
             "uid": uid,
             "file_id": screenshot_file_id
         })
         
         # Log bot response
-        db_manager.log_chat_message(user_id, "bot_response", confirmation_text, {
+        await db_manager.log_chat_message(user_id, "bot_response", confirmation_text, {
             "action": "verification_submitted",
             "uid": uid
         })
         
         # Update user flow to pending verification
-        update_user_data(user_id, current_flow='pending_verification')
+        await update_user_data(user_id, current_flow='pending_verification')
         
         # Provide next steps to user
         next_steps_text = """🎯 **What's Next?**
@@ -950,7 +940,7 @@ Use /verify {user_id} to approve or /reject {user_id} to reject."""
         )
         
         # Log the next steps message
-        db_manager.log_chat_message(user_id, "bot_response", next_steps_text, {
+        await db_manager.log_chat_message(user_id, "bot_response", next_steps_text, {
             "action": "verification_next_steps",
             "buttons": ["Join Premium Group", "Contact Support"]
         })
@@ -987,25 +977,25 @@ Use /verify {user_id} to approve or /reject {user_id} to reject."""
         )
         
         # Log follow-up message
-        db_manager.log_chat_message(user_id, "bot_response", follow_up_text, {
+        await db_manager.log_chat_message(user_id, "bot_response", follow_up_text, {
             "action": "verification_timeline",
             "status": "pending_review",
             "buttons": ["Verification Help", "Contact Support"]
         })
         
         # Update user flow to indicate they're waiting for verification
-        update_user_data(user_id, current_flow='awaiting_verification')
+        await update_user_data(user_id, current_flow='awaiting_verification')
             
     else:
         await update.message.reply_text("Please complete the registration process first by using /start")
         
         # Log chat history for invalid photo upload
-        db_manager.log_chat_message(user_id, "user_action", "Uploaded photo outside of flow", {
+        await db_manager.log_chat_message(user_id, "user_action", "Uploaded photo outside of flow", {
             "action_type": "invalid_photo_upload",
             "current_flow": user_data[3] if user_data else "unknown"
         })
         
-        db_manager.log_chat_message(user_id, "bot_response", "Please complete the registration process first by using /start", {
+        await db_manager.log_chat_message(user_id, "bot_response", "Please complete the registration process first by using /start", {
             "action": "invalid_photo_response"
         })
 
@@ -1020,7 +1010,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # Get user data
-    user_data = get_user_data(user_id)
+    user_data = await get_user_data(user_id)
     
     if user_data and user_data[3] == 'awaiting_deposit_screenshot':
         # Check if document is a valid format (PDF or image)
@@ -1056,13 +1046,14 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_info = await context.bot.get_file(document.file_id)
         
         # Create verification request
-        create_verification_request(user_id, document.file_id)
+        from database.connection import create_verification_request as async_create_verification_request
+        await async_create_verification_request(user_id, user_data[6] if user_data[6] else "Unknown", document.file_id)
         
         # Send confirmation to user
         await update.message.reply_text("📄 **Document Received Successfully!**\n\nYour deposit proof has been submitted for verification.")
         
         # Log the document submission
-        db_manager.log_chat_message(user_id, "user_action", f"Uploaded document: {file_name}", {
+        await db_manager.log_chat_message(user_id, "user_action", f"Uploaded document: {file_name}", {
             "action_type": "document_upload",
             "file_type": mime_type,
             "file_name": file_name,
@@ -1094,7 +1085,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         # Log admin notification
-        db_manager.log_chat_message(user_id, "bot_response", "Document submitted for admin review", {
+        await db_manager.log_chat_message(user_id, "bot_response", "Document submitted for admin review", {
             "action": "admin_notification_sent",
             "admin_id": ADMIN_USER_ID,
             "file_type": mime_type
@@ -1127,7 +1118,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         # Log the next steps message
-        db_manager.log_chat_message(user_id, "bot_response", next_steps_text, {
+        await db_manager.log_chat_message(user_id, "bot_response", next_steps_text, {
             "action": "verification_next_steps",
             "buttons": ["Join Premium Group", "Contact Support"]
         })
@@ -1164,36 +1155,36 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         # Log follow-up message
-        db_manager.log_chat_message(user_id, "bot_response", follow_up_text, {
+        await db_manager.log_chat_message(user_id, "bot_response", follow_up_text, {
             "action": "verification_timeline",
             "status": "pending_review",
             "buttons": ["Verification Help", "Contact Support", "Main Menu"]
         })
         
         # Update user flow to indicate they're waiting for verification
-        update_user_data(user_id, current_flow='awaiting_verification')
+        await update_user_data(user_id, current_flow='awaiting_verification')
             
     else:
         await update.message.reply_text("Please complete the registration process first by using /start")
         
         # Log chat history for invalid document upload
-        db_manager.log_chat_message(user_id, "user_action", "Uploaded document outside of flow", {
+        await db_manager.log_chat_message(user_id, "user_action", "Uploaded document outside of flow", {
             "action_type": "invalid_document_upload",
             "current_flow": user_data[3] if user_data else "unknown",
             "file_name": document.file_name if document.file_name else "unknown"
         })
         
-        db_manager.log_chat_message(user_id, "bot_response", "Please complete the registration process first by using /start", {
+        await db_manager.log_chat_message(user_id, "bot_response", "Please complete the registration process first by using /start", {
             "action": "invalid_document_response"
         })
 
 # Handle upgrade requests
 async def handle_upgrade_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    log_interaction(user_id, "upgrade_request")
+    await log_interaction(user_id, "upgrade_request")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_message", "UPGRADE", {
+    await db_manager.log_chat_message(user_id, "user_message", "UPGRADE", {
         "action_type": "upgrade_request"
     })
     
@@ -1212,7 +1203,7 @@ Contact: @{ADMIN_USERNAME}"""
     await update.message.reply_text(upgrade_text)
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", upgrade_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", upgrade_text, {
         "action": "upgrade_response",
         "admin_contact": ADMIN_USERNAME
     })
@@ -1223,10 +1214,10 @@ async def help_signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     user_id = query.from_user.id
-    log_interaction(user_id, "help_signup")
+    await log_interaction(user_id, "help_signup")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_action", "Requested signup help", {
+    await db_manager.log_chat_message(user_id, "user_action", "Requested signup help", {
         "action_type": "button_click",
         "button_data": "help_signup"
     })
@@ -1250,7 +1241,7 @@ Need personal assistance? Contact @{BotConfig.ADMIN_USERNAME}"""
     )
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", help_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", help_text, {
         "action": "signup_help"
     })
 
@@ -1259,10 +1250,10 @@ async def help_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     user_id = query.from_user.id
-    log_interaction(user_id, "help_deposit")
+    await log_interaction(user_id, "help_deposit")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_action", "Requested deposit help", {
+    await db_manager.log_chat_message(user_id, "user_action", "Requested deposit help", {
         "action_type": "button_click",
         "button_data": "help_deposit"
     })
@@ -1287,7 +1278,7 @@ Need help? Contact @{BotConfig.ADMIN_USERNAME}"""
     )
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", help_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", help_text, {
         "action": "deposit_help"
     })
 
@@ -1298,11 +1289,11 @@ async def handle_not_interested(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     
     user_id = query.from_user.id
-    update_user_data(user_id, is_active=False)
-    log_interaction(user_id, "not_interested")
+    await update_user_data(user_id, is_active=False)
+    await log_interaction(user_id, "not_interested")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_action", "Clicked not interested", {
+    await db_manager.log_chat_message(user_id, "user_action", "Clicked not interested", {
         "action_type": "button_click",
         "button_data": "not_interested"
     })
@@ -1320,7 +1311,7 @@ We'll be here when you're ready to start your trading journey! 🚀"""
     )
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", farewell_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", farewell_text, {
         "action": "not_interested_farewell"
     })
 
@@ -1333,17 +1324,17 @@ async def handle_group_access_request(update: Update, context: ContextTypes.DEFA
     first_name = query.from_user.first_name or "there"
     username = query.from_user.username or ""
     
-    log_interaction(user_id, "group_access_request")
+    await log_interaction(user_id, "group_access_request")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_action", "Requested premium group access", {
+    await db_manager.log_chat_message(user_id, "user_action", "Requested premium group access", {
         "action_type": "group_access_request",
         "username": username,
         "first_name": first_name
     })
     
     # Check if user is verified before allowing premium access
-    user_data = get_user_data(user_id)
+    user_data = await get_user_data(user_id)
     is_verified = user_data and user_data[4] == 1  # deposit_confirmed field
     
     # Also check verification requests table
@@ -1360,7 +1351,7 @@ async def handle_group_access_request(update: Update, context: ContextTypes.DEFA
                 WHERE user_id = ? AND status = 'approved'
                 ORDER BY created_at DESC LIMIT 1
             '''
-        result = db_manager.execute_query(query, (user_id,), fetch=True)
+        result = await db_manager.execute_query(query, (user_id,), fetch=True)
         is_verified = result is not None and len(result) > 0
     
     if not is_verified:
@@ -1397,7 +1388,7 @@ Click the button below for detailed guidance."""
         )
         
         # Log verification required response
-        db_manager.log_chat_message(user_id, "bot_response", verification_required_text, {
+        await db_manager.log_chat_message(user_id, "bot_response", verification_required_text, {
             "action": "verification_required_for_premium",
             "verification_status": "not_verified",
             "buttons": ["Verification Help", "Contact Support"]
@@ -1433,7 +1424,7 @@ Hi {first_name}! ✅ **You are verified!** Click the link below to join our prem
     )
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", join_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", join_text, {
         "action": "premium_group_join_instructions",
         "group_link": PREMIUM_GROUP_LINK,
         "verification_status": "verified",
@@ -1441,7 +1432,7 @@ Hi {first_name}! ✅ **You are verified!** Click the link below to join our prem
     })
     
     # Update user status to indicate they're in the process of joining
-    update_user_data(user_id, current_flow='joining_group')
+    await update_user_data(user_id, current_flow='joining_group')
 
 # Admin callback handlers
 async def handle_admin_queue_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1453,7 +1444,7 @@ async def handle_admin_queue_callback(update: Update, context: ContextTypes.DEFA
         await context.bot.send_message(chat_id=query.message.chat_id, text="❌ You don't have permission to use this command.")
         return
     
-    pending_requests = get_pending_verifications()
+    pending_requests = await get_pending_verifications()
     
     if not pending_requests:
         queue_text = "✅ No pending verification requests."
@@ -1502,7 +1493,7 @@ async def handle_admin_activity_callback(update: Update, context: ContextTypes.D
             LIMIT ?
         '''
     
-    recent_activity = db_manager.execute_query(activity_query, (10,), fetch=True)
+    recent_activity = await db_manager.execute_query(activity_query, (10,), fetch=True)
     
     if not recent_activity:
         activity_text = "📊 No recent activity found."
@@ -1529,10 +1520,10 @@ async def handle_verification_help(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
     
     user_id = query.from_user.id
-    log_interaction(user_id, "verification_help")
+    await log_interaction(user_id, "verification_help")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_action", "Requested verification help", {
+    await db_manager.log_chat_message(user_id, "user_action", "Requested verification help", {
         "action_type": "button_click",
         "button_data": "verification_help"
     })
@@ -1568,7 +1559,7 @@ Contact: @{ADMIN_USERNAME}
     )
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", help_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", help_text, {
         "action": "verification_help_response"
     })
 
@@ -1578,10 +1569,10 @@ async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_T
     await query.answer()
     
     user_id = query.from_user.id
-    log_interaction(user_id, "contact_support")
+    await log_interaction(user_id, "contact_support")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_action", "Clicked contact support", {
+    await db_manager.log_chat_message(user_id, "user_action", "Clicked contact support", {
         "action_type": "button_click",
         "button_data": "contact_support"
     })
@@ -1595,7 +1586,7 @@ async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_T
     )
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", response_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", response_text, {
         "action": "contact_support"
     })
 
@@ -1608,10 +1599,10 @@ async def handle_group_join_confirmation(update: Update, context: ContextTypes.D
     first_name = query.from_user.first_name or "there"
     username = query.from_user.username or ""
     
-    log_interaction(user_id, "group_join_confirmed")
+    await log_interaction(user_id, "group_join_confirmed")
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "user_action", "Confirmed group membership", {
+    await db_manager.log_chat_message(user_id, "user_action", "Confirmed group membership", {
         "action_type": "group_join_confirmation",
         "username": username,
         "first_name": first_name
@@ -1643,13 +1634,13 @@ Hi {first_name}! Thank you for joining our premium trading group.
     )
     
     # Log bot response
-    db_manager.log_chat_message(user_id, "bot_response", welcome_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", welcome_text, {
         "action": "premium_group_welcome_confirmation",
         "buttons": ["Start Trading Journey"]
     })
     
     # Update user status to group member
-    update_user_data(user_id, current_flow='group_member')
+    await update_user_data(user_id, current_flow='group_member')
 
 # Callback query handler
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1702,10 +1693,10 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
     first_name = user.first_name or "there"
     
-    log_interaction(user_id, "menu_command")
+    await log_interaction(user_id, "menu_command")
     
     # Get user data to check verification status
-    user_data = get_user_data(user_id)
+    user_data = await get_user_data(user_id)
     is_verified = user_data and user_data[4] == 1 if user_data else False
     
     menu_text = f"""🎯 **OPTRIXTRADES Main Menu**
@@ -1737,7 +1728,7 @@ Hi {first_name}! Welcome to your trading dashboard.
     )
     
     # Log chat history
-    db_manager.log_chat_message(user_id, "command", "/menu", {
+    await db_manager.log_chat_message(user_id, "command", "/menu", {
         "username": user.username or "",
         "first_name": first_name,
         "verification_status": "verified" if is_verified else "pending"
@@ -1753,8 +1744,8 @@ async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     first_name = query.from_user.first_name or "there"
     
     # Get user data to check verification status
-    user_data = get_user_data(user_id)
-    is_verified = user_data and user_data[4] == 1 if user_data else False
+    user_data = await get_user_data(user_id)
+    is_verified = user_data and user_data.get('deposit_confirmed') == 1 if user_data else False
     
     menu_text = f"""🎯 **OPTRIXTRADES Main Menu**
 
@@ -1791,7 +1782,7 @@ async def account_menu_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     
     user_id = query.from_user.id
-    user_data = get_user_data(user_id)
+    user_data = await get_user_data(user_id)
     
     if not user_data:
         await context.bot.send_message(
@@ -1800,11 +1791,11 @@ async def account_menu_callback(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return
     
-    username = user_data[1] or "Not set"
-    first_name = user_data[2]
-    current_flow = user_data[3]
-    is_verified = user_data[4] == 1
-    uid = user_data[6] or "Not provided"
+    username = user_data.get('username') or "Not set"
+    first_name = user_data.get('first_name')
+    current_flow = user_data.get('current_flow')
+    is_verified = user_data.get('deposit_confirmed') == 1
+    uid = user_data.get('uid') or "Not provided"
     
     status_text = f"""👤 **Account Information**
 
@@ -1881,7 +1872,7 @@ async def start_trading_callback(update: Update, context: ContextTypes.DEFAULT_T
     first_name = query.from_user.first_name or "there"
     
     # Log the action
-    log_interaction(user_id, "start_trading")
+    await log_interaction(user_id, "start_trading")
     
     trading_text = f"""📈 **Ready to Start Trading, {first_name}!**
 
@@ -1922,7 +1913,7 @@ async def start_trading_callback(update: Update, context: ContextTypes.DEFAULT_T
     )
     
     # Log the response
-    db_manager.log_chat_message(user_id, "bot_response", trading_text, {
+    await db_manager.log_chat_message(user_id, "bot_response", trading_text, {
         "action": "start_trading_guide",
         "buttons": ["Join Premium Group", "Open Trading Platform", "Contact Support", "Main Menu"]
     })
@@ -1978,7 +1969,7 @@ async def admin_verify_command(update: Update, context: ContextTypes.DEFAULT_TYP
         target_user_id = int(context.args[0])
         
         # Update user as verified
-        update_user_data(target_user_id, deposit_confirmed=True, current_flow='completed')
+        await update_user_data(target_user_id, deposit_confirmed=True, current_flow='completed')
         
         # Update verification request status
         if BotConfig.DATABASE_TYPE == 'postgresql':
@@ -1993,10 +1984,10 @@ async def admin_verify_command(update: Update, context: ContextTypes.DEFAULT_TYP
                 SET status = 'approved', admin_response = 'Manually approved by admin', updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ? AND status = 'pending'
             '''
-        db_manager.execute_query(query, (target_user_id,))
+        await db_manager.execute_query(query, (target_user_id,))
         
         # Get user data for notification
-        user_data = get_user_data(target_user_id)
+        user_data = await get_user_data(target_user_id)
         if user_data:
             # Notify user of approval with immediate premium access
             success_message = f"""🎉 **Verification Approved!**
@@ -2038,7 +2029,7 @@ Your trading journey starts now! 🚀"""
                 )
                 
                 # Log the approval notification
-                db_manager.log_chat_message(target_user_id, "bot_response", success_message, {
+                await db_manager.log_chat_message(target_user_id, "bot_response", success_message, {
                     "action": "verification_approved",
                     "approved_by_admin": user_id,
                     "buttons": ["Join Premium Group", "Contact Support", "Start Trading"]
@@ -2083,10 +2074,10 @@ async def admin_reject_command(update: Update, context: ContextTypes.DEFAULT_TYP
                 SET status = 'rejected', admin_response = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = ? AND status = 'pending'
             '''
-        db_manager.execute_query(query, (reason, target_user_id))
+        await db_manager.execute_query(query, (reason, target_user_id))
         
         # Get user data for notification
-        user_data = get_user_data(target_user_id)
+        user_data = await get_user_data(target_user_id)
         if user_data:
             # Notify user of rejection with helpful action buttons
             rejection_message = f"""❌ **Verification Rejected**
@@ -2119,7 +2110,7 @@ Unfortunately, your verification request has been rejected.
                 )
                 
                 # Log the rejection notification
-                db_manager.log_chat_message(target_user_id, "bot_response", rejection_message, {
+                await db_manager.log_chat_message(target_user_id, "bot_response", rejection_message, {
                     "action": "verification_rejected",
                     "rejected_by_admin": user_id,
                     "reason": reason,
@@ -2144,7 +2135,7 @@ async def admin_queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("❌ You don't have permission to use this command.")
         return
     
-    pending_requests = get_pending_verifications()
+    pending_requests = await get_pending_verifications()
     
     if not pending_requests:
         await update.message.reply_text("✅ No pending verification requests.")
@@ -2176,7 +2167,7 @@ async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_
         return
     
     message_text = " ".join(context.args)
-    users = get_all_active_users()
+    users = await get_all_active_users()
     
     if not users:
         await update.message.reply_text("❌ No active users found for broadcasting.")
@@ -2188,14 +2179,14 @@ async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_
             INSERT INTO broadcast_messages (message_text, total_users)
             VALUES (%s, %s) RETURNING id
         '''
-        result = db_manager.execute_query(query, (message_text, len(users)), fetch=True)
+        result = await db_manager.execute_query(query, (message_text, len(users)), fetch=True)
         broadcast_id = result[0]['id'] if result else None
     else:
         query = '''
             INSERT INTO broadcast_messages (message_text, total_users)
             VALUES (?, ?)
         '''
-        db_manager.execute_query(query, (message_text, len(users)))
+        await db_manager.execute_query(query, (message_text, len(users)))
         broadcast_id = None  # SQLite lastrowid not easily accessible through db_manager
     
     successful_sends = 0
@@ -2213,7 +2204,7 @@ async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_
             )
             successful_sends += 1
             # Log broadcast message to each user's chat history
-            db_manager.log_chat_message(user_id_target, "broadcast", message_text, {
+            await db_manager.log_chat_message(user_id_target, "broadcast", message_text, {
                 "sent_by_admin": True,
                 "admin_id": user_id
             })
@@ -2235,7 +2226,7 @@ async def admin_broadcast_command(update: Update, context: ContextTypes.DEFAULT_
                 SET sent_count = ?, failed_count = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             '''
-        db_manager.execute_query(query, (successful_sends, failed_sends, broadcast_id))
+        await db_manager.execute_query(query, (successful_sends, failed_sends, broadcast_id))
     
     # Send delivery confirmation to admin
     confirmation_text = f"""✅ **Broadcast Complete!**
@@ -2274,7 +2265,7 @@ async def admin_chat_history_command(update: Update, context: ContextTypes.DEFAU
         return
     
     # Get chat history
-    chat_history = db_manager.get_chat_history(target_user_id, limit)
+    chat_history = await db_manager.get_chat_history(target_user_id, limit)
     
     if not chat_history:
         await update.message.reply_text(f"No chat history found for user {target_user_id}.")
@@ -2326,7 +2317,7 @@ async def admin_recent_activity_command(update: Update, context: ContextTypes.DE
     limit = int(context.args[0]) if context.args else 30
     
     # Get recent activity
-    recent_activity = db_manager.get_recent_activity(limit)
+    recent_activity = await db_manager.get_recent_activity(limit)
     
     if not recent_activity:
         await update.message.reply_text("No recent activity found.")
@@ -2370,7 +2361,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
     callback_data = query.data
     
     if callback_data == "admin_queue":
-        pending_requests = get_pending_verifications()
+        pending_requests = await get_pending_verifications()
         
         if not pending_requests:
             queue_text = "✅ No pending verification requests."
@@ -2378,7 +2369,13 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
             queue_text = "📋 **Pending Verification Queue:**\n\n"
             
             for req in pending_requests[:5]:  # Show only first 5
-                req_id, user_id_req, first_name, username, uid, created_at = req
+                req_data = req
+                req_id = req_data.get('id')
+                user_id_req = req_data.get('user_id')
+                first_name = req_data.get('first_name')
+                username = req_data.get('username')
+                uid = req_data.get('uid')
+                created_at = req_data.get('created_at')
                 username_display = f"@{username}" if username else "No username"
                 queue_text += f"**#{req_id}** - {first_name} ({username_display})\n"
                 queue_text += f"🆔 User ID: `{user_id_req}`\n"
@@ -2411,7 +2408,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
             )
     
     elif callback_data == "admin_activity":
-        recent_activity = db_manager.get_recent_activity(10)
+        recent_activity = await db_manager.get_recent_activity(10)
         
         if not recent_activity:
             await context.bot.send_message(chat_id=query.message.chat_id, text="No recent activity found.")
@@ -2447,7 +2444,7 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         await context.bot.send_message(chat_id=query.message.chat_id, text=broadcast_text, reply_markup=reply_markup, parse_mode='Markdown')
     
     elif callback_data == "admin_users":
-        users = get_all_active_users()
+        users = await get_all_active_users()
         
         if not users:
             await context.bot.send_message(chat_id=query.message.chat_id, text="No active users found.")
@@ -2470,8 +2467,8 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
         await context.bot.send_message(chat_id=query.message.chat_id, text=users_text, reply_markup=reply_markup)
     
     elif callback_data == "admin_stats":
-        users = get_all_active_users()
-        pending = get_pending_verifications()
+        users = await get_all_active_users()
+        pending = await get_pending_verifications()
         
         stats_text = f"📈 **Bot Statistics:**\n\n"
         stats_text += f"👥 Total Users: {len(users)}\n"
@@ -2647,7 +2644,7 @@ async def admin_search_user_command(update: Update, context: ContextTypes.DEFAUL
     if search_term.startswith('@'):
         username = search_term[1:]
         # Search by username
-        user_data = db_manager.search_user_by_username(username)
+        user_data = await db_manager.search_user_by_username(username)
         if not user_data:
             await update.message.reply_text(f"❌ No user found with username: @{username}")
             return
@@ -2655,7 +2652,7 @@ async def admin_search_user_command(update: Update, context: ContextTypes.DEFAUL
         # Try to search by user ID
         try:
             search_user_id = int(search_term)
-            user_data = get_user_data(search_user_id)
+            user_data = await get_user_data(search_user_id)
             if not user_data:
                 await update.message.reply_text(f"❌ No user found with ID: {search_user_id}")
                 return
@@ -2669,14 +2666,14 @@ async def admin_search_user_command(update: Update, context: ContextTypes.DEFAUL
     
     # Check verification status
     verification_status = "❌ Not Verified"
-    pending_verification = db_manager.get_verification_request(found_user_id)
+    pending_verification = await db_manager.get_verification_request(found_user_id)
     if pending_verification:
         verification_status = "⏳ Pending Verification"
-    elif db_manager.is_user_verified(found_user_id):
+    elif await db_manager.is_user_verified(found_user_id):
         verification_status = "✅ Verified"
     
     # Get recent activity count
-    recent_activity = db_manager.get_recent_activity_for_user(found_user_id, 5)
+    recent_activity = await db_manager.get_recent_activity_for_user(found_user_id, 5)
     activity_count = len(recent_activity) if recent_activity else 0
     
     user_info = f"""👤 **User Information**
@@ -2740,9 +2737,9 @@ async def admin_auto_verify_stats_command(update: Update, context: ContextTypes.
                 WHERE DATE(created_at) = ?
             '''
         
-        auto_approved_result = db_manager.execute_query(auto_approved_query, ('approved', True, today), fetch=True)
-        manual_pending_result = db_manager.execute_query(manual_pending_query, ('pending', False, today), fetch=True)
-        total_today_result = db_manager.execute_query(total_today_query, (today,), fetch=True)
+        auto_approved_result = await db_manager.execute_query(auto_approved_query, ('approved', True, today), fetch=True)
+        manual_pending_result = await db_manager.execute_query(manual_pending_query, ('pending', False, today), fetch=True)
+        total_today_result = await db_manager.execute_query(total_today_query, (today,), fetch=True)
         
         auto_approved_count = auto_approved_result[0]['count'] if auto_approved_result else 0
         manual_pending_count = manual_pending_result[0]['count'] if manual_pending_result else 0

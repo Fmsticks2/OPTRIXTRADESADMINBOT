@@ -31,18 +31,18 @@ class FollowUpScheduler:
     def __init__(self):
         self.bot = Bot(token=BOT_TOKEN)
 
-    def update_user_follow_up_day(self, user_id, day):
+    async def update_user_follow_up_day(self, user_id, day):
         """Update user follow-up day"""
         try:
             if BotConfig.DATABASE_TYPE == 'postgresql':
                 query = 'UPDATE users SET follow_up_day = %s, last_interaction = CURRENT_TIMESTAMP WHERE user_id = %s'
             else:
                 query = 'UPDATE users SET follow_up_day = ?, last_interaction = CURRENT_TIMESTAMP WHERE user_id = ?'
-            db_manager.execute_query(query, (day, user_id))
+            await db_manager.execute_query(query, (day, user_id))
         except Exception as e:
             logger.error(f"Error updating follow-up day for user {user_id}: {e}")
 
-    def log_interaction(self, user_id, interaction_type, interaction_data=""):
+    async def log_interaction(self, user_id, interaction_type, interaction_data=""):
         """Log interaction"""
         try:
             if BotConfig.DATABASE_TYPE == 'postgresql':
@@ -55,7 +55,7 @@ class FollowUpScheduler:
                     INSERT INTO interactions (user_id, interaction_type, interaction_data)
                     VALUES (?, ?, ?)
                 '''
-            db_manager.execute_query(query, (user_id, interaction_type, interaction_data))
+            await db_manager.execute_query(query, (user_id, interaction_type, interaction_data))
         except Exception as e:
             logger.error(f"Error logging interaction for user {user_id}: {e}")
 
@@ -81,7 +81,7 @@ class FollowUpScheduler:
                     AND is_active = TRUE
                 '''
             
-            follow_up_1_users = db_manager.execute_query(query1, (six_hours_ago,), fetch=True) or []
+            follow_up_1_users = await db_manager.execute_query(query1, (six_hours_ago,), fetch=True) or []
             
             for user_id, first_name in follow_up_1_users:
                 try:
@@ -106,8 +106,8 @@ Tap below to continue your registration. You're just one step away! 🚀"""
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     await self.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup)
-                    self.update_user_follow_up_day(user_id, 1)
-                    self.log_interaction(user_id, "follow_up_1")
+                    await self.update_user_follow_up_day(user_id, 1)
+                    await self.log_interaction(user_id, "follow_up_1")
                     
                 except TelegramError as e:
                     logger.error(f"Failed to send follow-up 1 to user {user_id}: {e}")
@@ -133,7 +133,7 @@ Tap below to continue your registration. You're just one step away! 🚀"""
                     AND is_active = TRUE
                 '''
             
-            day_2_users = db_manager.execute_query(query2, (day_2_cutoff,), fetch=True) or []
+            day_2_users = await db_manager.execute_query(query2, (day_2_cutoff,), fetch=True) or []
             
             for user_id, first_name in day_2_users:
                 try:
@@ -152,8 +152,8 @@ Don't miss your shot! 🎯"""
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     
                     await self.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup)
-                    self.update_user_follow_up_day(user_id, 2)
-                    self.log_interaction(user_id, "follow_up_2")
+                    await self.update_user_follow_up_day(user_id, 2)
+                    await self.log_interaction(user_id, "follow_up_2")
                     
                 except TelegramError as e:
                     logger.error(f"Failed to send follow-up 2 to user {user_id}: {e}")
