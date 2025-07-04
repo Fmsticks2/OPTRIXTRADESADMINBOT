@@ -1,7 +1,0 @@
-python-telegram-bot==20.7
-sqlite3
-asyncio
-logging
-datetime
-tenacity==9.1.2
-pytz==2023.3
