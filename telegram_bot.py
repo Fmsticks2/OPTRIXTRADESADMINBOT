@@ -1605,7 +1605,7 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
                 )
                 return REGISTER_UID
             
-            await update_user_data(user_id, {"uid": uid})
+            await update_user_data(user_id, uid=uid)
             
             await self._send_persistent_message(
                 chat_id=user_id,
