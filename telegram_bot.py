@@ -113,23 +113,9 @@ class TradingBot:
         retry=retry_if_exception_type(Exception)
     )
     async def _send_persistent_message(self, chat_id: int, text: str, reply_markup=None, parse_mode=None, disable_web_page_preview=False):
-        """Send or edit a message while maintaining history"""
+        """Send a new message while maintaining chat history"""
         try:
-            if chat_id in self.message_history:
-                last_message_id = self.message_history[chat_id]
-                try:
-                    await self.application.bot.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=last_message_id,
-                        text=text,
-                        reply_markup=reply_markup,
-                        parse_mode=parse_mode,
-                        disable_web_page_preview=disable_web_page_preview
-                    )
-                    return last_message_id
-                except Exception as edit_error:
-                    logger.debug(f"Couldn't edit message, sending new: {edit_error}")
-            
+            # Always send a new message to preserve chat history
             new_message = await self.application.bot.send_message(
                 chat_id=chat_id,
                 text=text,
@@ -533,7 +519,8 @@ Only risk 1-2% of your capital per trade"""
         """Handle text messages from users"""
         try:
             user_id = update.effective_user.id
-            text = update.message.text.strip()
+            message_text = update.message.text.strip()
+            text = message_text.upper()
             
             user_data = await get_user_data(user_id)
             if not user_data:
@@ -542,12 +529,49 @@ Only risk 1-2% of your capital per trade"""
             
             await log_interaction(user_id, "text_message", update.message.text)
             
-            if text.upper() == "UPGRADE":
+            # Handle UID submission
+            if text.startswith("UID:") or message_text.isdigit() or (len(message_text) >= 6 and message_text.isalnum()):
+                uid = message_text.replace("UID:", "").strip()
+                
+                # Basic UID validation
+                if len(uid) >= 6 and len(uid) <= 20 and uid.isalnum():
+                    # Update user with UID
+                    await update_user_data(user_id, uid=uid)
+                    
+                    response_text = f"""✅ **UID Received: {uid}**
+
+📸 **Next Step:** Send your deposit screenshot to complete verification
+
+⚡ **What happens next:**
+• Upload your deposit screenshot
+• Our system will process your verification
+• You'll get instant access once approved
+
+🎯 **Ready for screenshot upload!**"""
+                    
+                    await update.message.reply_text(response_text, parse_mode='Markdown')
+                else:
+                    error_response = f"""❌ **Invalid UID Format**
+
+📋 **UID Requirements:**
+• Length: 6-20 characters
+• Format: Letters and numbers only
+
+💡 **Examples of valid UIDs:**
+• ABC123456
+• USER789012
+• TRADER456789
+
+🔄 **Please send a valid UID to continue.**"""
+                    
+                    await update.message.reply_text(error_response, parse_mode='Markdown')
+                    
+            elif text == "UPGRADE":
                 await self._handle_upgrade_request(update, context)
             else:
                 # Default response for unrecognized text
                 await update.message.reply_text(
-                    "I didn't understand that. Please use the menu buttons or type /start to begin."
+                    "I received your message. Use the menu buttons to navigate or type /start to see options."
                 )
                 
         except Exception as e:
@@ -565,14 +589,70 @@ Only risk 1-2% of your capital per trade"""
             
             await log_interaction(user_id, "photo_upload", "deposit_screenshot")
             
-            # Check if user is in verification flow
-            if user_data.get("verification_pending") or user_data.get("uid"):
-                await self.handle_screenshot_upload(update, context)
+            # Check if user has provided UID
+            uid = user_data[6] if len(user_data) > 6 and user_data[6] else None
+            
+            if uid:
+                screenshot_file_id = update.message.photo[-1].file_id
+                
+                # Create verification request
+                try:
+                    from database.connection import create_verification_request
+                    await create_verification_request(user_id, uid, screenshot_file_id)
+                    
+                    confirmation_text = f"""✅ **Screenshot Received Successfully!**
+
+📋 **Verification Details:**
+• UID: {uid}
+• Screenshot: Uploaded
+• Status: Under Review
+
+⏳ Your verification request has been submitted to our admin team. You'll receive a notification once your deposit is verified.
+
+🕐 **Processing Time:** Usually within 2-4 hours
+
+Thank you for your patience! 🙏"""
+                    
+                    await update.message.reply_text(confirmation_text, parse_mode='Markdown')
+                    
+                    # Notify admin
+                    if self.admin_user_id:
+                        admin_notification = f"""🔔 **New Verification Request**
+
+👤 **User:** {update.effective_user.first_name or 'Unknown'}
+🆔 **User ID:** {user_id}
+🔑 **UID:** {uid}
+📸 **Screenshot:** Uploaded
+
+**Admin Actions:**
+• /verify {user_id} - Approve
+• /reject {user_id} - Reject
+• /queue - View all pending"""
+                        
+                        try:
+                            await context.bot.send_message(
+                                chat_id=self.admin_user_id,
+                                text=admin_notification,
+                                parse_mode='Markdown'
+                            )
+                        except Exception as admin_error:
+                            logger.error(f"Failed to notify admin: {admin_error}")
+                            
+                except Exception as db_error:
+                    logger.error(f"Database error in verification: {db_error}")
+                    await update.message.reply_text(
+                        "❌ There was an error processing your verification. Please try again or contact support."
+                    )
             else:
-                await update.message.reply_text("Please complete the registration process first by using /start")
+                await update.message.reply_text(
+                    "📸 Screenshot received! But I need your UID first.\n\nPlease send your broker UID, then upload your screenshot again."
+                )
                 
         except Exception as e:
             logger.error(f"Error in handle_photo: {e}")
+            await update.message.reply_text(
+                "❌ There was an error processing your photo. Please try again."
+            )
 
     async def _handle_upgrade_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle upgrade requests from users"""
