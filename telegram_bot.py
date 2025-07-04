@@ -488,20 +488,15 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
     # Send new message instead of editing to preserve chat history
     await context.bot.send_message(
         chat_id=user_id,
-        text=confirmation_text
+        text=confirmation_text,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📝 Start Verification", callback_data="start_verification")],
+            [InlineKeyboardButton("❓ Where to find UID?", callback_data="uid_help")]
+        ])
     )
     
     # Log bot response
     await db_manager.log_chat_message(user_id, "bot_response", confirmation_text)
-    
-    instruction_text = "Please send your UID and deposit screenshot as separate messages."
-    await context.bot.send_message(
-        chat_id=user_id, 
-        text=instruction_text
-    )
-    
-    # Log instruction
-    await db_manager.log_chat_message(user_id, "bot_response", instruction_text)
 
 async def help_signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1174,7 +1169,7 @@ Choose an option below:"""
 
 
 async def handle_admin_queue_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle admin queue callback"""
+    """Handle admin queue callback with verification action buttons"""
     query = update.callback_query
     await query.answer()
     
@@ -1187,25 +1182,42 @@ async def handle_admin_queue_callback(update: Update, context: ContextTypes.DEFA
     
     if not pending_requests:
         queue_text = "✅ No pending verification requests."
+        keyboard = [
+            [InlineKeyboardButton("🔄 Refresh", callback_data="admin_queue")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="admin_dashboard")]
+        ]
     else:
         queue_text = "📋 **Pending Verification Queue:**\n\n"
+        keyboard = []
         
-        for req in pending_requests:
+        for i, req in enumerate(pending_requests[:5], 1):  # Limit to 5 for button space
             req_id, user_id_req, first_name, username, uid, created_at = req
             username_display = f"@{username}" if username else "No username"
-            queue_text += f"**#{req_id}** - {first_name} ({username_display})\n"
-            queue_text += f"🆔 User ID: `{user_id_req}`\n"
-            queue_text += f"💳 UID: {uid}\n"
-            queue_text += f"⏰ Submitted: {created_at}\n\n"
+            queue_text += f"**{i}.** {first_name} ({username_display})\n"
+            queue_text += f"🆔 ID: `{user_id_req}` | 💳 UID: `{uid}`\n"
+            queue_text += f"⏰ {created_at}\n\n"
+            
+            # Add approve/reject buttons for each user
+            keyboard.append([
+                InlineKeyboardButton(f"✅ Approve #{i}", callback_data=f"verify_{user_id_req}"),
+                InlineKeyboardButton(f"❌ Reject #{i}", callback_data=f"reject_{user_id_req}")
+            ])
+        
+        if len(pending_requests) > 5:
+            queue_text += f"\n... and {len(pending_requests) - 5} more requests.\n"
+            queue_text += "💡 Use `/queue` command to see all requests."
+        
+        # Add navigation buttons
+        keyboard.extend([
+            [InlineKeyboardButton("🔄 Refresh", callback_data="admin_queue")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="admin_dashboard")]
+        ])
     
-    keyboard = [
-        [InlineKeyboardButton("🔄 Refresh", callback_data="admin_queue")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="admin_dashboard")]
-    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await context.bot.send_message(
+    await context.bot.edit_message_text(
         chat_id=query.message.chat_id,
+        message_id=query.message.message_id,
         text=queue_text,
         reply_markup=reply_markup,
         parse_mode='Markdown'
@@ -1902,6 +1914,11 @@ Only risk 1-2% of your capital per trade"""
             
             await log_interaction(user_id, "text_message", update.message.text)
             
+         # Check for specific commands first
+            if text == "UPGRADE":
+                await self._handle_upgrade_request(update, context)
+                return
+            
             # Handle UID submission
             uid = message_text.replace("UID:", "").strip()
             
@@ -1941,9 +1958,6 @@ Only risk 1-2% of your capital per trade"""
                 
                 await update.message.reply_text(error_response, parse_mode='Markdown')
                 return  # Exit early for invalid UID
-                    
-            elif text == "UPGRADE":
-                await self._handle_upgrade_request(update, context)
             else:
                 # Default response for unrecognized text
                 await update.message.reply_text(
@@ -2230,6 +2244,140 @@ You will be contacted shortly by our support team."""
             return USER_LOOKUP
         except Exception as e:
             logger.error(f"Error in handle_user_lookup: {e}")
+    
+    async def handle_broadcast_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle broadcast message input from admin"""
+        try:
+            user_id = update.effective_user.id
+            
+            if not await self._is_admin(user_id):
+                await update.message.reply_text("⛔ Unauthorized")
+                return ConversationHandler.END
+            
+            broadcast_message = update.message.text.strip()
+            
+            if not broadcast_message:
+                await update.message.reply_text("❌ Please provide a valid message to broadcast.")
+                return BROADCAST_MESSAGE
+            
+            # Get all users
+            all_users = await get_all_users()
+            
+            if not all_users:
+                await update.message.reply_text("❌ No users found to broadcast to.")
+                return ConversationHandler.END
+            
+            # Send broadcast message to all users
+            successful_sends = 0
+            failed_sends = 0
+            
+            for user in all_users:
+                try:
+                    target_user_id = user.get('user_id') if isinstance(user, dict) else user[0]
+                    
+                    await context.bot.send_message(
+                        chat_id=target_user_id,
+                        text=f"📢 **Admin Broadcast**\n\n{broadcast_message}",
+                        parse_mode='Markdown'
+                    )
+                    successful_sends += 1
+                    
+                except Exception as send_error:
+                    logger.error(f"Failed to send broadcast to user {target_user_id}: {send_error}")
+                    failed_sends += 1
+            
+            # Send delivery confirmation to admin
+            confirmation_text = f"""📢 **Broadcast Complete**
+
+✅ Successfully sent: {successful_sends}
+❌ Failed to send: {failed_sends}
+📊 Total users: {len(all_users)}
+
+📝 **Message:** {broadcast_message[:100]}{'...' if len(broadcast_message) > 100 else ''}"""
+            
+            await update.message.reply_text(confirmation_text, parse_mode='Markdown')
+            
+            # Log the broadcast
+            await log_interaction(user_id, "admin_broadcast", f"Broadcast to {successful_sends} users")
+            
+            return ConversationHandler.END
+            
+        except Exception as e:
+            logger.error(f"Error in handle_broadcast_message: {e}")
+            await update.message.reply_text("❌ Error sending broadcast message.")
+            return ConversationHandler.END
+    
+    async def handle_lookup_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle user lookup input from admin"""
+        try:
+            user_id = update.effective_user.id
+            
+            if not await self._is_admin(user_id):
+                await update.message.reply_text("⛔ Unauthorized")
+                return ConversationHandler.END
+            
+            lookup_user_id = update.message.text.strip()
+            
+            # Validate user ID format
+            if not lookup_user_id.isdigit():
+                await update.message.reply_text("❌ Please provide a valid numeric User ID.")
+                return USER_LOOKUP
+            
+            lookup_user_id = int(lookup_user_id)
+            
+            # Get user data
+            user_data = await get_user_data(lookup_user_id)
+            
+            if not user_data:
+                await update.message.reply_text(f"❌ No user found with ID: {lookup_user_id}")
+                return ConversationHandler.END
+            
+            # Format user information
+            if isinstance(user_data, dict):
+                name = user_data.get('first_name', 'Unknown')
+                username = user_data.get('username', 'Not set')
+                uid = user_data.get('uid', 'Not provided')
+                is_verified = user_data.get('verified', False)
+                is_active = user_data.get('is_active', False)
+                created_at = user_data.get('created_at', 'Unknown')
+            else:
+                # Handle tuple format
+                name = user_data[2] if len(user_data) > 2 else 'Unknown'
+                username = user_data[3] if len(user_data) > 3 else 'Not set'
+                uid = user_data[6] if len(user_data) > 6 else 'Not provided'
+                is_verified = bool(user_data[4]) if len(user_data) > 4 else False
+                is_active = bool(user_data[5]) if len(user_data) > 5 else False
+                created_at = user_data[7] if len(user_data) > 7 else 'Unknown'
+            
+            status = "✅ Verified" if is_verified else "❌ Not Verified"
+            active_status = "🟢 Active" if is_active else "🔴 Inactive"
+            
+            user_info_text = f"""👤 **User Lookup Results**
+
+🆔 **User ID:** `{lookup_user_id}`
+👤 **Name:** {name}
+🏷️ **Username:** @{username if username != 'Not set' else 'Not set'}
+💳 **UID:** `{uid}`
+🔒 **Status:** {status}
+📊 **Activity:** {active_status}
+📅 **Joined:** {created_at}
+
+**Admin Actions:**
+• /admin_verify {lookup_user_id} - Verify user
+• /admin_reject {lookup_user_id} - Reject user
+• /chathistory {lookup_user_id} - View chat history"""
+            
+            await update.message.reply_text(user_info_text, parse_mode='Markdown')
+            
+            # Log the lookup
+            await log_interaction(user_id, "admin_user_lookup", f"Looked up user {lookup_user_id}")
+            
+            return ConversationHandler.END
+            
+        except Exception as e:
+            logger.error(f"Error in handle_lookup_user: {e}")
+            await update.message.reply_text("❌ Error looking up user.")
+            return ConversationHandler.END
 
     async def handle_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle main menu navigation"""
@@ -2341,6 +2489,16 @@ You will be contacted shortly by our support team."""
                 await self.help_signup(update, context)
             elif data == "help_deposit":
                 await self.help_deposit(update, context)
+            elif data == "admin_queue":
+                await handle_admin_queue_callback(update, context)
+            elif data == "admin_activity":
+                await handle_admin_activity_callback(update, context)
+            elif data == "admin_dashboard":
+                await handle_admin_callbacks(update, context)
+            elif data.startswith("verify_"):
+                await self.handle_verify_callback(update, context)
+            elif data.startswith("reject_"):
+                await self.handle_reject_callback(update, context)
             else:
                 await query.answer("Unknown action")
                 
@@ -2605,6 +2763,213 @@ Thank you for your patience! 🙏"""
             
         except Exception as e:
             logger.error(f"Error in handle_photo: {e}")
+
+    async def admin_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Main admin dashboard command"""
+        try:
+            user_id = update.effective_user.id
+            
+            if not await self._is_admin(user_id):
+                await update.message.reply_text("❌ You don't have permission to use this command.")
+                return
+            
+            first_name = update.effective_user.first_name or "Admin"
+            
+            # Get pending verifications count
+            pending_requests = await get_pending_verifications()
+            pending_count = len(pending_requests) if pending_requests else 0
+            
+            # Get total users count
+            all_users = await get_all_users()
+            total_users = len(all_users) if all_users else 0
+            
+            admin_text = f"""👑 **Admin Dashboard**
+
+Welcome back, {first_name}!
+
+📊 **Quick Stats:**
+• Total Users: {total_users}
+• Pending Verifications: {pending_count}
+
+🛠️ **Admin Tools:**
+• View verification queue
+• Send broadcast messages
+• Look up user information
+• Manage user verifications
+
+💡 **Quick Commands:**
+• `/queue` - View pending verifications
+• `/verify <user_id>` - Approve verification
+• `/reject <user_id>` - Reject verification
+• `/broadcast` - Send broadcast message
+• `/lookup` - Look up user info"""
+            
+            keyboard = [
+                [InlineKeyboardButton("📋 Verification Queue", callback_data="admin_queue")],
+                [InlineKeyboardButton("📢 Broadcast Message", callback_data="broadcast"),
+                 InlineKeyboardButton("🔍 User Lookup", callback_data="user_lookup")],
+                [InlineKeyboardButton("📊 Recent Activity", callback_data="admin_activity")],
+                [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+            ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=admin_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+            # Log the action
+            await log_interaction(user_id, "admin_dashboard", "Accessed admin dashboard")
+            
+        except Exception as e:
+            logger.error(f"Error in admin_command: {e}")
+            await update.message.reply_text("❌ Error accessing admin dashboard.")
+
+    async def handle_verify_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle verification approval callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            if not await self._is_admin(user_id):
+                await context.bot.send_message(chat_id=query.message.chat_id, text="❌ You don't have permission to use this feature.")
+                return
+            
+            # Extract user ID from callback data (format: verify_123456789)
+            target_user_id = int(query.data.split("_")[1])
+            
+            # Update user verification status
+            await update_user_data(target_user_id, {
+                'verified': True,
+                'verification_status': 'approved',
+                'verification_date': datetime.now().isoformat()
+            })
+            
+            # Update verification request status
+            if BotConfig.DATABASE_TYPE == 'postgresql':
+                query_sql = "UPDATE verification_requests SET status = %s WHERE user_id = %s"
+            else:
+                query_sql = "UPDATE verification_requests SET status = ? WHERE user_id = ?"
+            
+            await db_manager.execute_query(query_sql, ('approved', target_user_id))
+            
+            # Notify user of approval
+            success_message = f"""🎉 **Verification Approved!**
+
+✅ Your account has been **manually verified** by our admin team!
+✅ Status: **Approved**
+
+🚀 **You now have access to:**
+• Premium Signals: {PREMIUM_GROUP_LINK}
+• VIP Trading Group: {PREMIUM_GROUP_LINK}
+• Exclusive market insights
+• Priority support
+
+💡 **Next Steps:**
+1. Join our premium channels
+2. Start receiving VIP signals
+3. Begin your trading journey
+
+📈 **Happy Trading!**"""
+            
+            keyboard = [
+                [InlineKeyboardButton("🚀 Join Premium Group", url=PREMIUM_GROUP_LINK)],
+                [InlineKeyboardButton("💬 Contact Support", callback_data="support")],
+                [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+            ]
+            
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text=success_message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+            # Update admin with confirmation
+            await context.bot.edit_message_text(
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id,
+                text=f"✅ User {target_user_id} has been verified and notified.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📋 Back to Queue", callback_data="admin_queue")],
+                    [InlineKeyboardButton("🏠 Admin Dashboard", callback_data="admin_dashboard")]
+                ])
+            )
+            
+            # Log the action
+            await log_interaction(user_id, "admin_verify", f"Verified user {target_user_id}")
+            
+        except Exception as e:
+            logger.error(f"Error in handle_verify_callback: {e}")
+            await query.answer("❌ Error verifying user.")
+
+    async def handle_reject_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle verification rejection callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            if not await self._is_admin(user_id):
+                await context.bot.send_message(chat_id=query.message.chat_id, text="❌ You don't have permission to use this feature.")
+                return
+            
+            # Extract user ID from callback data (format: reject_123456789)
+            target_user_id = int(query.data.split("_")[1])
+            
+            # Update verification request status
+            if BotConfig.DATABASE_TYPE == 'postgresql':
+                query_sql = "UPDATE verification_requests SET status = %s WHERE user_id = %s"
+            else:
+                query_sql = "UPDATE verification_requests SET status = ? WHERE user_id = ?"
+            
+            await db_manager.execute_query(query_sql, ('rejected', target_user_id))
+            
+            # Notify user of rejection
+            rejection_message = f"""❌ **Verification Rejected**
+
+📋 **Reason:** Verification requirements not met
+
+🔄 **What you can do:**
+• Review our verification requirements
+• Ensure your deposit meets minimum amount
+• Submit a clear screenshot of your deposit
+• Contact support if you need help
+
+💡 **Need assistance?** Our support team is here to help!"""
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Try Again", callback_data="get_vip_access")],
+                [InlineKeyboardButton("💬 Contact Support", callback_data="support")],
+                [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+            ]
+            
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text=rejection_message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+            # Update admin with confirmation
+            await context.bot.edit_message_text(
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id,
+                text=f"❌ User {target_user_id} verification has been rejected and user notified.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📋 Back to Queue", callback_data="admin_queue")],
+                    [InlineKeyboardButton("🏠 Admin Dashboard", callback_data="admin_dashboard")]
+                ])
+            )
+            
+            # Log the action
+            await log_interaction(user_id, "admin_reject", f"Rejected user {target_user_id}")
+            
+        except Exception as e:
+            logger.error(f"Error in handle_reject_callback: {e}")
+            await query.answer("❌ Error rejecting user verification.")
 
     async def admin_verify_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to verify a user"""
@@ -3741,6 +4106,19 @@ How to make your first deposit:
             fallbacks=[CommandHandler("cancel", self.cancel)],
         )
         
+        # Conversation handler for admin functions
+        admin_conv = ConversationHandler(
+            entry_points=[
+                CommandHandler("broadcast", self.handle_broadcast),
+                CommandHandler("lookup", self.handle_user_lookup)
+            ],
+            states={
+                BROADCAST_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_broadcast_message)],
+                USER_LOOKUP: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_lookup_user)],
+            },
+            fallbacks=[CommandHandler("cancel", self.cancel)],
+        )
+        
         # User commands
         self.application.add_handler(CommandHandler("start", self.start_command))
         self.application.add_handler(CommandHandler("vipsignals", self.vip_signals_command))
@@ -3752,6 +4130,10 @@ How to make your first deposit:
         self.application.add_handler(CommandHandler("getmyid", get_my_id_command))
         
         # Admin commands
+        self.application.add_handler(CommandHandler("admin", self.admin_command))
+        self.application.add_handler(CommandHandler("verify", self.admin_verify_command))
+        self.application.add_handler(CommandHandler("reject", self.admin_reject_command))
+        self.application.add_handler(CommandHandler("queue", self.admin_queue_command))
         self.application.add_handler(CommandHandler("admin_verify", self.admin_verify_command))
         self.application.add_handler(CommandHandler("admin_reject", self.admin_reject_command))
         self.application.add_handler(CommandHandler("admin_queue", self.admin_queue_command))
@@ -3768,6 +4150,7 @@ How to make your first deposit:
         
         self.application.add_handler(CallbackQueryHandler(self.button_callback))
         self.application.add_handler(verification_conv)
+        self.application.add_handler(admin_conv)
         
         # Add text, photo, and document handlers
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_message))
