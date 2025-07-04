@@ -25,6 +25,9 @@ from telegram.ext import (
 )
 from telegram.error import TelegramError
 
+# Configuration imports
+from config import BotConfig
+
 # Database imports
 from database import (
     initialize_db,
@@ -45,8 +48,137 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Constants from BotConfig
+PREMIUM_CHANNEL_LINK = f"https://t.me/c/{BotConfig.PREMIUM_CHANNEL_ID.replace('-100', '')}"
+PREMIUM_GROUP_LINK = "https://t.me/+LTnKwBO54DRiOTNk"  # Premium group link
+
 # States for conversation
 REGISTER_UID, UPLOAD_SCREENSHOT, BROADCAST_MESSAGE, USER_LOOKUP = range(4)
+
+# Helper functions
+def validate_uid(uid):
+    """Validate UID format and length"""
+    if not uid or not isinstance(uid, str):
+        return False, "UID must be a valid string"
+    
+    # Remove whitespace
+    uid = uid.strip()
+    
+    if len(uid) < BotConfig.MIN_UID_LENGTH:
+        return False, f"UID too short (minimum {BotConfig.MIN_UID_LENGTH} characters)"
+    
+    if len(uid) > BotConfig.MAX_UID_LENGTH:
+        return False, f"UID too long (maximum {BotConfig.MAX_UID_LENGTH} characters)"
+    
+    # Check for alphanumeric characters only
+    if not uid.isalnum():
+        return False, "UID must contain only letters and numbers"
+    
+    return True, "Valid UID"
+
+def should_auto_verify(user_id, uid):
+    """Determine if user should be auto-verified based on criteria"""
+    if not BotConfig.AUTO_VERIFY_ENABLED:
+        return False, "Auto-verification is disabled"
+    
+    # Validate UID format
+    is_valid, reason = validate_uid(uid)
+    if not is_valid:
+        return False, reason
+    
+    # Check business hours if required
+    if BotConfig.AUTO_VERIFY_BUSINESS_HOURS_ONLY:
+        current_hour = datetime.now().hour
+        if not (BotConfig.BUSINESS_HOURS_START <= current_hour < BotConfig.BUSINESS_HOURS_END):
+            return False, "Auto-verification only available during business hours"
+    
+    # Check daily auto-approval limit
+    today = datetime.now().date()
+    if BotConfig.DATABASE_TYPE == 'postgresql':
+        query = '''
+            SELECT COUNT(*) as count FROM verification_requests 
+            WHERE status = %s AND auto_verified = %s 
+            AND DATE(created_at) = %s
+        '''
+    else:
+        query = '''
+            SELECT COUNT(*) as count FROM verification_requests 
+            WHERE status = ? AND auto_verified = ? 
+            AND DATE(created_at) = ?
+        '''
+    
+    result = db_manager.execute_query(query, ('approved', True, today), fetch=True)
+    daily_count = result[0]['count'] if result else 0
+    
+    if daily_count >= BotConfig.DAILY_AUTO_APPROVAL_LIMIT:
+        return False, f"Daily auto-approval limit reached ({BotConfig.DAILY_AUTO_APPROVAL_LIMIT})"
+    
+    return True, "All auto-verification criteria met"
+
+async def auto_verify_user(user_id, uid, file_id, context):
+    """Auto-verify a user and update their status"""
+    try:
+        # Insert verification request with approved status
+        if BotConfig.DATABASE_TYPE == 'postgresql':
+            query = '''
+                INSERT INTO verification_requests (user_id, uid, screenshot_file_id, status, auto_verified, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            '''
+        else:
+            query = '''
+                INSERT INTO verification_requests (user_id, uid, screenshot_file_id, status, auto_verified, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            '''
+        
+        db_manager.execute_query(query, (
+            user_id, uid, file_id, 'approved', True, datetime.now()
+        ))
+        
+        # Update user data
+        await update_user_data(user_id, {
+            'deposit_confirmed': True,
+            'verification_status': 'approved'
+        })
+        
+        # Send success message to user
+        success_message = f"""🎉 **Verification Successful!**
+
+✅ Your account has been **automatically verified**!
+✅ UID: `{uid}`
+✅ Status: **Approved**
+
+🚀 **You now have access to:**
+• Premium Signals: {PREMIUM_GROUP_LINK}
+• VIP Trading Group: {PREMIUM_GROUP_LINK}
+• Exclusive market insights
+• Priority support
+
+💡 **Next Steps:**
+1. Join our premium channels
+2. Start receiving VIP signals
+3. Begin your trading journey
+
+📈 **Happy Trading!**"""
+        
+        keyboard = [
+            [InlineKeyboardButton("🚀 Start Trading", url=BotConfig.BROKER_LINK)],
+            [InlineKeyboardButton("💬 Contact Support", callback_data="support")],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+        ]
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=success_message,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
+        
+        logger.info(f"Auto-verified user {user_id} with UID {uid}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error auto-verifying user {user_id}: {e}")
+        return False
 
 class TradingBot:
     def __init__(self):
@@ -157,11 +289,20 @@ class TradingBot:
 You have full access to our VIP trading signals and features."""
                 reply_markup = InlineKeyboardMarkup(self.verified_user_keyboard)
             else:
-                welcome_text = f"""👋 *Hey {user.first_name or "there"}!* Welcome to *OPTRIXTRADES*
+                welcome_text = f"""Heyy {user.first_name or "there"}
+Welcome to OPTRIXTRADES
+you're one step away from unlocking high-accuracy trading signals, expert strategies, and real trader bonuses, completely free.
 
-Unlock VIP trading signals by completing our quick verification process."""
+Here's what you get as a member:
+✅ Daily VIP trading signals
+✅ Strategy sessions from 6-figure traders
+✅ Access to our private trader community
+✅ Exclusive signup bonuses (up to $500)
+✅ Automated trading bot – trade while you sleep
+
+👇 Tap below to activate your free VIP access and get started."""
                 reply_markup = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔓 Get Verified", callback_data="get_vip_access")],
+                    [InlineKeyboardButton("➡️ Get Free VIP Access", callback_data="get_vip_access")],
                     [InlineKeyboardButton("❓ How It Works", callback_data="how_it_works")]
                 ])
             
@@ -176,10 +317,7 @@ Unlock VIP trading signals by completing our quick verification process."""
             if is_verified:
                 follow_up = "Use the menu below to access your VIP features:"
             else:
-                follow_up = """*Here's what you get when verified:*
-✅ Daily VIP trading signals
-✅ Expert trading strategies
-✅ Private community access"""
+                follow_up = """"""
                 
             await context.bot.send_message(
                 chat_id=user_id,
@@ -210,19 +348,32 @@ Unlock VIP trading signals by completing our quick verification process."""
 You have full access to all VIP features."""
                 keyboard = self.verified_user_keyboard
             else:
-                text = f"""📝 *How It Works:*
+                text = f"""To activate your free access and join our VIP Signal Channel, follow these steps:
 
-1️⃣ *Register* at our broker: [Click Here]({self.broker_link})
-2️⃣ *Deposit* $20+ (recommended $100+ for full access)
-3️⃣ *Verify* by sending your UID and deposit proof
-4️⃣ *Get Access* to VIP signals within minutes
+1️⃣Click the link below to register with our official broker partner
+[{self.broker_link}]
+2️⃣Deposit $20 or more
+3️⃣Send your proof of deposit
 
-*Why we verify:*
-🔒 Prevent signal abuse
-🛡️ Ensure serious traders only
-💎 Maintain signal quality"""
+once your proof have been confirmed your access will be unlocked immediately
+
+The more you deposit, the more powerful your AI access:
+✅ $100+ → Full access to OPTRIX Web AI Portal, Live Signals & AI tools.
+✅ $500+ → Includes:
+— All available signal alert options
+— VIP telegram group
+— Access to private sessions and risk management blueprint
+— OPTRIX AI Auto-Trading (trades for you automatically)
+
+Why is it free?
+We earn a small commission from the broker through your trading volume, not your money. So we are more focused on your success, the more you win, the better for both of us. ✅
+
+Want to unlock even higher-tier bonuses or full bot access?
+Send \"UPGRADE\""""
                 keyboard = [
-                    [InlineKeyboardButton("🔓 Start Verification", callback_data="get_vip_access")],
+                    [InlineKeyboardButton("➡️ I've Registered", callback_data="get_vip_access")],
+                    [InlineKeyboardButton("➡️ Need help signing up", callback_data="help_signup")],
+                    [InlineKeyboardButton("➡️ Need support making a deposit", callback_data="help_deposit")],
                     [InlineKeyboardButton("⬅️ Back", callback_data="main_menu")]
                 ]
             
@@ -254,16 +405,9 @@ You have full access to all VIP features."""
                 )
                 return
             
-            text = """🔓 *Get VIP Access*
+            text = """Send in your uid and deposit screenshot to gain access optrixtrades trades premium signal channel.
 
-To verify your account:
-
-1️⃣ Open your broker account
-2️⃣ Copy your *Unique ID* (UID)
-3️⃣ Take screenshot of your deposit
-4️⃣ Send both to this bot
-
-*Minimum deposit:* $20 (recommended $100+)"""
+BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Get an early access now into our premium channel only limited slots are available."""
             
             await self._send_persistent_message(
                 chat_id=user_id,
@@ -328,6 +472,10 @@ To verify your account:
             user_id = update.message.from_user.id
             photo = update.message.photo[-1]
             
+            # Get user data to retrieve UID
+            user_data = await get_user_data(user_id)
+            uid = user_data.get('uid', 'Not provided') if user_data else 'Not provided'
+            
             # Store photo file_id for verification
             await update_user_data(user_id, {
                 "screenshot_id": photo.file_id,
@@ -335,25 +483,84 @@ To verify your account:
                 "verification_date": datetime.now(pytz.utc).isoformat()
             })
             
+            # Check if user should be auto-verified
+            can_auto_verify, auto_verify_reason = should_auto_verify(user_id, uid)
+            
+            if can_auto_verify:
+                # Attempt auto-verification
+                try:
+                    success = await auto_verify_user(user_id, uid, photo.file_id, context)
+                    if success:
+                        # Auto-verification completed successfully
+                        return ConversationHandler.END
+                    else:
+                        logger.error(f"Auto-verification failed for user {user_id}, falling back to manual review")
+                except Exception as e:
+                    logger.error(f"Auto-verification error for user {user_id}: {e}")
+            
+            # Manual verification process
             # Notify admin
             if self.admin_user_id:
                 try:
-                    user_data = await get_user_data(user_id)
-                    uid = user_data.get('uid', 'Not provided') if user_data else 'Not provided'
-                    await context.bot.send_message(
-                        chat_id=self.admin_user_id,
-                        text=f"🔄 New verification request from user {user_id}\n\nUID: {uid}"
-                    )
+                    admin_notification = f"""🔔 **NEW VERIFICATION REQUEST**
+
+👤 **User:** {update.effective_user.first_name}
+🆔 **User ID:** {user_id}
+💳 **UID:** {uid}
+📸 **Screenshot:** Uploaded
+⏰ **Time:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Use /verify {user_id} to approve or /reject {user_id} to reject."""
+                    
                     await context.bot.send_photo(
                         chat_id=self.admin_user_id,
-                        photo=photo.file_id
+                        photo=photo.file_id,
+                        caption=admin_notification,
+                        parse_mode="Markdown"
                     )
                 except Exception as e:
                     logger.error(f"Couldn't notify admin: {e}")
             
+            # Send confirmation to user with appropriate buttons
+            if can_auto_verify:
+                confirmation_text = f"""✅ **Screenshot Received Successfully!**
+
+📋 **Verification Details:**
+• UID: {uid}
+• Screenshot: Uploaded
+• Status: Under Review (Manual)
+• Reason: Auto-verification temporarily unavailable
+
+⏳ Your verification request has been submitted to our admin team. You'll receive a notification once your deposit is verified.
+
+🕐 **Processing Time:** Usually within 2-4 hours
+
+Thank you for your patience! 🙏"""
+            else:
+                confirmation_text = f"""✅ **Screenshot Received Successfully!**
+
+📋 **Verification Details:**
+• UID: {uid}
+• Screenshot: Uploaded
+• Status: Under Review (Manual)
+• Reason: {auto_verify_reason}
+
+⏳ Your verification request has been submitted to our admin team. You'll receive a notification once your deposit is verified.
+
+🕐 **Processing Time:** Usually within 2-4 hours
+
+Thank you for your patience! 🙏"""
+            
+            # Add appropriate buttons
+            keyboard = [
+                [InlineKeyboardButton("📊 My Account", callback_data="my_account")],
+                [InlineKeyboardButton("⬅️ Main Menu", callback_data="main_menu")]
+            ]
+            
             await self._send_persistent_message(
                 chat_id=user_id,
-                text="🔍 *Verification in Progress...*\n\nWe're reviewing your information. This usually takes 1-2 hours.",
+                text=confirmation_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
             
@@ -665,7 +872,7 @@ Thank you for your patience! 🙏"""
             
             upgrade_text = f"""🔥 UPGRADE REQUEST RECEIVED
 
-For premium upgrade options and full bot access, please contact our support team directly.
+A human support will be needed here for higher-tier bonuses or full bot access.
 
 Our team will help you unlock:
 🚀 Advanced AI trading algorithms
@@ -673,7 +880,9 @@ Our team will help you unlock:
 📈 Personal trading mentor
 💰 Higher deposit bonuses
 
-Contact: @{self.admin_username}"""
+Contact: @{self.admin_username}
+
+You will be contacted shortly by our support team."""
             
             await update.message.reply_text(upgrade_text)
             
@@ -866,7 +1075,25 @@ Contact: @{self.admin_username}"""
             elif data == "user_lookup":
                 await self.handle_user_lookup(update, context)
             elif data == "main_menu":
-                await self.handle_main_menu(update, context)
+                await self.main_menu_callback(update, context)
+            elif data == "menu":
+                await self.menu_command(update, context)
+            elif data == "account_menu":
+                await self.account_menu_callback(update, context)
+            elif data == "help_menu":
+                await self.help_menu_callback(update, context)
+            elif data == "notification_settings":
+                await self.notification_settings_callback(update, context)
+            elif data == "start_trading":
+                await self.start_trading_callback(update, context)
+            elif data == "contact_support":
+                await self.contact_support(update, context)
+            elif data == "verification_help":
+                await self.verification_help(update, context)
+            elif data == "help_signup":
+                await self.help_signup(update, context)
+            elif data == "help_deposit":
+                await self.help_deposit(update, context)
             else:
                 await query.answer("Unknown action")
                 
@@ -940,20 +1167,924 @@ Contact: @{self.admin_username}"""
                 await update.message.reply_text("Please start with /start first.")
                 return
             
-            # Handle photo upload (could be verification screenshot)
-            photo = update.message.photo[-1]  # Get highest resolution
+            # Check if user has UID
+            uid = user_data.get('uid') if isinstance(user_data, dict) else (user_data[6] if len(user_data) > 6 and user_data[6] else None)
             
-            # For now, acknowledge receipt
-            await update.message.reply_text(
-                "📸 Photo received! If this is a verification screenshot, please make sure you've also provided your UID.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔓 Start Verification", callback_data="get_vip_access")],
-                    [InlineKeyboardButton("📋 Main Menu", callback_data="main_menu")]
-                ])
-            )
+            if uid:
+                # User has UID, process as verification screenshot
+                await self.handle_screenshot_upload(update, context)
+            else:
+                # User doesn't have UID, prompt them to provide it first
+                await update.message.reply_text(
+                    "📸 Photo received! To proceed with verification, please provide your Broker UID first.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔓 Start Verification", callback_data="start_verification")],
+                        [InlineKeyboardButton("📋 Main Menu", callback_data="main_menu")]
+                    ])
+                )
             
         except Exception as e:
             logger.error(f"Error in handle_photo: {e}")
+
+    async def admin_verify_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Admin command to verify a user"""
+        try:
+            user_id = update.effective_user.id
+            
+            if not await self._is_admin(user_id):
+                await update.message.reply_text("⛔ Unauthorized")
+                return
+            
+            if not context.args:
+                await update.message.reply_text("Usage: /verify <user_id>")
+                return
+            
+            target_user_id = int(context.args[0])
+            
+            # Update user verification status
+            await update_user_data(target_user_id, {
+                'verified': True,
+                'verification_status': 'approved',
+                'verification_date': datetime.now().isoformat()
+            })
+            
+            # Update verification request status
+            if BotConfig.DATABASE_TYPE == 'postgresql':
+                query = "UPDATE verification_requests SET status = %s WHERE user_id = %s"
+            else:
+                query = "UPDATE verification_requests SET status = ? WHERE user_id = ?"
+            
+            db_manager.execute_query(query, ('approved', target_user_id))
+            
+            # Notify user of approval
+            success_message = f"""🎉 **Verification Approved!**
+
+✅ Your account has been **manually verified** by our admin team!
+✅ Status: **Approved**
+
+🚀 **You now have access to:**
+• Premium Signals: {PREMIUM_GROUP_LINK}
+• VIP Trading Group: {PREMIUM_GROUP_LINK}
+• Exclusive market insights
+• Priority support
+
+💡 **Next Steps:**
+1. Join our premium channels
+2. Start receiving VIP signals
+3. Begin your trading journey
+
+📈 **Happy Trading!**"""
+            
+            keyboard = [
+                [InlineKeyboardButton("🚀 Join Premium Group", url=PREMIUM_GROUP_LINK)],
+                [InlineKeyboardButton("💬 Contact Support", callback_data="support")],
+                [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+            ]
+            
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text=success_message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+            await update.message.reply_text(f"✅ User {target_user_id} has been verified and notified.")
+            
+            # Log the action
+            await log_interaction(user_id, "admin_verify", f"Verified user {target_user_id}")
+            
+        except Exception as e:
+            logger.error(f"Error in admin_verify_command: {e}")
+            await update.message.reply_text("❌ Error verifying user.")
+    
+    async def admin_reject_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Admin command to reject a user verification"""
+        try:
+            user_id = update.effective_user.id
+            
+            if not await self._is_admin(user_id):
+                await update.message.reply_text("⛔ Unauthorized")
+                return
+            
+            if not context.args:
+                await update.message.reply_text("Usage: /reject <user_id> [reason]")
+                return
+            
+            target_user_id = int(context.args[0])
+            reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Verification requirements not met"
+            
+            # Update verification request status
+            if BotConfig.DATABASE_TYPE == 'postgresql':
+                query = "UPDATE verification_requests SET status = %s WHERE user_id = %s"
+            else:
+                query = "UPDATE verification_requests SET status = ? WHERE user_id = ?"
+            
+            db_manager.execute_query(query, ('rejected', target_user_id))
+            
+            # Notify user of rejection
+            rejection_message = f"""❌ **Verification Rejected**
+
+📋 **Reason:** {reason}
+
+🔄 **What you can do:**
+• Review our verification requirements
+• Ensure your deposit meets minimum amount
+• Submit a clear screenshot of your deposit
+• Contact support if you need help
+
+💡 **Need assistance?** Our support team is here to help!"""
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Try Again", callback_data="get_vip_access")],
+                [InlineKeyboardButton("💬 Contact Support", callback_data="support")],
+                [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+            ]
+            
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text=rejection_message,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+            await update.message.reply_text(f"❌ User {target_user_id} verification has been rejected and user notified.")
+            
+            # Log the action
+            await log_interaction(user_id, "admin_reject", f"Rejected user {target_user_id}: {reason}")
+            
+        except Exception as e:
+            logger.error(f"Error in admin_reject_command: {e}")
+            await update.message.reply_text("❌ Error rejecting user verification.")
+
+    async def admin_queue_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Admin command to view pending verification queue"""
+        try:
+            user_id = update.effective_user.id
+            
+            if not await self._is_admin(user_id):
+                await update.message.reply_text("⛔ Unauthorized")
+                return
+            
+            # Get pending verification requests
+            pending_requests = await get_pending_verifications()
+            
+            if not pending_requests:
+                await update.message.reply_text("✅ No pending verification requests.")
+                return
+            
+            queue_text = "📋 **Pending Verification Queue**\n\n"
+            
+            for i, request in enumerate(pending_requests[:10], 1):  # Limit to 10 requests
+                user_data = await get_user_data(request['user_id'])
+                username = user_data.get('username', 'N/A') if user_data else 'N/A'
+                first_name = user_data.get('first_name', 'Unknown') if user_data else 'Unknown'
+                
+                queue_text += f"""{i}. **{first_name}** (@{username})
+   • User ID: `{request['user_id']}`
+   • UID: `{request.get('uid', 'N/A')}`
+   • Submitted: {request.get('created_at', 'Unknown')}
+   • Commands: `/verify {request['user_id']}` | `/reject {request['user_id']}`
+
+"""
+            
+            if len(pending_requests) > 10:
+                queue_text += f"\n... and {len(pending_requests) - 10} more requests."
+            
+            await update.message.reply_text(queue_text, parse_mode='Markdown')
+            
+        except Exception as e:
+            logger.error(f"Error in admin_queue_command: {e}")
+            await update.message.reply_text("❌ Error retrieving verification queue.")
+
+    async def admin_broadcast_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Admin command to broadcast message to all users"""
+        try:
+            user_id = update.effective_user.id
+            
+            if not await self._is_admin(user_id):
+                await update.message.reply_text("⛔ Unauthorized")
+                return
+            
+            if not context.args:
+                await update.message.reply_text("Usage: /broadcast <message>")
+                return
+            
+            broadcast_message = " ".join(context.args)
+            
+            # Get all users
+            all_users = await get_all_users()
+            
+            if not all_users:
+                await update.message.reply_text("❌ No users found to broadcast to.")
+                return
+            
+            # Create broadcast record
+            broadcast_id = f"broadcast_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            
+            # Send broadcast message to all users
+            successful_sends = 0
+            failed_sends = 0
+            
+            for user in all_users:
+                try:
+                    target_user_id = user.get('user_id') if isinstance(user, dict) else user[0]
+                    
+                    await context.bot.send_message(
+                        chat_id=target_user_id,
+                        text=f"📢 **Admin Broadcast**\n\n{broadcast_message}",
+                        parse_mode='Markdown'
+                    )
+                    successful_sends += 1
+                    
+                except Exception as send_error:
+                    logger.error(f"Failed to send broadcast to user {target_user_id}: {send_error}")
+                    failed_sends += 1
+            
+            # Send delivery confirmation to admin
+            confirmation_text = f"""📢 **Broadcast Complete**
+
+✅ Successfully sent: {successful_sends}
+❌ Failed to send: {failed_sends}
+📊 Total users: {len(all_users)}
+
+📝 **Message:** {broadcast_message[:100]}{'...' if len(broadcast_message) > 100 else ''}"""
+            
+            await update.message.reply_text(confirmation_text, parse_mode='Markdown')
+            
+            # Log the broadcast
+            await log_interaction(user_id, "admin_broadcast", f"Broadcast to {successful_sends} users")
+            
+        except Exception as e:
+            logger.error(f"Error in admin_broadcast_command: {e}")
+            await update.message.reply_text("❌ Error sending broadcast message.")
+
+    async def menu_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /menu command"""
+        try:
+            user_id = update.effective_user.id
+            await log_interaction(user_id, "menu_command")
+            
+            user_data = await get_user_data(user_id)
+            is_verified = user_data.get('verified', False) if user_data else False
+            
+            menu_text = "🏠 **Main Menu**\n\nChoose an option below:"
+            
+            if is_verified:
+                keyboard = [
+                    [InlineKeyboardButton("📊 Account Status", callback_data="account_menu")],
+                    [InlineKeyboardButton("🚀 Start Trading", callback_data="start_trading")],
+                    [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
+                    [InlineKeyboardButton("🔔 Notifications", callback_data="notification_settings")],
+                    [InlineKeyboardButton("💬 Contact Support", callback_data="contact_support")]
+                ]
+            else:
+                keyboard = [
+                    [InlineKeyboardButton("📊 Account Status", callback_data="account_menu")],
+                    [InlineKeyboardButton("🔓 Get Verified", callback_data="get_vip_access")],
+                    [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
+                    [InlineKeyboardButton("🔔 Notifications", callback_data="notification_settings")],
+                    [InlineKeyboardButton("💬 Contact Support", callback_data="contact_support")]
+                ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=menu_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in menu_command: {e}")
+
+    async def main_menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle main menu callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            await log_interaction(user_id, "main_menu_callback")
+            
+            user_data = await get_user_data(user_id)
+            is_verified = user_data.get('verified', False) if user_data else False
+            
+            menu_text = "🏠 **Main Menu**\n\nChoose an option below:"
+            
+            if is_verified:
+                keyboard = [
+                    [InlineKeyboardButton("📊 Account Status", callback_data="account_menu")],
+                    [InlineKeyboardButton("🚀 Start Trading", callback_data="start_trading")],
+                    [InlineKeyboardButton("🚀 Join Premium Group", url=PREMIUM_GROUP_LINK)],
+                    [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
+                    [InlineKeyboardButton("🔔 Notifications", callback_data="notification_settings")],
+                    [InlineKeyboardButton("💬 Contact Support", callback_data="contact_support")]
+                ]
+            else:
+                keyboard = [
+                    [InlineKeyboardButton("📊 Account Status", callback_data="account_menu")],
+                    [InlineKeyboardButton("🔓 Get Verified", callback_data="get_vip_access")],
+                    [InlineKeyboardButton("❓ Help", callback_data="help_menu")],
+                    [InlineKeyboardButton("🔔 Notifications", callback_data="notification_settings")],
+                    [InlineKeyboardButton("💬 Contact Support", callback_data="contact_support")]
+                ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=menu_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in main_menu_callback: {e}")
+
+    async def account_menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle account menu callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            await log_interaction(user_id, "account_menu_callback")
+            
+            user_data = await get_user_data(user_id)
+            
+            if user_data:
+                name = user_data.get('first_name', 'Unknown')
+                username = user_data.get('username', 'Not set')
+                uid = user_data.get('uid', 'Not provided')
+                is_verified = user_data.get('verified', False)
+                status = "✅ Verified" if is_verified else "❌ Not Verified"
+                current_flow = user_data.get('current_flow', 'main_menu')
+                
+                account_text = f"""📊 **Account Information**
+
+👤 **Name:** {name}
+🏷️ **Username:** @{username}
+🆔 **User ID:** `{user_id}`
+💳 **UID:** `{uid}`
+🔒 **Status:** {status}
+📍 **Current Flow:** {current_flow}
+
+💼 **Broker Link:** [Click Here]({self.broker_link})"""
+            else:
+                account_text = "❌ **No account information found**\n\nPlease complete registration to create your account."
+            
+            keyboard = [
+                [InlineKeyboardButton("🔄 Refresh Status", callback_data="account_menu")]
+            ]
+            
+            # Add verification button if not verified
+            if not user_data or not user_data.get('verified', False):
+                keyboard.append([InlineKeyboardButton("🔓 Complete Verification", callback_data="get_vip_access")])
+            
+            keyboard.append([InlineKeyboardButton("⬅️ Back to Menu", callback_data="main_menu")])
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=account_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown',
+                disable_web_page_preview=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in account_menu_callback: {e}")
+
+    async def help_menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle help menu callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            await log_interaction(user_id, "help_menu_callback")
+            
+            help_text = """❓ **Help & Support**
+
+Choose a topic for assistance:"""
+            
+            keyboard = [
+                [InlineKeyboardButton("🔍 Verification Help", callback_data="verification_help")],
+                [InlineKeyboardButton("💰 Deposit Guide", callback_data="help_deposit")],
+                [InlineKeyboardButton("📝 Registration Guide", callback_data="help_signup")],
+                [InlineKeyboardButton("💬 Contact Support", callback_data="contact_support")],
+                [InlineKeyboardButton("⬅️ Back to Menu", callback_data="main_menu")]
+            ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=help_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in help_menu_callback: {e}")
+
+    async def notification_settings_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle notification settings callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            await log_interaction(user_id, "notification_settings_callback")
+            
+            settings_text = """🔔 **Notification Settings**
+
+📊 **Current Settings:**
+• Trading Signals: ✅ Enabled
+• Account Updates: ✅ Enabled
+• Admin Messages: ✅ Enabled
+• System Alerts: ✅ Enabled
+
+⚙️ **Note:** Notification customization is under development. All notifications are currently enabled by default."""
+            
+            keyboard = [
+                [InlineKeyboardButton("⬅️ Back to Menu", callback_data="main_menu")]
+            ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=settings_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in notification_settings_callback: {e}")
+
+    async def start_trading_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle start trading callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            await log_interaction(user_id, "start_trading_callback")
+            
+            user_data = await get_user_data(user_id)
+            is_verified = user_data.get('verified', False) if user_data else False
+            
+            if is_verified:
+                trading_text = f"""🚀 **Start Trading**
+
+🎯 **Ready to Trade?**
+You're all set to start your trading journey!
+
+📈 **Access Your Tools:**
+• Join our Premium Group for live signals
+• Use our recommended broker platform
+• Follow our expert analysis
+
+💡 **Trading Tips:**
+• Start with small amounts
+• Follow risk management rules
+• Stay updated with market news
+
+🔗 **Quick Links:**"""
+                
+                keyboard = [
+                    [InlineKeyboardButton("🚀 Join Premium Group", url=PREMIUM_GROUP_LINK)],
+                    [InlineKeyboardButton("💼 Open Broker Account", url=self.broker_link)],
+                    [InlineKeyboardButton("📊 Account Status", callback_data="account_menu")],
+                    [InlineKeyboardButton("⬅️ Back to Menu", callback_data="main_menu")]
+                ]
+            else:
+                trading_text = """🔒 **Verification Required**
+
+To start trading, you need to complete verification first.
+
+✅ **Complete these steps:**
+1. Get verified with your broker UID
+2. Upload deposit screenshot
+3. Wait for admin approval
+4. Access premium trading features"""
+                
+                keyboard = [
+                    [InlineKeyboardButton("🔓 Get Verified", callback_data="get_vip_access")],
+                    [InlineKeyboardButton("❓ How It Works", callback_data="how_it_works")],
+                    [InlineKeyboardButton("⬅️ Back to Menu", callback_data="main_menu")]
+                ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=trading_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown',
+                disable_web_page_preview=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in start_trading_callback: {e}")
+
+    async def contact_support(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle contact support callback"""
+        try:
+            if update.callback_query:
+                query = update.callback_query
+                await query.answer()
+                user_id = query.from_user.id
+            else:
+                user_id = update.effective_user.id
+            
+            await log_interaction(user_id, "contact_support")
+            
+            support_text = f"""💬 **Contact Support**
+
+🆘 **Need Help?**
+Our support team is here to assist you!
+
+📞 **Contact Information:**
+👤 **Admin:** @{self.admin_username}
+⏰ **Hours:** 24/7 Support Available
+📧 **Response Time:** Usually within 1-2 hours
+
+❓ **Common Issues:**
+• Verification problems
+• Account access issues
+• Trading questions
+• Technical support
+
+💡 **Tip:** Please include your User ID (`{user_id}`) when contacting support for faster assistance."""
+            
+            keyboard = [
+                [InlineKeyboardButton("💬 Message Admin", url=f"https://t.me/{self.admin_username}")],
+                [InlineKeyboardButton("❓ Help Menu", callback_data="help_menu")],
+                [InlineKeyboardButton("⬅️ Back to Menu", callback_data="main_menu")]
+            ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=support_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in contact_support: {e}")
+
+    async def verification_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle verification help callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            await log_interaction(user_id, "verification_help")
+            
+            help_text = """🔍 **Verification Help**
+
+❓ **Frequently Asked Questions:**
+
+**Q: What is UID?**
+A: UID is your unique broker account identifier (8-20 characters)
+
+**Q: Where do I find my UID?**
+A: In your broker account → Profile → Account ID/UID
+
+**Q: What screenshot do I need?**
+A: A clear image of your deposit confirmation showing amount and date
+
+**Q: How long does verification take?**
+A: Usually 2-4 hours during business hours
+
+**Q: What's the minimum deposit?**
+A: $20 minimum (recommended $100+ for full access)
+
+💡 **Tips for Faster Verification:**
+• Use clear, high-quality screenshots
+• Ensure UID is clearly visible
+• Include deposit amount and date
+• Contact support if you have issues"""
+            
+            keyboard = [
+                [InlineKeyboardButton("🔓 Start Verification", callback_data="get_vip_access")],
+                [InlineKeyboardButton("💬 Contact Support", callback_data="contact_support")],
+                [InlineKeyboardButton("⬅️ Back to Help", callback_data="help_menu")]
+            ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=help_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in verification_help: {e}")
+
+    async def help_signup(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle signup help callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            await log_interaction(user_id, "help_signup")
+            
+            signup_text = f"""📝 **Registration Guide**
+
+🎯 **Step-by-Step Registration:**
+
+**Step 1: Create Broker Account**
+• Click: [Register Here]({self.broker_link})
+• Fill in your personal details
+• Verify your email address
+• Complete account setup
+
+**Step 2: Make Initial Deposit**
+• Minimum: $20 (recommended $100+)
+• Choose your preferred payment method
+• Complete the deposit process
+• Save the confirmation screenshot
+
+**Step 3: Get Your UID**
+• Login to your broker account
+• Go to Profile/Account Settings
+• Find your Account ID/UID
+• Copy the alphanumeric code
+
+**Step 4: Verify with Bot**
+• Send your UID to this bot
+• Upload deposit screenshot
+• Wait for admin approval
+
+✅ **You're all set!**"""
+            
+            keyboard = [
+                [InlineKeyboardButton("💼 Register Now", url=self.broker_link)],
+                [InlineKeyboardButton("🔓 Start Verification", callback_data="get_vip_access")],
+                [InlineKeyboardButton("⬅️ Back to Help", callback_data="help_menu")]
+            ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=signup_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown',
+                disable_web_page_preview=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in help_signup: {e}")
+
+    async def help_deposit(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle deposit help callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            await log_interaction(user_id, "help_deposit")
+            
+            deposit_text = """💰 **Deposit Guide**
+
+💳 **How to Make a Deposit:**
+
+**Step 1: Login to Broker**
+• Access your broker account
+• Navigate to 'Deposit' or 'Fund Account'
+
+**Step 2: Choose Payment Method**
+• Credit/Debit Card
+• Bank Transfer
+• E-wallets (Skrill, Neteller)
+• Cryptocurrency
+
+**Step 3: Enter Amount**
+• Minimum: $20
+• Recommended: $100+ for full access
+• Check for any bonus offers
+
+**Step 4: Complete Payment**
+• Follow payment instructions
+• Wait for confirmation
+• Take screenshot of confirmation
+
+**Step 5: Verify Deposit**
+• Send screenshot to this bot
+• Include your UID
+• Wait for verification
+
+⚠️ **Important Notes:**
+• Keep all transaction records
+• Use the same name as your account
+• Contact support if deposit fails"""
+            
+            keyboard = [
+                [InlineKeyboardButton("💼 Access Broker", url=self.broker_link)],
+                [InlineKeyboardButton("🔓 Verify Deposit", callback_data="get_vip_access")],
+                [InlineKeyboardButton("⬅️ Back to Help", callback_data="help_menu")]
+            ]
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=deposit_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown',
+                disable_web_page_preview=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in help_deposit: {e}")
+
+    async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle document uploads from users"""
+        try:
+            user_id = update.effective_user.id
+            document = update.message.document
+            
+            # Check if user exists
+            user_data = await get_user_data(user_id)
+            if not user_data:
+                await update.message.reply_text("Please start with /start first.")
+                return
+            
+            await log_interaction(user_id, "document_upload", f"File: {document.file_name}")
+            
+            # Check file type
+            allowed_types = ['pdf', 'jpg', 'jpeg', 'png']
+            file_extension = document.file_name.lower().split('.')[-1] if '.' in document.file_name else ''
+            
+            if file_extension not in allowed_types:
+                await update.message.reply_text(
+                    "❌ **Invalid file type**\n\nPlease upload:\n• PDF documents\n• Image files (JPG, PNG)\n• Screenshots of your deposit",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            # Check if user has UID
+            uid = user_data.get('uid') if isinstance(user_data, dict) else (user_data[6] if len(user_data) > 6 and user_data[6] else None)
+            
+            if not uid:
+                await update.message.reply_text(
+                    "📄 Document received! But I need your UID first.\n\nPlease provide your broker UID, then upload your document again.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔓 Start Verification", callback_data="start_verification")]
+                    ])
+                )
+                return
+            
+            # Process as verification document
+            try:
+                from database.connection import create_verification_request
+                await create_verification_request(user_id, uid, document.file_id)
+                
+                confirmation_text = f"""✅ **Document Received Successfully!**
+
+📋 **Verification Details:**
+• UID: {uid}
+• Document: {document.file_name}
+• File Type: {file_extension.upper()}
+• Status: Under Review
+
+⏳ Your verification request has been submitted to our admin team. You'll receive a notification once your deposit is verified.
+
+🕐 **Processing Time:** Usually within 2-4 hours
+
+📊 **What's Next?**
+• Our team will review your document
+• You'll get notified of the decision
+• Once approved, you'll have full access
+
+Thank you for your patience! 🙏"""
+                
+                keyboard = [
+                    [InlineKeyboardButton("📊 Check Status", callback_data="account_menu")],
+                    [InlineKeyboardButton("💬 Contact Support", callback_data="contact_support")],
+                    [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+                ]
+                
+                await update.message.reply_text(
+                    confirmation_text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode='Markdown'
+                )
+                
+                # Notify admin
+                if self.admin_user_id:
+                    admin_notification = f"""📄 **New Document Verification Request**
+
+👤 **User:** {update.effective_user.first_name or 'Unknown'}
+🆔 **User ID:** {user_id}
+🔑 **UID:** {uid}
+📄 **Document:** {document.file_name}
+📁 **Type:** {file_extension.upper()}
+
+**Admin Actions:**
+• /verify {user_id} - Approve
+• /reject {user_id} - Reject
+• /queue - View all pending"""
+                    
+                    try:
+                        await context.bot.send_document(
+                            chat_id=self.admin_user_id,
+                            document=document.file_id,
+                            caption=admin_notification,
+                            parse_mode='Markdown'
+                        )
+                    except Exception as admin_error:
+                        logger.error(f"Failed to notify admin about document: {admin_error}")
+                        
+            except Exception as db_error:
+                logger.error(f"Database error in document verification: {db_error}")
+                await update.message.reply_text(
+                    "❌ There was an error processing your document. Please try again or contact support."
+                )
+                
+        except Exception as e:
+            logger.error(f"Error in handle_document: {e}")
+            await update.message.reply_text(
+                "❌ There was an error processing your document. Please try again."
+            )
+
+    async def help_signup(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle help signup callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            await log_interaction(user_id, "help_signup")
+            
+            help_text = f"""📹 **SIGNUP HELP**
+
+Step-by-step registration guide:
+
+1️⃣ Click this link: {BotConfig.BROKER_LINK}
+2️⃣ Fill in your personal details
+3️⃣ Verify your email address
+4️⃣ Complete account verification
+5️⃣ Make your first deposit ($20 minimum)
+
+📝 **Important Notes:**
+• Use real information for verification
+• Keep your login details safe
+• Contact support if you need help
+
+💡 **Need more help?** Contact our support team!"""
+            
+            keyboard = [
+                [InlineKeyboardButton("🔗 Register Now", url=BotConfig.BROKER_LINK)],
+                [InlineKeyboardButton("💬 Contact Support", callback_data="contact_support")],
+                [InlineKeyboardButton("🔙 Back", callback_data="get_vip_access")]
+            ]
+            
+            await query.edit_message_text(
+                text=help_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in help_signup: {e}")
+    
+    async def help_deposit(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle help deposit callback"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            await log_interaction(user_id, "help_deposit")
+            
+            help_text = f"""💳 **DEPOSIT HELP**
+
+How to make your first deposit:
+
+1️⃣ Log into your broker account
+2️⃣ Go to "Deposit" section
+3️⃣ Choose your payment method
+4️⃣ Enter deposit amount ($20 minimum)
+5️⃣ Complete the payment
+6️⃣ Take a screenshot of confirmation
+
+📱 **Payment Methods:**
+• Credit/Debit Cards
+• Bank Transfer
+• E-wallets
+• Crypto (if available)
+
+⚠️ **Important:** Always take a screenshot of your deposit confirmation!
+
+💡 **Need assistance?** Our support team is here to help!"""
+            
+            keyboard = [
+                [InlineKeyboardButton("🔗 Go to Broker", url=BotConfig.BROKER_LINK)],
+                [InlineKeyboardButton("💬 Contact Support", callback_data="contact_support")],
+                [InlineKeyboardButton("🔙 Back", callback_data="get_vip_access")]
+            ]
+            
+            await query.edit_message_text(
+                text=help_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in help_deposit: {e}")
 
     async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Log errors caused by updates."""
@@ -992,20 +2123,30 @@ Contact: @{self.admin_username}"""
             fallbacks=[CommandHandler("cancel", self.cancel)],
         )
         
-        # Add all handlers
+        # User commands
         self.application.add_handler(CommandHandler("start", self.start_command))
         self.application.add_handler(CommandHandler("vipsignals", self.vip_signals_command))
         self.application.add_handler(CommandHandler("myaccount", self.my_account_command))
         self.application.add_handler(CommandHandler("support", self.support_command))
         self.application.add_handler(CommandHandler("stats", self.stats_command))
         self.application.add_handler(CommandHandler("howitworks", self.how_it_works))
+        self.application.add_handler(CommandHandler("menu", self.menu_command))
+        
+        # Admin commands
+        self.application.add_handler(CommandHandler("admin_verify", self.admin_verify_command))
+        self.application.add_handler(CommandHandler("admin_reject", self.admin_reject_command))
+        self.application.add_handler(CommandHandler("admin_queue", self.admin_queue_command))
+        self.application.add_handler(CommandHandler("admin_broadcast", self.admin_broadcast_command))
+        self.application.add_handler(CommandHandler("broadcast", self.handle_broadcast))
+        self.application.add_handler(CommandHandler("lookup", self.handle_user_lookup))
         
         self.application.add_handler(CallbackQueryHandler(self.button_callback))
         self.application.add_handler(verification_conv)
         
-        # Add text and photo handlers
+        # Add text, photo, and document handlers
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_message))
         self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
+        self.application.add_handler(MessageHandler(filters.Document.ALL, self.handle_document))
         
         self.application.add_error_handler(self.error_handler)
 

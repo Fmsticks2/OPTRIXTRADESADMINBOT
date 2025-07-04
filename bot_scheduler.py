@@ -85,19 +85,17 @@ class FollowUpScheduler:
             
             for user_id, first_name in follow_up_1_users:
                 try:
-                    text = f"""Hey {first_name} 👋
-
-Just checking in...
+                    text = f"""Hey {first_name} 👋 just checking in…
 
 You haven't completed your free VIP access setup yet. If you still want:
 
 ✅ Daily signals
-✅ Auto trading bot  
+✅ Auto trading bot
 ✅ Bonus deposit rewards
 
-...then don't miss out. Traders are already making serious moves this week.
+…then don't miss out. Traders are already making serious moves this week.
 
-Tap below to continue your registration. You're just one step away! 🚀"""
+Tap below to continue your registration. You're just one step away 👇"""
 
                     keyboard = [
                         [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="get_vip_access")],
@@ -137,16 +135,16 @@ Tap below to continue your registration. You're just one step away! 🚀"""
             
             for user_id, first_name in day_2_users:
                 try:
-                    text = """📈 Just an update...
+                    text = """🔥 Just an update…
 
 We've already had 42 traders activate their access this week and most of them are already using the free bot + signals to start profiting.
 
 You're still eligible but access may close soon once we hit this week's quota.
 
-Don't miss your shot! 🎯"""
+Don't miss your shot."""
 
                     keyboard = [
-                        [InlineKeyboardButton("➡️ Complete My Free Access", callback_data="get_vip_access")],
+                        [InlineKeyboardButton("➡️ Complete My Free access", callback_data="get_vip_access")],
                         [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{ADMIN_USERNAME}")]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
