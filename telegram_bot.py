@@ -4036,7 +4036,7 @@ How to make your first deposit:
         
         # Set webhook
         await self.application.bot.set_webhook(
-            url=self.webhook_url + self.webhook_path,
+            url=self.webhook_url,
             allowed_updates=["message", "callback_query"]
         )
         
@@ -4069,9 +4069,9 @@ How to make your first deposit:
         
         # Create and start the web server
         app = web.Application()
-        app.router.add_post(self.webhook_path, webhook_handler)
+        app.router.add_post(f"/webhook/{self.bot_token}", webhook_handler)
         app.router.add_get("/health", health_check)
-        app.router.add_get(self.webhook_path, method_not_allowed)
+        app.router.add_get(f"/webhook/{self.bot_token}", method_not_allowed)
         app.router.add_route("*", "/{path:.*}", method_not_allowed)
         
         runner = web.AppRunner(app)
