@@ -4023,6 +4023,9 @@ How to make your first deposit:
                 UPLOAD_SCREENSHOT: [MessageHandler(filters.PHOTO, self.handle_screenshot_upload)],
             },
             fallbacks=[CommandHandler("cancel", self.cancel)],
+            per_message=False,
+            per_chat=True,
+            per_user=False,
         )
         
         # Conversation handler for admin functions
@@ -4036,6 +4039,9 @@ How to make your first deposit:
                 USER_LOOKUP: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_lookup_user)],
             },
             fallbacks=[CommandHandler("cancel", self.cancel)],
+            per_message=False,
+            per_chat=True,
+            per_user=False,
         )
         
         # User commands
