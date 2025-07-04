@@ -1904,72 +1904,7 @@ Only risk 1-2% of your capital per trade"""
         except Exception as e:
             logger.error(f"Error in button callback: {e}")
 
-    async def handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle text messages from users"""
-        try:
-            user_id = update.effective_user.id
-            message_text = update.message.text.strip()
-            text = message_text.upper()
-            
-            user_data = await get_user_data(user_id)
-            if not user_data:
-                await self.start_command(update, context)
-                return
-            
-            await log_interaction(user_id, "text_message", update.message.text)
-            
-         # Check for specific commands first
-            if text == "UPGRADE":
-                await self._handle_upgrade_request(update, context)
-                return
-            
-            # Handle UID submission
-            uid = message_text.replace("UID:", "").strip()
-            
-            # Check if this looks like a UID (6-20 alphanumeric characters)
-            if len(uid) >= 6 and len(uid) <= 20 and uid.isalnum():
-                # Update user with UID
-                await update_user_data(user_id, uid=uid)
-                
-                response_text = f"""✅ **UID Received: {uid}**
-
-📸 **Next Step:** Send your deposit screenshot to complete verification
-
-⚡ **What happens next:**
-• Upload your deposit screenshot
-• Our system will process your verification
-• You'll get instant access once approved
-
-🎯 **Ready for screenshot upload!**"""
-                
-                await update.message.reply_text(response_text, parse_mode='Markdown')
-                return  # Exit early for valid UID
-            
-            # Check if user tried to send a UID but it's invalid format
-            elif len(message_text) >= 3 and any(c.isalnum() for c in message_text):
-                error_response = f"""❌ **Invalid UID Format**
-
-📋 **UID Requirements:**
-• Length: 6-20 characters
-• Format: Letters and numbers only
-
-💡 **Examples of valid UIDs:**
-• ABC123456
-• USER789012
-• TRADER456789
-
-🔄 **Please send a valid UID to continue.**"""
-                
-                await update.message.reply_text(error_response, parse_mode='Markdown')
-                return  # Exit early for invalid UID
-            else:
-                # Default response for unrecognized text
-                await update.message.reply_text(
-                    "I received your message. Use the menu buttons to navigate or type /start to see options."
-                )
-                
-        except Exception as e:
-            logger.error(f"Error in handle_text_message: {e}")
+    # Removed duplicate handle_text_message method - using the one at line 2492 instead
 
     async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle photo uploads from users"""
@@ -4132,14 +4067,15 @@ How to make your first deposit:
         self.application.add_handler(CommandHandler("autostats", self.admin_auto_verify_stats_command))
         self.application.add_handler(CommandHandler("chathistory", admin_chat_history_command))
         
-        # Specific callback handlers
-        self.application.add_handler(CallbackQueryHandler(self.contact_support, pattern='^contact_support$'))
-
-        self.application.add_handler(CallbackQueryHandler(self.button_callback))
+        # Add conversation handlers FIRST (higher priority)
         self.application.add_handler(verification_conv)
         self.application.add_handler(admin_conv)
         
-        # Add text, photo, and document handlers
+        # Specific callback handlers
+        self.application.add_handler(CallbackQueryHandler(self.contact_support, pattern='^contact_support$'))
+        self.application.add_handler(CallbackQueryHandler(self.button_callback))
+        
+        # Add text, photo, and document handlers (lower priority)
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_message))
         self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
         self.application.add_handler(MessageHandler(filters.Document.ALL, self.handle_document))
