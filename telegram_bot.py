@@ -530,15 +530,14 @@ Only risk 1-2% of your capital per trade"""
             await log_interaction(user_id, "text_message", update.message.text)
             
             # Handle UID submission
-            if text.startswith("UID:") or message_text.isdigit() or (len(message_text) >= 6 and message_text.isalnum()):
-                uid = message_text.replace("UID:", "").strip()
+            uid = message_text.replace("UID:", "").strip()
+            
+            # Check if this looks like a UID (6-20 alphanumeric characters)
+            if len(uid) >= 6 and len(uid) <= 20 and uid.isalnum():
+                # Update user with UID
+                await update_user_data(user_id, uid=uid)
                 
-                # Basic UID validation
-                if len(uid) >= 6 and len(uid) <= 20 and uid.isalnum():
-                    # Update user with UID
-                    await update_user_data(user_id, uid=uid)
-                    
-                    response_text = f"""✅ **UID Received: {uid}**
+                response_text = f"""✅ **UID Received: {uid}**
 
 📸 **Next Step:** Send your deposit screenshot to complete verification
 
@@ -548,10 +547,13 @@ Only risk 1-2% of your capital per trade"""
 • You'll get instant access once approved
 
 🎯 **Ready for screenshot upload!**"""
-                    
-                    await update.message.reply_text(response_text, parse_mode='Markdown')
-                else:
-                    error_response = f"""❌ **Invalid UID Format**
+                
+                await update.message.reply_text(response_text, parse_mode='Markdown')
+                return  # Exit early for valid UID
+            
+            # Check if user tried to send a UID but it's invalid format
+            elif len(message_text) >= 3 and any(c.isalnum() for c in message_text):
+                error_response = f"""❌ **Invalid UID Format**
 
 📋 **UID Requirements:**
 • Length: 6-20 characters
@@ -563,8 +565,9 @@ Only risk 1-2% of your capital per trade"""
 • TRADER456789
 
 🔄 **Please send a valid UID to continue.**"""
-                    
-                    await update.message.reply_text(error_response, parse_mode='Markdown')
+                
+                await update.message.reply_text(error_response, parse_mode='Markdown')
+                return  # Exit early for invalid UID
                     
             elif text == "UPGRADE":
                 await self._handle_upgrade_request(update, context)
