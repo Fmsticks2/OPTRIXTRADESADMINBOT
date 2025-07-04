@@ -340,7 +340,7 @@ def should_auto_verify(user_id, uid):
             AND DATE(created_at) = ?
         '''
     
-    result = await db_manager.execute_query(query, ('approved', True, today), fetch=True)
+    result = db_manager.execute_query(query, ('approved', True, today), fetch=True)
     daily_count = result[0]['count'] if result else 0
     
     if daily_count >= BotConfig.DAILY_AUTO_APPROVAL_LIMIT:
@@ -2793,7 +2793,7 @@ async def admin_auto_verify_stats_command(update: Update, context: ContextTypes.
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Exception while handling an update: {context.error}")
 
-def main():
+async def main():
     # Initialize database
     init_database()
     
@@ -2844,4 +2844,5 @@ def main():
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
-    main()
+    import asyncio
+    asyncio.run(main())

@@ -18,7 +18,7 @@ class BotConfig:
     # Database
     DATABASE_PATH: str = os.getenv('DATABASE_PATH', 'trading_bot.db')
     SQLITE_DATABASE_PATH: str = os.path.join(os.path.dirname(__file__), os.getenv('SQLITE_DATABASE_PATH', 'trading_bot.db'))
-    DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'postgresql')
+    DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'sqlite')
     DATABASE_URL: str = os.getenv('DATABASE_URL', '')
     
     # PostgreSQL specific settings

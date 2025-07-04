@@ -752,6 +752,100 @@ Contact: @{self.admin_username}"""
         except Exception as e:
             logger.error(f"Error in uid_help: {e}")
 
+    async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle button callbacks"""
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            user_id = query.from_user.id
+            data = query.data
+            
+            # Route to appropriate handler based on callback data
+            if data == "get_vip_access":
+                await self.get_vip_access(update, context)
+            elif data == "how_it_works":
+                await self.how_it_works(update, context)
+            elif data == "start_verification":
+                await self.start_verification(update, context)
+            elif data == "uid_help":
+                await self.uid_help(update, context)
+            elif data == "vip_signals":
+                await self.vip_signals_command(update, context)
+            elif data == "my_account":
+                await self.my_account_command(update, context)
+            elif data == "support":
+                await self.support_command(update, context)
+            elif data == "stats":
+                await self.stats_command(update, context)
+            elif data == "broadcast":
+                await self.handle_broadcast(update, context)
+            elif data == "user_lookup":
+                await self.handle_user_lookup(update, context)
+            elif data == "main_menu":
+                await self.handle_main_menu(update, context)
+            else:
+                await query.answer("Unknown action")
+                
+        except Exception as e:
+            logger.error(f"Error in button_callback: {e}")
+
+    async def handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle text messages"""
+        try:
+            user_id = update.effective_user.id
+            message_text = update.message.text.strip()
+            
+            # Log interaction
+            await log_interaction(user_id, "text_message", message_text)
+            
+            # Check if user exists, if not create them
+            user_data = await get_user_data(user_id)
+            if not user_data:
+                await self.start_command(update, context)
+                return
+            
+            # Handle different text inputs based on context
+            # For now, provide a generic response
+            await update.message.reply_text(
+                "I received your message. Use the menu buttons to navigate or type /start to see options.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📋 Main Menu", callback_data="main_menu")]
+                ])
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in handle_text_message: {e}")
+
+    async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle photo uploads"""
+        try:
+            user_id = update.effective_user.id
+            
+            # Log interaction
+            await log_interaction(user_id, "photo_upload", "screenshot")
+            
+            # Check if user exists
+            user_data = await get_user_data(user_id)
+            if not user_data:
+                await update.message.reply_text("Please start with /start first.")
+                return
+            
+            # Handle photo upload (could be verification screenshot)
+            photo = update.message.photo[-1]  # Get highest resolution
+            
+            # For now, acknowledge receipt
+            await update.message.reply_text(
+                "📸 Photo received! If this is a verification screenshot, please make sure you've also provided your UID.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔓 Start Verification", callback_data="get_vip_access")],
+                    [InlineKeyboardButton("📋 Main Menu", callback_data="main_menu")]
+                ])
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in handle_photo: {e}")
+
     async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Log errors caused by updates."""
         logger.error("Exception while handling an update:", exc_info=context.error)

@@ -27,7 +27,7 @@ def display_bot_info():
 if __name__ == '__main__':
     display_bot_info()
     try:
-        main()
+        asyncio.run(main())
     except KeyboardInterrupt:
         print("\n🛑 Bot stopped by user")
     except Exception as e:

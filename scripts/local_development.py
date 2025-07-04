@@ -238,7 +238,8 @@ class LocalDevelopmentManager:
                 # Start polling mode
                 logger.info("   🔄 Starting polling mode...")
                 from telegram_bot import main
-                main()
+                import asyncio
+                await main()
                 
         except Exception as e:
             logger.error(f"❌ Bot startup failed: {e}")
