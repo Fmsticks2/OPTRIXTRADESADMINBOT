@@ -878,6 +878,7 @@ Contact: @{self.admin_username}"""
         try:
             user_id = update.effective_user.id
             message_text = update.message.text.strip()
+            text = message_text.upper()
             
             # Log interaction
             await log_interaction(user_id, "text_message", message_text)
@@ -888,8 +889,33 @@ Contact: @{self.admin_username}"""
                 await self.start_command(update, context)
                 return
             
-            # Handle different text inputs based on context
-            # For now, provide a generic response
+            # Handle UID submission
+            uid = message_text.replace("UID:", "").strip()
+            
+            # Check if this looks like a UID (6-20 alphanumeric characters)
+            if len(uid) >= 6 and len(uid) <= 20 and uid.isalnum():
+                # Valid UID format
+                await update_user_data(user_id, {"uid": uid})
+                await update.message.reply_text(
+                    f"✅ UID Received: {uid}\n\nNow please upload your deposit screenshot to complete verification.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("📋 Main Menu", callback_data="main_menu")]
+                    ])
+                )
+                return
+            
+            # Handle UPGRADE command
+            if text == "UPGRADE":
+                await update.message.reply_text(
+                    "🔓 *VIP Access Verification*\n\nTo get VIP access, you need to:\n\n1️⃣ Provide your Broker UID\n2️⃣ Upload deposit screenshot\n\nClick below to start:",
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔓 Start Verification", callback_data="get_vip_access")]
+                    ])
+                )
+                return
+            
+            # Default response for unrecognized text
             await update.message.reply_text(
                 "I received your message. Use the menu buttons to navigate or type /start to see options.",
                 reply_markup=InlineKeyboardMarkup([
