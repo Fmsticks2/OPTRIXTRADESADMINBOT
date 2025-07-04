@@ -1609,7 +1609,11 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
             
             await self._send_persistent_message(
                 chat_id=user_id,
-                text="✅ *UID Received!*\n\n📸 *Verification Step 2/2*\n\nNow please send your *deposit screenshot* as a photo:",
+                text="✅ *UID Received!*\n\nYour UID has been recorded.\n\n📸 *Verification Step 2/2*\n\nNow please send your *deposit screenshot* as a photo. If you have any issues, you can contact support using the button below:",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")],
+                    [InlineKeyboardButton("⬅️ Main Menu", callback_data="main_menu")]
+                ]),
                 parse_mode="Markdown"
             )
             
