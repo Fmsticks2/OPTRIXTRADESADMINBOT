@@ -56,10 +56,7 @@ PREMIUM_GROUP_LINK = "https://t.me/+LTnKwBO54DRiOTNk"  # Premium group link
 REGISTER_UID, UPLOAD_SCREENSHOT, BROADCAST_MESSAGE, USER_LOOKUP = range(4)
 
 # Standalone utility functions
-def init_database():
-    """Initialize database using the database manager"""
-    from database.db_manager import db_manager
-    db_manager.init_database()
+# Removed obsolete init_database function - using initialize_db() from database package instead
 
 def is_admin(user_id):
     """Check if user is admin"""

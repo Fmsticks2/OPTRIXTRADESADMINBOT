@@ -238,7 +238,34 @@ class DatabaseManager:
                     CREATE INDEX IF NOT EXISTS idx_user_interactions_user_id ON user_interactions (user_id);
                     CREATE INDEX IF NOT EXISTS idx_verification_requests_status ON verification_requests (status);
                 '''),
-                ('005_add_verification_columns', '''
+                ('005_create_chat_history_table', '''
+                    CREATE TABLE IF NOT EXISTS chat_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER,
+                        message_type TEXT,
+                        message_text TEXT,
+                        message_data TEXT,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users(user_id)
+                    )
+                '''),
+                ('006_add_verification_columns', '''
+                    ALTER TABLE verification_requests ADD COLUMN auto_verified BOOLEAN DEFAULT FALSE;
+                    ALTER TABLE verification_requests ADD COLUMN admin_response TEXT;
+                    ALTER TABLE verification_requests ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                '''),
+                ('005_create_chat_history_table', '''
+                    CREATE TABLE IF NOT EXISTS chat_history (
+                        id SERIAL PRIMARY KEY,
+                        user_id BIGINT,
+                        message_type VARCHAR(20),
+                        message_text TEXT,
+                        message_data JSONB,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users(user_id)
+                    )
+                '''),
+                ('006_add_verification_columns', '''
                     ALTER TABLE verification_requests ADD COLUMN auto_verified BOOLEAN DEFAULT FALSE;
                     ALTER TABLE verification_requests ADD COLUMN admin_response TEXT;
                     ALTER TABLE verification_requests ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
@@ -337,6 +364,84 @@ class DatabaseManager:
             logger.error(f"Args: {args}")
             raise
     
+    async def log_chat_message(self, user_id: int, message_type: str, message_text: str, message_data: Dict = None):
+        """Log chat message to history"""
+        try:
+            import json
+            if self.db_type == 'postgresql':
+                query = '''
+                    INSERT INTO chat_history (user_id, message_type, message_text, message_data)
+                    VALUES ($1, $2, $3, $4)
+                '''
+                await self.execute(query, user_id, message_type, message_text, json.dumps(message_data) if message_data else None)
+            else:
+                query = '''
+                    INSERT INTO chat_history (user_id, message_type, message_text, message_data)
+                    VALUES (?, ?, ?, ?)
+                '''
+                await self.execute(query, user_id, message_type, message_text, json.dumps(message_data) if message_data else None)
+                
+        except Exception as e:
+            logger.error(f"Failed to log chat message: {e}")
+    
+    async def get_chat_history(self, user_id: int, limit: int = 50) -> List[Dict]:
+        """Get chat history for a user"""
+        try:
+            if self.db_type == 'postgresql':
+                query = '''
+                    SELECT * FROM chat_history 
+                    WHERE user_id = $1 
+                    ORDER BY timestamp DESC 
+                    LIMIT $2
+                '''
+            else:
+                query = '''
+                    SELECT * FROM chat_history 
+                    WHERE user_id = ? 
+                    ORDER BY timestamp DESC 
+                    LIMIT ?
+                '''
+            
+            return await self.execute(query, user_id, limit, fetch='all')
+            
+        except Exception as e:
+            logger.error(f"Failed to get chat history: {e}")
+            return []
+    
+    async def health_check(self) -> Dict[str, Any]:
+        """Check database health and return status"""
+        try:
+            if not self.is_initialized:
+                return {"status": "error", "message": "Database not initialized"}
+            
+            if self.db_type == 'postgresql':
+                async with self.get_connection() as conn:
+                    result = await conn.fetchval("SELECT 1")
+                    return {
+                        "status": "healthy",
+                        "database_type": "postgresql",
+                        "connection": "active",
+                        "test_query": "passed"
+                    }
+            else:
+                # SQLite
+                async with self.get_connection() as conn:
+                    cursor = await conn.execute("SELECT 1")
+                    result = await cursor.fetchone()
+                    return {
+                        "status": "healthy",
+                        "database_type": "sqlite",
+                        "connection": "active",
+                        "test_query": "passed",
+                        "database_file": self.sqlite_path
+                    }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": str(e),
+                "database_type": self.db_type
+            }
+
     async def close(self):
         """Close database connections"""
         if self.pool:
