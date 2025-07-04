@@ -674,16 +674,16 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Log chat history
     await db_manager.log_chat_message(user_id, "user_message", message_text)
     
-    # Handle UID submission
-    if text.startswith("UID:") or message_text.isdigit():
+    # Handle UID submission (improved to work regardless of flow state)
+    if text.startswith("UID:") or message_text.isdigit() or (len(message_text) >= BotConfig.MIN_UID_LENGTH and len(message_text) <= BotConfig.MAX_UID_LENGTH and re.match(r'^[a-zA-Z0-9]+$', message_text)):
         uid = message_text.replace("UID:", "").strip()
         
         # Validate UID format
         is_valid, validation_message = validate_uid(uid)
         
         if is_valid:
-            # Update user with UID
-            await update_user_data(user_id, uid=uid)
+            # Update user with UID and set flow to confirmation for consistent processing
+            await update_user_data(user_id, uid=uid, current_flow='confirmation')
             
             # Check if auto-verification is possible
             can_auto_verify, auto_verify_reason = should_auto_verify(user_id, uid)
@@ -728,8 +728,29 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 "uid": uid,
                 "validation_status": "valid",
                 "auto_verify_eligible": can_auto_verify,
-                "auto_verify_reason": auto_verify_reason
+                "auto_verify_reason": auto_verify_reason,
+                "flow_updated": "confirmation"
             })
+            
+            # Provide additional guidance for users who sent UID directly
+            guidance_text = """💡 **What's Next?**
+
+📸 **Upload your deposit screenshot** as the next message
+📋 **Screenshot should show:**
+• Your deposit amount ($20 minimum)
+• Transaction confirmation
+• Clear and readable details
+
+⚡ **Processing:** Your verification will begin immediately after screenshot upload!"""
+            
+            await update.message.reply_text(guidance_text, parse_mode='Markdown')
+            
+            # Log guidance message
+            await db_manager.log_chat_message(user_id, "bot_response", guidance_text, {
+                "action": "uid_guidance_provided"
+            })
+            
+            return  # Exit early to prevent further processing
         else:
             # UID validation failed
             error_response = f"""❌ **Invalid UID Format**
@@ -820,10 +841,13 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await log_interaction(user_id, "photo_upload", "deposit_screenshot")
     
-    if user_data[3] == 'confirmation':  # current_flow is confirmation
-        # Get the user's UID from database
-        uid = user_data[6] if user_data[6] else "Not provided"
-        screenshot_file_id = update.message.photo[-1].file_id
+    # Get the user's UID from database
+    uid = user_data[6] if user_data[6] else "Not provided"
+    screenshot_file_id = update.message.photo[-1].file_id
+    
+    # Check if user has provided UID (regardless of flow state)
+    if uid and uid != "Not provided":
+        # Process screenshot for verification
         
         # Check if user should be auto-verified
         can_auto_verify, auto_verify_reason = should_auto_verify(user_id, uid)
@@ -987,16 +1011,41 @@ Use /verify {user_id} to approve or /reject {user_id} to reject."""
         await update_user_data(user_id, current_flow='awaiting_verification')
             
     else:
-        await update.message.reply_text("Please complete the registration process first by using /start")
+        # User uploaded screenshot but hasn't provided UID yet
+        guidance_text = """📸 **Screenshot Received!**
+
+❗ **Missing Information:** We need your UID first
+
+📋 **To complete verification:**
+1️⃣ **Send your UID** (broker account ID)
+2️⃣ **Then upload your deposit screenshot**
+
+💡 **UID Format Examples:**
+• ABC123456
+• USER789012
+• TRADER456789
+
+🔄 **Please send your UID now, then upload this screenshot again.**"""
         
-        # Log chat history for invalid photo upload
-        await db_manager.log_chat_message(user_id, "user_action", "Uploaded photo outside of flow", {
-            "action_type": "invalid_photo_upload",
-            "current_flow": user_data[3] if user_data else "unknown"
+        keyboard = [
+            [InlineKeyboardButton("❓ What is UID?", callback_data="help_uid")],
+            [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(guidance_text, reply_markup=reply_markup, parse_mode='Markdown')
+        
+        # Log chat history for screenshot without UID
+        await db_manager.log_chat_message(user_id, "user_action", "Uploaded screenshot without UID", {
+            "action_type": "screenshot_no_uid",
+            "current_flow": user_data[3] if user_data else "unknown",
+            "uid_status": uid
         })
         
-        await db_manager.log_chat_message(user_id, "bot_response", "Please complete the registration process first by using /start", {
-            "action": "invalid_photo_response"
+        await db_manager.log_chat_message(user_id, "bot_response", guidance_text, {
+            "action": "uid_required_guidance",
+            "buttons": ["What is UID?", "Contact Support", "Main Menu"]
         })
 
 # Handle document uploads (PDF and image files)
@@ -1563,6 +1612,67 @@ Contact: @{ADMIN_USERNAME}
         "action": "verification_help_response"
     })
 
+# New handler for UID help
+async def handle_uid_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    await log_interaction(user_id, "uid_help")
+    
+    # Log chat history
+    await db_manager.log_chat_message(user_id, "user_action", "Requested UID help", {
+        "action_type": "button_click",
+        "button_data": "help_uid"
+    })
+    
+    uid_help_text = f"""❓ **What is a UID?**
+
+🆔 **UID = User Identifier**
+Your unique account ID from your broker platform
+
+📋 **Where to find your UID:**
+• Login to your broker account
+• Go to Account Settings or Profile
+• Look for "Account ID", "User ID", or "UID"
+• Copy the alphanumeric code
+
+💡 **UID Format Examples:**
+• ABC123456
+• USER789012
+• TRADER456789
+• 12345678
+
+✅ **Requirements:**
+• {BotConfig.MIN_UID_LENGTH}-{BotConfig.MAX_UID_LENGTH} characters long
+• Letters and numbers only
+• No spaces or special characters
+
+🔗 **Need to register first?**
+{BotConfig.BROKER_LINK}
+
+📞 **Still need help?** Contact @{BotConfig.ADMIN_USERNAME}"""
+    
+    keyboard = [
+        [InlineKeyboardButton("🔗 Register with Broker", url=BotConfig.BROKER_LINK)],
+        [InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")],
+        [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=uid_help_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+    
+    # Log bot response
+    await db_manager.log_chat_message(user_id, "bot_response", uid_help_text, {
+        "action": "uid_help_response",
+        "buttons": ["Register with Broker", "Contact Support", "Main Menu"]
+    })
+
 # New handler for contact support
 async def handle_contact_support(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -1671,6 +1781,8 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_contact_support(update, context)
     elif data == "verification_help":
         await handle_verification_help(update, context)
+    elif data == "help_uid":
+        await handle_uid_help(update, context)
     elif data == "not_interested":
         await handle_not_interested(update, context)
     elif data == "main_menu":

@@ -410,24 +410,26 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
         "button_data": "get_vip_access"
     })
     
-    activation_text = f"""To activate your free access and join our VIP Signal Channel, follow these steps:
+    activation_text = f"""✅ Activation Instructions
 
-1️⃣ Click the link below to register with our official broker partner
+To activate your free access and join our VIP Signal Channel, follow these steps:
+
+1️⃣Click the link below to register with our official broker partner
 {BotConfig.BROKER_LINK}
 
-2️⃣ Deposit $20 or more
+2️⃣Deposit $20 or more
 
-3️⃣ Send your proof of deposit
+3️⃣Send your proof of deposit
 
-Once your proof has been confirmed, your access will be unlocked immediately.
+once your proof have been confirmed your access will be unlocked immediately
 
 The more you deposit, the more powerful your AI access:
 
-✅ $100+ → Full access to OPTRIX Web AI Portal, Live Signals & AI tools
+✅ $100+ → Full access to OPTRIX Web AI Portal, Live Signals & AI tools.
 
 ✅ $500+ → Includes:
 — All available signal alert options
-— VIP telegram group  
+— VIP telegram group
 — Access to private sessions and risk management blueprint
 — OPTRIX AI Auto-Trading (trades for you automatically)"""
 
@@ -453,10 +455,10 @@ The more you deposit, the more powerful your AI access:
     # Send second part of message
     second_part = """Why is it free?
 
-We earn a small commission from the broker through your trading volume, not your money. So we are more focused on your success - the more you win, the better for both of us. ✅
+We earn a small commission from the broker through your trading volume, not your money. So we are more focused on your success, the more you win, the better for both of us. ✅
 
 Want to unlock even higher-tier bonuses or full bot access?
-Send "UPGRADE" """
+Send "UPGRADE"""
 
     await context.bot.send_message(chat_id=query.from_user.id, text=second_part)
     
@@ -477,9 +479,11 @@ async def registration_confirmation(update: Update, context: ContextTypes.DEFAUL
         "button_data": "registered"
     })
     
-    confirmation_text = """Send in your UID and deposit screenshot to gain access to OPTRIXTRADES premium signal channel.
+    confirmation_text = """✅ Confirmation
 
-BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Get early access now into our premium channel - only limited slots are available! 🚀"""
+Send in your uid and deposit screenshot to gain access optrixtrades trades premium signal channel.
+
+BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Get an early access now into our premium channel only limited slots are available."""
 
     # Send new message instead of editing to preserve chat history
     await context.bot.send_message(
