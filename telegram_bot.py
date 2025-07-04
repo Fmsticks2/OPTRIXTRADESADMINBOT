@@ -1870,7 +1870,7 @@ Only risk 1-2% of your capital per trade"""
             elif data == "user_lookup":
                 await self.handle_user_lookup(update, context)
             elif data == "main_menu":
-                await main_menu_callback(update, context)
+                await self.main_menu_callback(update, context)
             elif data == "uid_help":
                 await self.uid_help(update, context)
             elif data == "registered":
@@ -1886,13 +1886,13 @@ Only risk 1-2% of your capital per trade"""
             elif data == "confirm_group_joined":
                 await handle_group_join_confirmation(update, context)
             elif data == "account_menu":
-                await account_menu_callback(update, context)
+                await self.account_menu_callback(update, context)
             elif data == "help_menu":
-                await help_menu_callback(update, context)
+                await self.help_menu_callback(update, context)
             elif data == "start_trading":
-                await start_trading_callback(update, context)
+                await self.start_trading_callback(update, context)
             elif data == "notification_settings":
-                await notification_settings_callback(update, context)
+                await self.notification_settings_callback(update, context)
             elif data == "contact_support":
                 await self.handle_contact_support(update, context)
             elif data == "verification_help":
