@@ -1578,6 +1578,11 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
             
             user_id = query.from_user.id
             
+            # Clear any existing conversation data and set state
+            if context.user_data:
+                context.user_data.clear()
+            context.user_data['conversation_state'] = 'REGISTER_UID'
+            
             await self._send_persistent_message(
                 chat_id=user_id,
                 text="📝 *Verification Step 1/2*\n\nPlease send your *Broker UID* (8-20 characters, alphanumeric):",
@@ -1595,14 +1600,20 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
             user_id = update.message.from_user.id
             uid = update.message.text.strip()
             
-            if not re.match(r"^[A-Za-z0-9]{8,20}$", uid):
+            # Validate UID format using the existing validation function
+            is_valid, validation_message = validate_uid(uid)
+            
+            if not is_valid:
                 await update.message.reply_text(
-                    "❌ *Invalid UID format*\n\nPlease enter a valid UID (8-20 alphanumeric characters).\nExample: ABC123XYZ456",
+                    f"❌ *Invalid UID format*\n\n{validation_message}\n\nPlease enter a valid UID (8-20 alphanumeric characters).\nExample: ABC123XYZ456",
                     parse_mode="Markdown"
                 )
-                return REGISTER_UID
+                return REGISTER_UID  # Stay in same state
             
+            # Store UID in both database and conversation context
             await update_user_data(user_id, uid=uid)
+            context.user_data['uid'] = uid  # Store in conversation context
+            context.user_data['conversation_state'] = 'UPLOAD_SCREENSHOT'
             
             await self._send_persistent_message(
                 chat_id=user_id,
@@ -1717,9 +1728,42 @@ Thank you for your patience! 🙏"""
                 parse_mode="Markdown"
             )
             
+            # Clear conversation state
+            if context.user_data:
+                context.user_data.pop('conversation_state', None)
+                context.user_data.pop('uid', None)
+            
             return ConversationHandler.END
         except Exception as e:
             logger.error(f"Error in handle_screenshot_upload: {e}")
+            # Clear conversation state on error
+            if context.user_data:
+                context.user_data.pop('conversation_state', None)
+                context.user_data.pop('uid', None)
+            return ConversationHandler.END
+    
+    async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Cancel the conversation"""
+        try:
+            user_id = update.effective_user.id
+            
+            # Clear conversation state
+            if context.user_data:
+                context.user_data.clear()
+            
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text="❌ *Verification cancelled*\n\nYou can start verification again anytime.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔓 Start Verification", callback_data="start_verification")],
+                    [InlineKeyboardButton("⬅️ Main Menu", callback_data="main_menu")]
+                ]),
+                parse_mode="Markdown"
+            )
+            
+            return ConversationHandler.END
+        except Exception as e:
+            logger.error(f"Error in cancel: {e}")
             return ConversationHandler.END
 
     async def vip_signals_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2376,7 +2420,12 @@ You will be contacted shortly by our support team."""
             # Log chat history
             await db_manager.log_chat_message(user_id, "user_message", message_text)
             
-            # Handle UID submission
+            # Check if user is in a conversation state - if so, let conversation handler process it
+            if context.user_data and context.user_data.get('conversation_state'):
+                # User is in a conversation, don't process here
+                return
+            
+            # Handle UID submission (only if not in conversation)
             if text.startswith("UID:") or message_text.isdigit():
                 uid = message_text.replace("UID:", "").strip()
                 
@@ -3954,9 +4003,13 @@ How to make your first deposit:
             ],
             states={
                 REGISTER_UID: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_uid_confirmation)],
-                UPLOAD_SCREENSHOT: [MessageHandler(filters.PHOTO, self.handle_screenshot_upload)],
+                UPLOAD_SCREENSHOT: [
+                    MessageHandler(filters.PHOTO, self.handle_screenshot_upload),
+                    MessageHandler(filters.Document.IMAGE, self.handle_screenshot_upload)
+                ],
             },
             fallbacks=[CommandHandler("cancel", self.cancel)],
+            allow_reentry=True,
             per_message=False,
             per_chat=True,
             per_user=False,
@@ -3977,6 +4030,10 @@ How to make your first deposit:
             per_chat=True,
             per_user=False,
         )
+        
+        # Add conversation handlers FIRST (highest priority)
+        self.application.add_handler(verification_conv)
+        self.application.add_handler(admin_conv)
         
         # User commands
         self.application.add_handler(CommandHandler("start", self.start_command))
@@ -4006,10 +4063,6 @@ How to make your first deposit:
         self.application.add_handler(CommandHandler("activity", self.admin_recent_activity_command))
         self.application.add_handler(CommandHandler("autostats", self.admin_auto_verify_stats_command))
         self.application.add_handler(CommandHandler("chathistory", admin_chat_history_command))
-        
-        # Add conversation handlers FIRST (higher priority)
-        self.application.add_handler(verification_conv)
-        self.application.add_handler(admin_conv)
         
         # Specific callback handlers
         self.application.add_handler(CallbackQueryHandler(self.contact_support, pattern='^contact_support$'))
