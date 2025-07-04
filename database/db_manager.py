@@ -221,7 +221,7 @@ class DatabaseManager:
             logger.error(f"Failed to initialize database: {e}")
             raise e
     
-    def log_chat_message(self, user_id: int, message_type: str, message_text: str, message_data: Dict = None):
+    async def log_chat_message(self, user_id: int, message_type: str, message_text: str, message_data: Dict = None):
         """Log chat message to history"""
         try:
             if self.db_type == 'postgresql':
