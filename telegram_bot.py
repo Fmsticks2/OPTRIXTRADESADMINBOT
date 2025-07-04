@@ -2499,6 +2499,7 @@ You will be contacted shortly by our support team."""
                         "auto_verify_eligible": can_auto_verify,
                         "auto_verify_reason": auto_verify_reason
                     })
+                    return
                 else:
                     # UID validation failed
                     error_response = f"""❌ **Invalid UID Format**
