@@ -894,7 +894,7 @@ Contact: @{self.admin_username}"""
             
             # Check if this looks like a UID (6-20 alphanumeric characters)
             if len(uid) >= 6 and len(uid) <= 20 and uid.isalnum():
-                # Valid UID format
+                # Valid UID format - Fixed function call
                 await update_user_data(user_id, uid=uid)
                 await update.message.reply_text(
                     f"✅ UID Received: {uid}\n\nNow please upload your deposit screenshot to complete verification.",
