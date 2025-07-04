@@ -2358,71 +2358,7 @@ You will be contacted shortly by our support team."""
         except Exception as e:
             logger.error(f"Error in uid_help: {e}")
 
-    async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle button callbacks"""
-        try:
-            query = update.callback_query
-            await query.answer()
-            
-            user_id = query.from_user.id
-            data = query.data
-            
-            # Route to appropriate handler based on callback data
-            if data == "get_vip_access":
-                await self.get_vip_access(update, context)
-            elif data == "how_it_works":
-                await self.how_it_works(update, context)
-            elif data == "start_verification":
-                await self.start_verification(update, context)
-            elif data == "uid_help":
-                await self.uid_help(update, context)
-            elif data == "vip_signals":
-                await self.vip_signals_command(update, context)
-            elif data == "my_account":
-                await self.my_account_command(update, context)
-            elif data == "support":
-                await self.support_command(update, context)
-            elif data == "stats":
-                await self.stats_command(update, context)
-            elif data == "broadcast":
-                await self.handle_broadcast(update, context)
-            elif data == "user_lookup":
-                await self.handle_user_lookup(update, context)
-            elif data == "main_menu":
-                await self.main_menu_callback(update, context)
-            elif data == "menu":
-                await self.menu_command(update, context)
-            elif data == "account_menu":
-                await self.account_menu_callback(update, context)
-            elif data == "help_menu":
-                await self.help_menu_callback(update, context)
-            elif data == "notification_settings":
-                await self.notification_settings_callback(update, context)
-            elif data == "start_trading":
-                await self.start_trading_callback(update, context)
-            elif data == "contact_support":
-                await self.contact_support(update, context)
-            elif data == "verification_help":
-                await self.verification_help(update, context)
-            elif data == "help_signup":
-                await self.help_signup(update, context)
-            elif data == "help_deposit":
-                await self.help_deposit(update, context)
-            elif data == "admin_queue":
-                await handle_admin_queue_callback(update, context)
-            elif data == "admin_activity":
-                await handle_admin_activity_callback(update, context)
-            elif data == "admin_dashboard":
-                await handle_admin_callbacks(update, context)
-            elif data.startswith("verify_"):
-                await self.handle_verify_callback(update, context)
-            elif data.startswith("reject_"):
-                await self.handle_reject_callback(update, context)
-            else:
-                await query.answer("Unknown action")
-                
-        except Exception as e:
-            logger.error(f"Error in button_callback: {e}")
+    # Duplicate button_callback function removed - using the one at line 1844
 
     async def handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle text messages with comprehensive auto-verification logic"""
