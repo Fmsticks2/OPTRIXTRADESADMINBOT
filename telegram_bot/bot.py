@@ -178,6 +178,42 @@ class TradingBot:
             logger.error(f"Error in bot run: {e}")
             raise
             
+    async def _track_messages(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Track messages for analytics and monitoring"""
+        try:
+            if update.effective_user and update.effective_message:
+                user_id = update.effective_user.id
+                message_text = update.effective_message.text or "[Non-text message]"
+                
+                # Store in message history
+                if user_id not in self.message_history:
+                    self.message_history[user_id] = []
+                
+                self.message_history[user_id].append({
+                    'timestamp': update.effective_message.date,
+                    'text': message_text[:100],  # Limit text length
+                    'message_id': update.effective_message.message_id
+                })
+                
+                # Keep only last 10 messages per user
+                if len(self.message_history[user_id]) > 10:
+                    self.message_history[user_id] = self.message_history[user_id][-10:]
+                    
+        except Exception as e:
+            logger.error(f"Error tracking message: {e}")
+    
+    async def handle_broadcast_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle broadcast message from admin"""
+        # This is a placeholder - implement actual broadcast logic
+        await update.message.reply_text("Broadcast functionality not yet implemented.")
+        logger.info(f"Broadcast message received from admin: {update.effective_user.id}")
+    
+    async def handle_lookup_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle user lookup from admin"""
+        # This is a placeholder - implement actual user lookup logic
+        await update.message.reply_text("User lookup functionality not yet implemented.")
+        logger.info(f"User lookup request from admin: {update.effective_user.id}")
+    
     async def schedule_follow_ups(self, user_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Schedule follow-up messages for a user who started but didn't complete verification"""
         if hasattr(self, 'follow_up_scheduler') and self.follow_up_scheduler:

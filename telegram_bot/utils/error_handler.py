@@ -4,6 +4,7 @@ import html
 import json
 import logging
 import traceback
+from functools import wraps
 from typing import Callable, Dict, Any, Optional, Coroutine
 
 from telegram import Update
@@ -77,6 +78,36 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
             logger.error(f"Failed to send error message to user: {e}")
 
 
+def error_handler_decorator(func: Callable) -> Callable:
+    """Decorator version of error handler for protecting individual functions.
+    
+    Args:
+        func: The function to protect with error handling
+        
+    Returns:
+        The wrapped function with error handling
+    """
+    @wraps(func)
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        try:
+            return await func(update, context, *args, **kwargs)
+        except Exception as e:
+            # Log the error
+            logger.error(f"Error in {func.__name__}: {e}", exc_info=True)
+            
+            # Create a mock context with the error for the error handler
+            error_context = context
+            error_context.error = e
+            
+            # Call the main error handler
+            await error_handler(update, error_context)
+            
+            # Re-raise the exception if needed
+            raise
+    
+    return wrapper
+
+
 def register_error_handlers(application) -> None:
     """Register error handlers with the application.
     
@@ -84,6 +115,10 @@ def register_error_handlers(application) -> None:
         application: The telegram application instance
     """
     application.add_error_handler(error_handler)
+
+
+# Create an alias for the decorator to match the expected usage
+error_handler = error_handler_decorator
 
 
 class ErrorLogger:

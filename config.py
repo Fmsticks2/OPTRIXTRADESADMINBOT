@@ -64,6 +64,7 @@ class BotConfig:
     
     # Logging
     LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
+    LOG_DIR: str = os.getenv('LOG_DIR', 'logs')
     LOG_FILE_PATH: str = os.getenv('LOG_FILE_PATH', 'bot.log')
     SCHEDULER_LOG_FILE_PATH: str = os.getenv('SCHEDULER_LOG_FILE_PATH', 'scheduler.log')
     ENABLE_FILE_LOGGING: bool = os.getenv('ENABLE_FILE_LOGGING', 'true').lower() == 'true'
