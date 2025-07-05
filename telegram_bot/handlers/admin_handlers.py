@@ -607,34 +607,20 @@ async def admin_search_user_callback(update: Update, context: ContextTypes.DEFAU
         await query.edit_message_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
     
-    search_text = (
-        "🔍 **USER SEARCH**\n\n"
-        "Search for users by:\n"
-        "• User ID\n"
-        "• Username\n"
-        "• UID\n\n"
-        "📝 **Instructions:**\n"
-        "• Type the search term\n"
-        "• Use exact matches for best results\n"
-        "• Search is case-insensitive\n\n"
-        "💡 **Examples:**\n"
-        "• `123456789` (User ID)\n"
-        "• `@username` (Username)\n"
-        "• `UID12345` (Trading UID)\n\n"
-        "Please enter your search term:"
-    )
+    response_text = "🔍 **Search User**\n\n"
+    response_text += "📋 **Instructions:**\n"
+    response_text += "• Enter a User ID (numbers only)\n"
+    response_text += "• Enter a username (with or without @)\n"
+    response_text += "• Enter a UID to search\n\n"
+    response_text += "🔢 Please enter your search term:"
     
-    keyboard = [
-        [InlineKeyboardButton("❌ Cancel Search", callback_data="admin_dashboard")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # Edit the existing message instead of creating a new one
-    await query.edit_message_text(search_text, parse_mode='Markdown', reply_markup=reply_markup)
-    
-    # Set conversation state for search input
+    # Set conversation state
     context.user_data['admin_action'] = 'search_user'
     
+    keyboard = [[InlineKeyboardButton("❌ Cancel", callback_data="admin_dashboard")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
     return SEARCH_USER
 
 async def admin_recent_activity_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -843,19 +829,13 @@ async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT
     admin_text += "Welcome to the admin control panel. Choose an action below:\n\n"
     admin_text += "📋 **Queue** - View pending verification requests\n"
     admin_text += "📢 **Broadcast** - Send message to all users\n"
-    admin_text += "🔍 **Search User** - Find user by ID or username\n"
-    admin_text += "📊 **Recent Activity** - View recent bot activity\n"
-    admin_text += "🤖 **Auto-Verify Stats** - Check auto-verification statistics\n"
-    admin_text += "💬 **Chat History** - View user chat logs\n\n"
+    admin_text += "🔍 **Search User** - Find user by ID or username\n\n"
     admin_text += "Use the buttons below or type commands directly."
     
     keyboard = [
         [InlineKeyboardButton("📋 Queue", callback_data="admin_queue"),
          InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
-        [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user"),
-         InlineKeyboardButton("📊 Recent Activity", callback_data="admin_recent_activity")],
-        [InlineKeyboardButton("🤖 Auto-Verify Stats", callback_data="admin_auto_verify_stats"),
-         InlineKeyboardButton("💬 Chat History", callback_data="admin_chat_history")],
+        [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
