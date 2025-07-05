@@ -452,11 +452,13 @@ class DatabaseManager:
     async def close(self):
         """Close the database connection pool."""
         if self.pool:
-            await self.pool.close()
+            if self.db_type == 'postgresql':
+                await self.pool.close()
+            else:
+                await self.pool.close()
             logger.info("Database connection pool closed.")
 
-# Global database manager instance
-db_manager = DatabaseManager()
+
 
 # Database operation functions
 async def get_user_data(user_id: int) -> Optional[Dict[str, Any]]:
@@ -479,11 +481,11 @@ async def update_user_data(user_id: int, **kwargs) -> bool:
         kwargs['updated_at'] = datetime.now()
         
         if db_manager.db_type == 'postgresql':
-            set_clause = ', '.join([f"{key} = ${i+2}" for i, key in enumerate(kwargs.keys())])
+            set_clause = ', '.join([f'"{key}" = ${i+2}' for i, key in enumerate(kwargs.keys())])
             query = f'UPDATE users SET {set_clause} WHERE user_id = $1'
             args = [user_id] + list(kwargs.values())
         else:
-            set_clause = ', '.join([f"{key} = ?" for key in kwargs.keys()])
+            set_clause = ', '.join([f'{key} = ?' for key in kwargs.keys()])
             query = f'UPDATE users SET {set_clause} WHERE user_id = ?'
             args = list(kwargs.values()) + [user_id]
         

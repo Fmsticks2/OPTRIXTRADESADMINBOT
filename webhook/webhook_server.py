@@ -22,6 +22,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import config
 from telegram_bot import TradingBot
+from database.connection import DatabaseManager
 
 # Configure logging
 logging.basicConfig(
@@ -35,8 +36,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class WebhookServer:
-    def __init__(self):
-        self.bot_instance = TradingBot()
+    def __init__(self, db_manager):
+        self.db_manager = db_manager
+        self.bot_instance = TradingBot(db_manager)
         self.application: Optional[Application] = None
         
     def setup_routes(self, app: FastAPI):
@@ -297,8 +299,7 @@ class WebhookServer:
         
         # Initialize database first
         try:
-            from database import db_manager
-            await db_manager.initialize()
+            await self.db_manager.initialize()
             logger.info("✅ Database initialized successfully")
         except Exception as e:
             logger.error(f"❌ Database initialization failed: {e}")
@@ -313,8 +314,7 @@ class WebhookServer:
         
         # Close database connection
         try:
-            from database import db_manager
-            await db_manager.close()
+            await self.db_manager.close()
             logger.info("✅ Database connection closed successfully")
         except Exception as e:
             logger.error(f"❌ Error closing database connection: {e}")
@@ -324,7 +324,8 @@ class WebhookServer:
             await self.application.shutdown()
 
 # Create global webhook server instance
-webhook_server = WebhookServer()
+db_manager = DatabaseManager()
+webhook_server = WebhookServer(db_manager)
 
 # Lifespan context manager for FastAPI
 @asynccontextmanager

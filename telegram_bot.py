@@ -100,8 +100,7 @@ async def admin_chat_history_command(update: Update, context: ContextTypes.DEFAU
         return
     
     # Get chat history
-    db_manager = DatabaseManager()
-    chat_history = await db_manager.get_chat_history(target_user_id, limit)
+    chat_history = await self.db_manager.get_chat_history(target_user_id, limit)
     
     if not chat_history:
         await update.message.reply_text(f"No chat history found for user {target_user_id}.")
@@ -155,8 +154,7 @@ async def get_all_active_users():
             WHERE is_active = ?
         '''
     
-    db_manager = DatabaseManager()
-    result = await db_manager.execute(query, True)
+    result = await self.db_manager.execute(query, True)
     return [(user['user_id'], user['first_name']) for user in result] if result else []
 
 async def create_verification_request(user_id, uid, screenshot_file_id):
@@ -279,8 +277,7 @@ async def should_auto_verify(user_id, uid):
             AND DATE(created_at) = ?
         '''
     
-    db_manager = DatabaseManager()
-    result = await db_manager.fetch(query, 'approved', True, today)
+    result = await self.db_manager.fetch(query, 'approved', True, today)
     daily_count = result[0]['count'] if result else 0
     
     if daily_count >= BotConfig.DAILY_AUTO_APPROVAL_LIMIT:
@@ -378,7 +375,7 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     await log_interaction(user_id, "activation_instructions")
     
     # Log chat history
-    await db_manager.log_chat_message(user_id, "user_action", "Clicked Get Free VIP Access", {
+    await self.db_manager.log_chat_message(user_id, "user_action", "Clicked Get Free VIP Access", {
         "action_type": "button_click",
         "button_data": "get_vip_access"
     })
@@ -421,7 +418,7 @@ The more you deposit, the more powerful your AI access:
     )
     
     # Log bot response
-    await db_manager.log_chat_message(user_id, "bot_response", activation_text, {
+    await self.db_manager.log_chat_message(user_id, "bot_response", activation_text, {
         "buttons": ["I've Registered", "Need help signing up", "Need support making a deposit"]
     })
     
@@ -436,7 +433,7 @@ Send "UPGRADE"""
     await context.bot.send_message(chat_id=query.from_user.id, text=second_part)
     
     # Log second part
-    await db_manager.log_chat_message(user_id, "bot_response", second_part)
+    await self.db_manager.log_chat_message(user_id, "bot_response", second_part)
 
 async def registration_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -447,7 +444,7 @@ async def registration_confirmation(update: Update, context: ContextTypes.DEFAUL
     await log_interaction(user_id, "registration_confirmation")
     
     # Log chat history
-    await db_manager.log_chat_message(user_id, "user_action", "Clicked I've Registered", {
+    await self.db_manager.log_chat_message(user_id, "user_action", "Clicked I've Registered", {
         "action_type": "button_click",
         "button_data": "registered"
     })
@@ -469,7 +466,7 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
     )
     
     # Log bot response
-    await db_manager.log_chat_message(user_id, "bot_response", confirmation_text)
+    await self.db_manager.log_chat_message(user_id, "bot_response", confirmation_text)
 
 async def help_signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -479,7 +476,7 @@ async def help_signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await log_interaction(user_id, "help_signup")
     
     # Log chat history
-    await db_manager.log_chat_message(user_id, "user_action", "Requested signup help", {
+    await self.db_manager.log_chat_message(user_id, "user_action", "Requested signup help", {
         "action_type": "button_click",
         "button_data": "help_signup"
     })
@@ -1306,7 +1303,8 @@ async def handle_admin_callbacks(update: Update, context: ContextTypes.DEFAULT_T
 
 
 class TradingBot:
-    def __init__(self):
+    def __init__(self, db_manager):
+        self.db_manager = db_manager
         # Load configuration from environment
         self.bot_token = os.getenv('BOT_TOKEN')
         self.broker_link = os.getenv('BROKER_LINK')
