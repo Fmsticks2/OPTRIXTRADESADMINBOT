@@ -1311,6 +1311,7 @@ class TradingBot:
         self.premium_channel_id = os.getenv('PREMIUM_CHANNEL_ID')
         self.admin_username = os.getenv('ADMIN_USERNAME')
         self.admin_user_id = int(os.getenv('ADMIN_USER_ID', '0'))
+        logger.info(f"ADMIN_USER_ID loaded as: {self.admin_user_id}")
         
         # Bot configuration
         self.webhook_url = os.getenv('WEBHOOK_URL', '')
@@ -1353,6 +1354,7 @@ class TradingBot:
 
     async def _is_admin(self, user_id: int) -> bool:
         """Check if user is admin"""
+        logger.info(f"Checking admin status for user_id: {user_id}. Admin ID is: {self.admin_user_id}")
         return user_id == self.admin_user_id
 
     async def _is_verified(self, user_id: int) -> bool:
