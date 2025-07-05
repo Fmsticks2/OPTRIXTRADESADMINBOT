@@ -7,7 +7,7 @@ def run_main_bot():
     """Run the main bot"""
     print("🤖 Starting Main Bot...")
     try:
-        subprocess.run([sys.executable, "telegram_bot.py"])
+        subprocess.run([sys.executable, "main.py"])
     except KeyboardInterrupt:
         print("Main bot stopped")
 

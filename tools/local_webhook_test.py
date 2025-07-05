@@ -17,7 +17,7 @@ from config import config
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from telegram_bot import TradingBot
+from telegram_bot.bot import TradingBot
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)

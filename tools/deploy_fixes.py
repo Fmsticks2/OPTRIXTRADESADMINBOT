@@ -105,8 +105,8 @@ def main():
     print(f"⏰ Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Check if fixes are in place
-    if not os.path.exists('telegram_bot.py'):
-        print("❌ telegram_bot.py not found. Are you in the right directory?")
+    if not os.path.exists('main.py'):
+        print("❌ main.py not found. Are you in the right directory?")
         return False
     
     print("✅ Bot files found")

@@ -21,7 +21,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import config
-from telegram_bot import TradingBot
+from telegram_bot.bot import TradingBot
 from database.connection import DatabaseManager
 
 # Configure logging

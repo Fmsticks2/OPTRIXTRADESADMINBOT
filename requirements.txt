@@ -1,11 +1,32 @@
+# OPTRIXTRADES Telegram Bot Dependencies
+
+# Telegram Bot Framework
 python-telegram-bot==20.7
+
+# Environment Variables
 python-dotenv==1.0.0
+
+# Web Framework (for webhook mode)
 fastapi==0.109.0
 uvicorn==0.27.0
+flask==2.3.3
+
+# HTTP Client
 requests==2.31.0
+httpx>=0.24.0
+
+# Database
 asyncpg==0.29.0
 psycopg2-binary==2.9.9
 aiosqlite==0.19.0
-flask==2.3.3
+
+# Utilities
 pytz==2024.1
 tenacity==8.2.3
+python-dateutil>=2.8.2
+
+# Image Processing
+pillow>=9.5.0
+
+# Logging
+structlog>=23.1.0

@@ -1,15 +1,16 @@
 import asyncio
 import logging
-from telegram_bot import main, BOT_TOKEN, BROKER_LINK, PREMIUM_CHANNEL_ID, ADMIN_USERNAME
+from main import main
+from config import BotConfig
 
 def display_bot_info():
     """Display bot configuration before starting"""
     print("🚀 OPTRIXTRADES Telegram Bot")
     print("=" * 50)
-    print(f"📱 Bot Token: {BOT_TOKEN[:10]}...{BOT_TOKEN[-10:]}")
-    print(f"🔗 Broker Link: {BROKER_LINK}")
-    print(f"📢 Premium Channel: {PREMIUM_CHANNEL_ID}")
-    print(f"👨‍💼 Admin: @{ADMIN_USERNAME}")
+    print(f"📱 Bot Token: {BotConfig.BOT_TOKEN[:10]}...{BotConfig.BOT_TOKEN[-10:]}")
+    print(f"🔗 Broker Link: {BotConfig.BROKER_LINK}")
+    print(f"📢 Premium Channel: {BotConfig.PREMIUM_CHANNEL_ID}")
+    print(f"👨‍💼 Admin: @{BotConfig.ADMIN_USERNAME}")
     print("=" * 50)
     print()
     print("🎯 Bot Features:")

@@ -237,7 +237,7 @@ class LocalDevelopmentManager:
             else:
                 # Start polling mode
                 logger.info("   🔄 Starting polling mode...")
-                from telegram_bot import main
+                from main import main
                 import asyncio
                 await main()
                 

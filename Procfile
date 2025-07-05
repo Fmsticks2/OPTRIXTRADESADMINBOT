@@ -1,2 +1,2 @@
-web: python telegram_bot.py
+web: python main.py
 worker: python bot_scheduler.py

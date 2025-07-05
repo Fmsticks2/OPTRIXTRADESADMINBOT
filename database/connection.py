@@ -36,9 +36,21 @@ class DatabaseManager:
     def __init__(self):
         self.pool = None
         self.database_url = BotConfig.DATABASE_URL.strip()
-        if '@:' in self.database_url:
-            logger.warning(f"Malformed DATABASE_URL detected: {self.database_url}. Overriding with public URL.")
-            self.database_url = 'postgresql://postgres:lSyqidmHknVYbkBghtRweAwPISFrfMca@caboose.proxy.rlwy.net:21466/railway'
+        
+        # Validate and fix DATABASE_URL if needed
+        if self.database_url:
+            # Check for common malformations
+            if '@:' in self.database_url:
+                logger.warning(f"Malformed DATABASE_URL detected: {self.database_url}. Attempting to fix.")
+                # Try to construct a valid URL from PostgreSQL components
+                try:
+                    # Build URL from individual components for better reliability
+                    self.database_url = f"postgresql://{BotConfig.POSTGRES_USER}:{BotConfig.POSTGRES_PASSWORD}@{BotConfig.POSTGRES_HOST}:{BotConfig.POSTGRES_PORT}/{BotConfig.POSTGRES_DB}"
+                    logger.info(f"Reconstructed DATABASE_URL from components")
+                except Exception as e:
+                    logger.error(f"Failed to reconstruct DATABASE_URL: {e}")
+                    # Fall back to default URL as last resort
+                    self.database_url = 'postgresql://postgres:lSyqidmHknVYbkBghtRweAwPISFrfMca@caboose.proxy.rlwy.net:21466/railway'
         self.sqlite_path = BotConfig.SQLITE_DATABASE_PATH
         self.is_initialized = False
         

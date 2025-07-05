@@ -112,7 +112,7 @@ async def debug_info():
 
 def run_polling_mode():
     """Run bot in polling mode (development)"""
-    from telegram_bot import main
+    from main import main
     print("🔄 Starting bot in POLLING mode...")
     
     # Start health server on a different port for polling mode
