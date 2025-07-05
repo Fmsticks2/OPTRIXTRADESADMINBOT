@@ -4017,7 +4017,7 @@ How to make your first deposit:
 
     async def initialize(self):
         """Initialize the bot"""
-        await initialize_db()
+        await self.db_manager.initialize()
         logger.info("Database initialized")
 
     def _setup_handlers(self):
@@ -4205,7 +4205,8 @@ How to make your first deposit:
             raise
 
 if __name__ == "__main__":
-    bot = TradingBot()
+    db_manager = DatabaseManager()
+    bot = TradingBot(db_manager)
     try:
         asyncio.run(bot.run())
     except KeyboardInterrupt:

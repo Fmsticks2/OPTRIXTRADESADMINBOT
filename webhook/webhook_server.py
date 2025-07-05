@@ -308,6 +308,17 @@ class WebhookServer:
         # Initialize bot application
         await self.initialize_application()
 
+        # Set webhook on startup
+        if config.WEBHOOK_URL:
+            logger.info(f"Attempting to set webhook to: {config.WEBHOOK_URL}")
+            success = await self.set_telegram_webhook(config.WEBHOOK_URL)
+            if success:
+                logger.info("✅ Webhook set successfully on startup.")
+            else:
+                logger.error("❌ Failed to set webhook on startup.")
+        else:
+            logger.warning("WEBHOOK_URL not configured. Skipping webhook setup.")
+
     async def shutdown(self):
         """Shutdown tasks"""
         logger.info("🛑 OPTRIXTRADES Webhook Server shutting down...")
