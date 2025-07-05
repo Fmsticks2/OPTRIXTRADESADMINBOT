@@ -18,7 +18,7 @@ class BotConfig:
     # Database
     DATABASE_PATH: str = os.getenv('DATABASE_PATH', 'trading_bot.db')
     SQLITE_DATABASE_PATH: str = os.path.join(os.path.dirname(__file__), os.getenv('SQLITE_DATABASE_PATH', 'trading_bot.db'))
-    DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'sqlite')
+    DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'postgresql' if os.getenv('DATABASE_URL') else 'sqlite')
     DATABASE_URL: str = os.getenv('DATABASE_URL', 'postgresql://postgres:lSyqidmHknVYbkBghtRweAwPISFrfMca@caboose.proxy.rlwy.net:21466/railway')
     
     # PostgreSQL specific settings
@@ -223,17 +223,31 @@ Development:
 # Create global config instance
 config = BotConfig()
 
-# Validation on import
-validation_result = config.validate_config()
-if not validation_result['valid']:
-    print("❌ Configuration Errors:")
-    for error in validation_result['errors']:
-        print(f"  - {error}")
+# Only validate configuration if we're in a production environment or if explicitly requested
+# This prevents validation errors during local development when env vars aren't set
+def validate_and_report_config(force_validation=False):
+    """Validate configuration and report results"""
+    # Skip validation in local development unless forced
+    if not force_validation and not config.is_railway_environment() and not os.getenv('VALIDATE_CONFIG'):
+        return
     
-if validation_result['warnings']:
-    print("⚠️  Configuration Warnings:")
-    for warning in validation_result['warnings']:
-        print(f"  - {warning}")
+    validation_result = config.validate_config()
+    if not validation_result['valid']:
+        print("❌ Configuration Errors:")
+        for error in validation_result['errors']:
+            print(f"  - {error}")
+        
+        # Only exit in production environments
+        if config.is_railway_environment():
+            print("\n🚨 Configuration errors detected in production environment!")
+            print("Please check your Railway environment variables.")
+    
+    if validation_result['warnings']:
+        print("⚠️  Configuration Warnings:")
+        for warning in validation_result['warnings']:
+            print(f"  - {warning}")
+    
+    return validation_result
 
 # Railway-specific setup
 if config.is_railway_environment():
@@ -243,3 +257,9 @@ if config.is_railway_environment():
     webhook_url = config.get_webhook_url()
     if webhook_url:
         print(f"🌐 Webhook URL: {webhook_url}")
+    
+    # Validate configuration in Railway environment
+    validate_and_report_config(force_validation=True)
+else:
+    print("🏠 Local Development Environment")
+    print("💡 Set VALIDATE_CONFIG=true to enable configuration validation locally")

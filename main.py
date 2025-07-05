@@ -23,7 +23,7 @@ import sys
 # Add the project root directory to the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import BotConfig
+from config import BotConfig, validate_and_report_config
 from database.connection import DatabaseManager
 from telegram_bot.bot import TradingBot
 from telegram_bot.utils.logger import setup_logging
@@ -36,6 +36,13 @@ async def main():
     logger = logging.getLogger(__name__)
     
     try:
+        # Validate configuration
+        logger.info("Validating configuration...")
+        validation_result = validate_and_report_config(force_validation=True)
+        if validation_result and not validation_result['valid']:
+            logger.critical("Configuration validation failed. Please check your environment variables.")
+            sys.exit(1)
+        
         # Initialize database manager
         logger.info("Initializing database connection...")
         db_manager = DatabaseManager()

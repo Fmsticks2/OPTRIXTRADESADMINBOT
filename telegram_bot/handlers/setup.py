@@ -90,9 +90,9 @@ def setup_all_handlers(bot):
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
-        per_message=True,  # Changed to True to address PTBUserWarning
+        per_message=False,  # Fixed: Set to False since we use MessageHandler and CommandHandler
         per_chat=True,
-        per_user=False,
+        per_user=True,  # Changed to True for proper user-based conversation tracking
     )
     
     # Conversation handler for admin functions
@@ -106,9 +106,9 @@ def setup_all_handlers(bot):
             USER_LOOKUP: [MessageHandler(filters.TEXT & ~filters.COMMAND, bot.handle_lookup_user)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
-        per_message=True,  # Changed to True to address PTBUserWarning
+        per_message=False,  # Fixed: Set to False since we use MessageHandler and CommandHandler
         per_chat=True,
-        per_user=False,
+        per_user=True,  # Changed to True for proper user-based conversation tracking
     )
     
     # Add conversation handlers FIRST (highest priority)
