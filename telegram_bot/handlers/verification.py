@@ -234,24 +234,36 @@ async def handle_screenshot_upload(update: Update, context: ContextTypes.DEFAULT
         reply_markup=reply_markup
     )
     
+    # Check if this is VIP verification
+    is_vip_verification = context.user_data.get('vip_verification', False)
+    
     # Enhanced admin notification with action buttons
+    verification_type = "VIP VERIFICATION" if is_vip_verification else "VERIFICATION"
     admin_message = (
-        f"🔔 **NEW VERIFICATION REQUEST**\n\n"
+        f"🔔 **NEW {verification_type} REQUEST**\n\n"
         f"**User Details:**\n"
         f"• Name: {user.first_name} {user.last_name if user.last_name else ''}\n"
         f"• Username: @{user.username if user.username else 'None'}\n"
         f"• User ID: `{user_id}`\n"
         f"• UID: `{uid}`\n"
+        f"• Type: {'🌟 VIP Access' if is_vip_verification else '💎 Premium Access'}\n"
         f"• Submitted: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         f"**Action Required:** Review and approve/reject"
     )
     
-    # Admin action buttons
-    admin_keyboard = [
-        [InlineKeyboardButton("✅ Approve", callback_data=f"approve_verification_{user_id}"),
-         InlineKeyboardButton("❌ Reject", callback_data=f"reject_verification_{user_id}")],
-        [InlineKeyboardButton("👤 View User Profile", callback_data=f"view_user_{user_id}")]
-    ]
+    # Admin action buttons - different callbacks for VIP vs regular verification
+    if is_vip_verification:
+        admin_keyboard = [
+            [InlineKeyboardButton("✅ Approve VIP", callback_data=f"approve_vip_verification_{user_id}"),
+             InlineKeyboardButton("❌ Reject VIP", callback_data=f"reject_vip_verification_{user_id}")],
+            [InlineKeyboardButton("👤 View User Profile", callback_data=f"view_user_{user_id}")]
+        ]
+    else:
+        admin_keyboard = [
+            [InlineKeyboardButton("✅ Approve", callback_data=f"approve_verification_{user_id}"),
+             InlineKeyboardButton("❌ Reject", callback_data=f"reject_verification_{user_id}")],
+            [InlineKeyboardButton("👤 View User Profile", callback_data=f"view_user_{user_id}")]
+        ]
     admin_reply_markup = InlineKeyboardMarkup(admin_keyboard)
     
     # Send notification to admin
@@ -763,6 +775,78 @@ async def back_to_verification_callback(update: Update, context: ContextTypes.DE
     # Redirect back to the main verification flow
     await start_verification(update, context)
 
+@error_handler_decorator
+async def vip_verification_requirements_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle VIP verification requirements callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Log user interaction
+    await log_interaction(query.from_user.id, 'vip_verification_requirements', 'User viewed VIP verification requirements')
+    
+    requirements_text = (
+        "🌟 **VIP GROUP ACCESS REQUIREMENTS**\n\n"
+        "To join our exclusive VIP trading group, you need to complete an additional verification process:\n\n"
+        "💰 **Minimum Deposit Requirement:**\n"
+        "• Must have a deposit of $500+ in your trading account\n\n"
+        "📋 **Required Documents:**\n"
+        "• Valid trading account UID\n"
+        "• Recent deposit screenshot showing $500+ in your account\n"
+        "• Account balance verification\n\n"
+        "🔒 **Verification Process:**\n"
+        "1. Submit your trading account UID\n"
+        "2. Upload a clear screenshot of your $500+ deposit\n"
+        "3. Wait for admin approval\n"
+        "4. Get instant access to VIP signals\n\n"
+        "💎 **VIP Benefits:**\n"
+        "• Exclusive high-accuracy signals\n"
+        "• Priority market analysis\n"
+        "• Direct access to expert traders\n"
+        "• Advanced trading strategies\n\n"
+        "Ready to unlock VIP access?"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("🚀 Continue Registration", callback_data="vip_continue_registration")],
+        [InlineKeyboardButton("🔙 Back", callback_data="back_to_verification")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(requirements_text, parse_mode='Markdown', reply_markup=reply_markup)
+
+@error_handler_decorator
+async def vip_continue_registration_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle VIP continue registration callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Log user interaction
+    await log_interaction(query.from_user.id, 'vip_continue_registration', 'User started VIP verification process')
+    
+    # Set VIP verification flag in user data
+    context.user_data['vip_verification'] = True
+    context.user_data[FLOW_KEY] = FLOW_CONFIRMATION
+    
+    # VIP verification instructions
+    vip_instructions_text = (
+        "🌟 **VIP VERIFICATION PROCESS**\n\n"
+        "Welcome to the VIP verification process! Please follow these steps carefully:\n\n"
+        "📝 **Step 1: Submit Your UID**\n"
+        "Please send your trading account UID (User ID) from your broker platform.\n\n"
+        "📸 **Step 2: Upload Screenshot**\n"
+        "After submitting your UID, you'll need to upload a clear screenshot showing:\n"
+        "• Your account balance\n"
+        "• Recent deposit transaction\n"
+        "• Account details matching your UID\n\n"
+        "⏱️ **Processing Time:** 24-48 hours\n\n"
+        "Let's start with your UID. Please send it now:"
+    )
+    
+    await query.message.reply_text(vip_instructions_text, parse_mode='Markdown')
+    
+    # Return state for UID input
+    return REGISTER_UID
+
 # Admin verification action handlers
 @error_handler_decorator
 async def approve_verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -800,8 +884,8 @@ async def approve_verification_callback(update: Update, context: ContextTypes.DE
         )
         
         user_keyboard = [
-            [InlineKeyboardButton("🚀 Access Premium Signals", callback_data="access_premium")],
-            [InlineKeyboardButton("💬 Join VIP Group", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+            [InlineKeyboardButton("💎 Join Premium Group", url="https://t.me/+LTnKwBO54DRiOTNk")],
+            [InlineKeyboardButton("🌟 Join VIP Group", callback_data="vip_verification_requirements")]
         ]
         user_reply_markup = InlineKeyboardMarkup(user_keyboard)
         
@@ -893,6 +977,139 @@ async def reject_verification_callback(update: Update, context: ContextTypes.DEF
     except Exception as e:
         logger.error(f"Error rejecting verification for user {user_id}: {e}")
         await query.message.reply_text("❌ Error occurred while rejecting verification.")
+
+@error_handler_decorator
+async def approve_vip_verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle admin approval of VIP verification"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Check if user is admin
+    if str(query.from_user.id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to perform this action.")
+        return
+    
+    # Extract user_id from callback data
+    try:
+        user_id = int(query.data.split('_')[-1])
+    except (ValueError, IndexError):
+        await query.message.reply_text("❌ Invalid user ID in callback data.")
+        return
+    
+    try:
+        # TODO: Update VIP verification status in database
+        # await update_vip_verification_status(user_id, 'approved')
+        
+        # Notify the user about VIP approval
+        vip_approval_message = (
+            "🌟 **VIP VERIFICATION APPROVED!**\n\n"
+            "🎉 Congratulations! Your VIP access has been approved successfully.\n\n"
+            "🚀 **You now have exclusive access to:**\n"
+            "• 🎯 High-accuracy VIP trading signals\n"
+            "• 📊 Priority market analysis\n"
+            "• 👥 Direct access to expert traders\n"
+            "• 🧠 Advanced trading strategies\n"
+            "• ⚡ Real-time market alerts\n"
+            "• 💎 Exclusive VIP community\n\n"
+            "📈 **Welcome to the VIP tier!**\n\n"
+            "You're now part of our most exclusive trading community! 🎊"
+        )
+        
+        # VIP user gets access to a special VIP group (you can change this URL)
+        vip_user_keyboard = [
+            [InlineKeyboardButton("🌟 Join VIP Trading Group", url="https://t.me/your_vip_group_link")],
+            [InlineKeyboardButton("📞 VIP Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+        ]
+        vip_user_reply_markup = InlineKeyboardMarkup(vip_user_keyboard)
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=vip_approval_message,
+            parse_mode='Markdown',
+            reply_markup=vip_user_reply_markup
+        )
+        
+        # Update admin message
+        await query.message.edit_text(
+            f"✅ **VIP VERIFICATION APPROVED**\n\n"
+            f"User ID: `{user_id}` has been granted VIP access.\n"
+            f"Approved by: {query.from_user.first_name}\n"
+            f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            parse_mode='Markdown'
+        )
+        
+        logger.info(f"VIP verification approved for user {user_id} by admin {query.from_user.id}")
+        
+    except Exception as e:
+        logger.error(f"Error approving VIP verification for user {user_id}: {e}")
+        await query.message.reply_text("❌ Error occurred while approving VIP verification.")
+
+@error_handler_decorator
+async def reject_vip_verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle admin rejection of VIP verification"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Check if user is admin
+    if str(query.from_user.id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to perform this action.")
+        return
+    
+    # Extract user_id from callback data
+    try:
+        user_id = int(query.data.split('_')[-1])
+    except (ValueError, IndexError):
+        await query.message.reply_text("❌ Invalid user ID in callback data.")
+        return
+    
+    try:
+        # TODO: Update VIP verification status in database
+        # await update_vip_verification_status(user_id, 'rejected')
+        
+        # Notify the user about VIP rejection
+        vip_rejection_message = (
+            "🌟 **VIP VERIFICATION REVIEW REQUIRED**\n\n"
+            "We've reviewed your VIP access submission and need additional information.\n\n"
+            "📋 **Common VIP verification issues:**\n"
+            "• Screenshot quality needs improvement\n"
+            "• UID verification failed\n"
+            "• Deposit amount doesn't meet VIP requirements\n"
+            "• Account details unclear\n\n"
+            "🔄 **Next steps for VIP access:**\n"
+            "• Please resubmit with clearer documentation\n"
+            "• Ensure your UID matches exactly\n"
+            "• Contact VIP support for assistance\n\n"
+            "📞 **VIP Support:** Our team is here to help you get approved!"
+        )
+        
+        vip_user_keyboard = [
+            [InlineKeyboardButton("🔄 Resubmit VIP Verification", callback_data="vip_continue_registration")],
+            [InlineKeyboardButton("📞 Contact VIP Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+        ]
+        vip_user_reply_markup = InlineKeyboardMarkup(vip_user_keyboard)
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=vip_rejection_message,
+            parse_mode='Markdown',
+            reply_markup=vip_user_reply_markup
+        )
+        
+        # Update admin message
+        await query.message.edit_text(
+            f"❌ **VIP VERIFICATION REJECTED**\n\n"
+            f"User ID: `{user_id}` VIP verification has been rejected.\n"
+            f"Rejected by: {query.from_user.first_name}\n"
+            f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            f"User has been notified and can resubmit for VIP access.",
+            parse_mode='Markdown'
+        )
+        
+        logger.info(f"VIP verification rejected for user {user_id} by admin {query.from_user.id}")
+        
+    except Exception as e:
+        logger.error(f"Error rejecting VIP verification for user {user_id}: {e}")
+        await query.message.reply_text("❌ Error occurred while rejecting VIP verification.")
 
 @error_handler_decorator
 async def view_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

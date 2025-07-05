@@ -79,7 +79,11 @@ from telegram_bot.handlers.verification import (
     back_to_verification_callback,
     approve_verification_callback,
     reject_verification_callback,
-    view_user_callback
+    view_user_callback,
+    vip_verification_requirements_callback,
+    vip_continue_registration_callback,
+    approve_vip_verification_callback,
+    reject_vip_verification_callback
 )
 
 # Conversation states
@@ -99,7 +103,8 @@ def setup_all_handlers(bot):
     # Conversation handler for verification flow
     verification_conv = ConversationHandler(
         entry_points=[
-            CallbackQueryHandler(registered_confirmation, pattern="^registered$")
+            CallbackQueryHandler(registered_confirmation, pattern="^registered$"),
+            CallbackQueryHandler(vip_continue_registration_callback, pattern="^vip_continue_registration$")
         ],
         states={
             REGISTER_UID: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid_confirmation)],
@@ -199,9 +204,14 @@ def setup_all_handlers(bot):
     bot.application.add_handler(CallbackQueryHandler(community_rules_callback, pattern='^community_rules$'))
     bot.application.add_handler(CallbackQueryHandler(back_to_verification_callback, pattern='^back_to_verification$'))
     
+    # VIP verification callback handlers
+    bot.application.add_handler(CallbackQueryHandler(vip_verification_requirements_callback, pattern='^vip_verification_requirements$'))
+    
     # Admin verification action handlers
     bot.application.add_handler(CallbackQueryHandler(approve_verification_callback, pattern='^approve_verification_\\d+$'))
     bot.application.add_handler(CallbackQueryHandler(reject_verification_callback, pattern='^reject_verification_\\d+$'))
+    bot.application.add_handler(CallbackQueryHandler(approve_vip_verification_callback, pattern='^approve_vip_verification_\\d+$'))
+    bot.application.add_handler(CallbackQueryHandler(reject_vip_verification_callback, pattern='^reject_vip_verification_\\d+$'))
     bot.application.add_handler(CallbackQueryHandler(view_user_callback, pattern='^view_user_\\d+$'))
     
     # Default callback handler (must be last)

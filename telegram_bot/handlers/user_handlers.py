@@ -215,14 +215,11 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         upgrade_text += "✅ Risk Management Blueprint\n"
         upgrade_text += "✅ Priority Support (24/7)\n"
         upgrade_text += "✅ Exclusive Market Analysis\n\n"
-        upgrade_text += "**Pricing:**\n"
-        upgrade_text += "• Monthly: $97/month\n"
-        upgrade_text += "• Quarterly: $247 (Save $44)\n"
-        upgrade_text += "• Annual: $797 (Save $367)\n\n"
         upgrade_text += f"Contact our team for upgrade: @{BotConfig.ADMIN_USERNAME}"
         
         keyboard = [
             [InlineKeyboardButton("💬 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")],
+            [InlineKeyboardButton("🌟 Join VIP Group", callback_data="vip_verification_requirements")],
             [InlineKeyboardButton("🔙 Back to Menu", callback_data="start_verification")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
