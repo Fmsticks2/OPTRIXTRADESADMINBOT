@@ -1326,9 +1326,12 @@ class TradingBot:
         
         # Admin keyboard - only shown to admin users
         self.admin_keyboard = [
-            [InlineKeyboardButton("📊 Stats", callback_data="stats")],
-            [InlineKeyboardButton("📢 Broadcast", callback_data="broadcast")],
-            [InlineKeyboardButton("🔍 User Lookup", callback_data="user_lookup")],
+            [InlineKeyboardButton("📋 Pending Queue", callback_data="admin_queue"),
+             InlineKeyboardButton("📊 User Activity", callback_data="admin_activity")],
+            [InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast"),
+             InlineKeyboardButton("👥 All Users", callback_data="admin_users")],
+            [InlineKeyboardButton("📈 Bot Stats", callback_data="admin_stats"),
+             InlineKeyboardButton("🔍 User Lookup", callback_data="user_lookup")]
         ]
         
         # Verified user keyboard - shown after successful verification
@@ -1389,18 +1392,13 @@ class TradingBot:
         try:
             user = update.effective_user
             user_id = user.id
-            
+
             # Log interaction
             await log_interaction(user_id, "start_command")
-            
+
             # Check admin status
             if await self._is_admin(user_id):
-                await self._send_persistent_message(
-                    chat_id=user_id,
-                    text="👑 *ADMIN MODE ACTIVATED*\n\nYou now have access to all admin commands.",
-                    reply_markup=InlineKeyboardMarkup(self.admin_keyboard),
-                    parse_mode="Markdown"
-                )
+                await self.admin_command(update, context)
                 return
             
             # Check verification status
@@ -2651,6 +2649,53 @@ Thank you for your patience! 🙏"""
 
     async def admin_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Main admin dashboard command"""
+        try:
+            user_id = update.effective_user.id
+            if not await self._is_admin(user_id):
+                await update.message.reply_text("❌ You don't have permission to use this command.")
+                return
+
+            first_name = update.effective_user.first_name or "Admin"
+
+            # Get pending verifications count
+            pending_requests = await get_pending_verifications()
+            pending_count = len(pending_requests) if pending_requests else 0
+
+            # Get total users count
+            all_users = await get_all_users()
+            total_users = len(all_users) if all_users else 0
+
+            admin_text = f"""👑 **Admin Dashboard**
+
+Welcome back, {first_name}!
+
+📊 **Quick Stats:**
+• Total Users: {total_users}
+• Pending Verifications: {pending_count}
+
+🛠️ **Admin Tools:**
+Select an option from the menu below to manage the bot.
+
+💡 **Quick Commands:**
+• `/queue` - View pending verifications
+• `/verify <user_id>` - Approve verification
+• `/reject <user_id>` - Reject verification
+• `/broadcast <message>` - Send broadcast message
+• `/lookup <user_id>` - Look up user info"""
+
+            await self._send_persistent_message(
+                chat_id=user_id,
+                text=admin_text,
+                reply_markup=InlineKeyboardMarkup(self.admin_keyboard),
+                parse_mode='Markdown'
+            )
+
+            # Log the action
+            await log_interaction(user_id, "admin_dashboard", "Accessed admin dashboard")
+
+        except Exception as e:
+            logger.error(f"Error in admin_command: {e}")
+            await update.message.reply_text("❌ Error accessing admin dashboard.")
         try:
             user_id = update.effective_user.id
             
