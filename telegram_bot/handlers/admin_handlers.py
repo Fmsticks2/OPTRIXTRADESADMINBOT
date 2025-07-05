@@ -413,7 +413,10 @@ async def admin_queue_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         
     except Exception as e:
         logger.error(f"Error in admin_queue_callback: {e}")
-        await query.edit_message_text("❌ Error retrieving verification queue.")
+        error_text = "❌ Error retrieving verification queue."
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(error_text, reply_markup=reply_markup)
 
 async def admin_broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle admin broadcast callback"""
@@ -549,7 +552,10 @@ async def admin_recent_activity_callback(update: Update, context: ContextTypes.D
         
     except Exception as e:
         logger.error(f"Error in admin_recent_activity_callback: {e}")
-        await query.edit_message_text("❌ Error retrieving recent activity data.")
+        error_text = "❌ Error retrieving recent activity data."
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(error_text, reply_markup=reply_markup)
 
 async def admin_auto_verify_stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle admin auto verify stats callback"""
@@ -620,7 +626,10 @@ async def admin_auto_verify_stats_callback(update: Update, context: ContextTypes
         
     except Exception as e:
         logger.error(f"Error in admin_auto_verify_stats_callback: {e}")
-        await query.edit_message_text("❌ Error retrieving verification statistics.")
+        error_text = "❌ Error retrieving verification statistics."
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(error_text, reply_markup=reply_markup)
 
 async def admin_chat_history_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle admin chat history callback"""

@@ -72,6 +72,10 @@ from telegram_bot.handlers.verification import (
     handle_remove_from_list,
     free_tips_callback,
     join_community_callback,
+    market_analysis_callback,
+    learning_resources_callback,
+    community_rules_callback,
+    back_to_verification_callback,
     approve_verification_callback,
     reject_verification_callback,
     view_user_callback
@@ -170,6 +174,9 @@ def setup_all_handlers(bot):
     # Admin callback handlers (not in conversation)
     bot.application.add_handler(CallbackQueryHandler(admin_dashboard_callback, pattern='^admin_dashboard$'))
     bot.application.add_handler(CallbackQueryHandler(admin_queue_callback, pattern='^admin_queue$'))
+    bot.application.add_handler(CallbackQueryHandler(admin_broadcast_callback, pattern='^admin_broadcast$'))
+    bot.application.add_handler(CallbackQueryHandler(admin_search_user_callback, pattern='^admin_search_user$'))
+    bot.application.add_handler(CallbackQueryHandler(admin_chat_history_callback, pattern='^admin_chat_history$'))
     bot.application.add_handler(CallbackQueryHandler(admin_recent_activity_callback, pattern='^admin_recent_activity$'))
     bot.application.add_handler(CallbackQueryHandler(admin_auto_verify_stats_callback, pattern='^admin_auto_verify_stats$'))
     
@@ -184,6 +191,10 @@ def setup_all_handlers(bot):
     # User engagement callback handlers
     bot.application.add_handler(CallbackQueryHandler(free_tips_callback, pattern='^free_tips$'))
     bot.application.add_handler(CallbackQueryHandler(join_community_callback, pattern='^join_community$'))
+    bot.application.add_handler(CallbackQueryHandler(market_analysis_callback, pattern='^market_analysis$'))
+    bot.application.add_handler(CallbackQueryHandler(learning_resources_callback, pattern='^learning_resources$'))
+    bot.application.add_handler(CallbackQueryHandler(community_rules_callback, pattern='^community_rules$'))
+    bot.application.add_handler(CallbackQueryHandler(back_to_verification_callback, pattern='^back_to_verification$'))
     
     # Admin verification action handlers
     bot.application.add_handler(CallbackQueryHandler(approve_verification_callback, pattern='^approve_verification_\\d+$'))

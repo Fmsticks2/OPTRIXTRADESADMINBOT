@@ -634,6 +634,115 @@ async def join_community_callback(update: Update, context: ContextTypes.DEFAULT_
     
     await query.message.reply_text(community_text, parse_mode='Markdown', reply_markup=reply_markup)
 
+
+@error_handler_decorator
+async def market_analysis_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle market analysis callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    analysis_text = (
+        "📊 **MARKET ANALYSIS**\n\n"
+        "📈 **Current Market Trends:**\n"
+        "• Major indices showing bullish momentum\n"
+        "• Tech stocks leading the rally\n"
+        "• Commodities showing mixed signals\n"
+        "• Forex markets remain volatile\n\n"
+        "🎯 **Key Levels to Watch:**\n"
+        "• Support: Previous swing lows\n"
+        "• Resistance: Recent highs\n"
+        "• Breakout zones: Consolidation areas\n\n"
+        "⚠️ **Risk Factors:**\n"
+        "• Economic data releases\n"
+        "• Geopolitical tensions\n"
+        "• Central bank decisions\n\n"
+        "💡 **Trading Tip:** Always wait for confirmation before entering trades!"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("🔙 Back to Tips", callback_data="free_tips")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(analysis_text, parse_mode='Markdown', reply_markup=reply_markup)
+
+
+@error_handler_decorator
+async def learning_resources_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle learning resources callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    resources_text = (
+        "📚 **LEARNING RESOURCES**\n\n"
+        "🎓 **Free Educational Content:**\n"
+        "• Trading basics and terminology\n"
+        "• Technical analysis fundamentals\n"
+        "• Risk management strategies\n"
+        "• Market psychology insights\n\n"
+        "📖 **Recommended Reading:**\n"
+        "• 'Trading in the Zone' by Mark Douglas\n"
+        "• 'Technical Analysis of Financial Markets'\n"
+        "• 'The Intelligent Investor' by Benjamin Graham\n\n"
+        "🎥 **Video Tutorials:**\n"
+        "• Chart pattern recognition\n"
+        "• Indicator usage and setup\n"
+        "• Live trading examples\n\n"
+        "🚀 **Want access to premium courses?** Get verified for exclusive content!"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("🔙 Back to Tips", callback_data="free_tips")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(resources_text, parse_mode='Markdown', reply_markup=reply_markup)
+
+
+@error_handler_decorator
+async def community_rules_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle community rules callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    rules_text = (
+        "📋 **COMMUNITY RULES**\n\n"
+        "✅ **DO:**\n"
+        "• Be respectful and professional\n"
+        "• Share valuable insights and analysis\n"
+        "• Help fellow traders learn and grow\n"
+        "• Follow proper trading etiquette\n"
+        "• Use appropriate language\n\n"
+        "❌ **DON'T:**\n"
+        "• Spam or post irrelevant content\n"
+        "• Share personal financial advice\n"
+        "• Promote other services/channels\n"
+        "• Use offensive or inappropriate language\n"
+        "• Share unverified information\n\n"
+        "⚖️ **Violations may result in:**\n"
+        "• Warning from moderators\n"
+        "• Temporary mute\n"
+        "• Permanent ban from community\n\n"
+        "🤝 **Let's build a supportive trading community together!**"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("🔙 Back to Community", callback_data="join_community")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(rules_text, parse_mode='Markdown', reply_markup=reply_markup)
+
+
+@error_handler_decorator
+async def back_to_verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle back to verification callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Redirect back to the main verification flow
+    await start_verification(update, context)
+
 # Admin verification action handlers
 @error_handler_decorator
 async def approve_verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -45,6 +45,7 @@ class BotConfig:
     TIMEZONE: str = os.getenv('TIMEZONE', 'UTC')
     
     # Admin Notifications
+    ADMIN_ERROR_NOTIFICATIONS: bool = os.getenv('ADMIN_ERROR_NOTIFICATIONS', 'true').lower() == 'true'
     NOTIFY_ON_MANUAL_NEEDED: bool = os.getenv('NOTIFY_ON_MANUAL_NEEDED', 'true').lower() == 'true'
     NOTIFY_ON_AUTO_APPROVAL: bool = os.getenv('NOTIFY_ON_AUTO_APPROVAL', 'false').lower() == 'true'
     NOTIFY_ON_REJECTION: bool = os.getenv('NOTIFY_ON_REJECTION', 'true').lower() == 'true'
