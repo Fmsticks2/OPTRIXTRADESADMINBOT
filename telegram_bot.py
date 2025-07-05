@@ -1600,6 +1600,10 @@ BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Ge
             user_id = update.message.from_user.id
             uid = update.message.text.strip()
             
+            # Debug logging
+            logger.info(f"🔍 handle_uid_confirmation called for user {user_id} with UID: {uid}")
+            logger.info(f"🔍 Current conversation state: {context.user_data.get('conversation_state', 'None')}")
+            
             # Validate UID format using the existing validation function
             is_valid, validation_message = validate_uid(uid)
             
@@ -2420,8 +2424,13 @@ You will be contacted shortly by our support team."""
             # Log chat history
             await db_manager.log_chat_message(user_id, "user_message", message_text)
             
+            # Debug logging
+            logger.info(f"🔍 handle_text_message called for user {user_id} with text: {message_text[:50]}...")
+            logger.info(f"🔍 User conversation state: {context.user_data.get('conversation_state', 'None') if context.user_data else 'No user_data'}")
+            
             # Check if user is in a conversation state - if so, let conversation handler process it
             if context.user_data and context.user_data.get('conversation_state'):
+                logger.info(f"🔍 Skipping text handler - user in conversation state: {context.user_data.get('conversation_state')}")
                 # User is in a conversation, don't process here
                 return
             

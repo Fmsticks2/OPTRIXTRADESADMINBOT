@@ -249,10 +249,32 @@ class DatabaseManager:
                         FOREIGN KEY (user_id) REFERENCES users(user_id)
                     )
                 '''),
-                ('006_add_verification_columns', '''
-                    ALTER TABLE verification_requests ADD COLUMN auto_verified BOOLEAN DEFAULT FALSE;
-                    ALTER TABLE verification_requests ADD COLUMN admin_response TEXT;
-                    ALTER TABLE verification_requests ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                ('006_fix_verification_table', '''
+                    -- Recreate verification_requests table with all required columns
+                    -- This handles the duplicate column error by recreating the table
+                    CREATE TABLE verification_requests_temp (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER,
+                        uid TEXT,
+                        screenshot_file_id TEXT,
+                        status TEXT DEFAULT 'pending',
+                        admin_notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        verified_at TIMESTAMP,
+                        verified_by INTEGER,
+                        auto_verified BOOLEAN DEFAULT FALSE,
+                        admin_response TEXT,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users (user_id)
+                    );
+                    INSERT INTO verification_requests_temp 
+                        (id, user_id, uid, screenshot_file_id, status, admin_notes, 
+                         created_at, verified_at, verified_by)
+                        SELECT id, user_id, uid, screenshot_file_id, status, admin_notes, 
+                               created_at, verified_at, verified_by
+                        FROM verification_requests;
+                    DROP TABLE verification_requests;
+                    ALTER TABLE verification_requests_temp RENAME TO verification_requests;
                 '''),
                 ('005_create_chat_history_table', '''
                     CREATE TABLE IF NOT EXISTS chat_history (
@@ -319,6 +341,22 @@ class DatabaseManager:
                     CREATE INDEX IF NOT EXISTS idx_users_last_interaction ON users (last_interaction);
                     CREATE INDEX IF NOT EXISTS idx_user_interactions_user_id ON user_interactions (user_id);
                     CREATE INDEX IF NOT EXISTS idx_verification_requests_status ON verification_requests (status);
+                '''),
+                ('005_create_chat_history_table', '''
+                    CREATE TABLE IF NOT EXISTS chat_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER,
+                        message_type TEXT,
+                        message_text TEXT,
+                        message_data TEXT,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (user_id) REFERENCES users(user_id)
+                    )
+                '''),
+                ('006_add_verification_columns', '''
+                    ALTER TABLE verification_requests ADD COLUMN auto_verified BOOLEAN DEFAULT FALSE;
+                    ALTER TABLE verification_requests ADD COLUMN admin_response TEXT;
+                    ALTER TABLE verification_requests ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
                 ''')
             ]
     
