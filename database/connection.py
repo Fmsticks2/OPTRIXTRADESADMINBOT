@@ -678,3 +678,6 @@ async def health_check() -> Dict[str, Any]:
             'database_type': db_manager.db_type,
             'timestamp': datetime.now().isoformat()
         }
+
+# Global database manager instance
+db_manager = DatabaseManager()

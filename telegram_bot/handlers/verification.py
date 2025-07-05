@@ -142,8 +142,8 @@ async def registered_confirmation(update: Update, context: ContextTypes.DEFAULT_
     confirmation_text += "BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Get an early\n"
     confirmation_text += "access now into our premium channel only limited slots are available."
     
-    # Send confirmation message
-    await query.message.edit_text(confirmation_text)
+    # Send confirmation message as new message instead of editing
+    await query.message.reply_text(confirmation_text)
     
     # Set state for conversation handler
     return REGISTER_UID
@@ -182,26 +182,75 @@ async def handle_screenshot_upload(update: Update, context: ContextTypes.DEFAULT
     # TODO: Implement actual verification request creation in database
     # await create_verification_request(user_id, uid, file_id)
     
-    # Notify user
+    # Enhanced user notification with engagement
+    user_response = (
+        "✅ **Verification Submitted Successfully!**\n\n"
+        f"**Your Details:**\n"
+        f"• UID: `{uid}`\n"
+        f"• Screenshot: Received ✅\n\n"
+        "🔍 **What happens next?**\n"
+        "• Our team will review your submission within 2-24 hours\n"
+        "• You'll receive a notification once approved\n"
+        "• Access to premium signals will be granted immediately\n\n"
+        "🎯 **While you wait:**\n"
+        "• Join our community discussions\n"
+        "• Check out our free trading tips\n"
+        "• Follow our market updates\n\n"
+        "📞 **Need help?** Contact our support team anytime!\n\n"
+        "🚀 **Excited to have you aboard!**"
+    )
+    
+    # Add engagement buttons
+    keyboard = [
+        [InlineKeyboardButton("📈 Free Trading Tips", callback_data="free_tips"),
+         InlineKeyboardButton("💬 Join Community", callback_data="join_community")],
+        [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await update.message.reply_text(
-        "✅ Thank you! Your verification information has been submitted.\n\n"
-        "Our team will review your submission and grant you access to the premium channel shortly.\n\n"
-        "Please wait for confirmation."
+        user_response,
+        parse_mode='Markdown',
+        reply_markup=reply_markup
     )
     
-    # Notify admin (placeholder)
+    # Enhanced admin notification with action buttons
     admin_message = (
-        f"🔔 New verification request:\n"
-        f"User: {user.first_name} {user.last_name if user.last_name else ''}\n"
-        f"Username: @{user.username if user.username else 'None'}\n"
-        f"User ID: {user_id}\n"
-        f"UID: {uid}\n"
+        f"🔔 **NEW VERIFICATION REQUEST**\n\n"
+        f"**User Details:**\n"
+        f"• Name: {user.first_name} {user.last_name if user.last_name else ''}\n"
+        f"• Username: @{user.username if user.username else 'None'}\n"
+        f"• User ID: `{user_id}`\n"
+        f"• UID: `{uid}`\n"
+        f"• Submitted: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        f"**Action Required:** Review and approve/reject"
     )
     
-    # TODO: Send notification to admin
-    # if BotConfig.ADMIN_USER_ID:
-    #     await context.bot.send_message(chat_id=BotConfig.ADMIN_USER_ID, text=admin_message)
-    #     await context.bot.send_photo(chat_id=BotConfig.ADMIN_USER_ID, photo=file_id)
+    # Admin action buttons
+    admin_keyboard = [
+        [InlineKeyboardButton("✅ Approve", callback_data=f"approve_verification_{user_id}"),
+         InlineKeyboardButton("❌ Reject", callback_data=f"reject_verification_{user_id}")],
+        [InlineKeyboardButton("👤 View User Profile", callback_data=f"view_user_{user_id}")]
+    ]
+    admin_reply_markup = InlineKeyboardMarkup(admin_keyboard)
+    
+    # Send notification to admin
+    if BotConfig.ADMIN_USER_ID:
+        try:
+            await context.bot.send_message(
+                chat_id=BotConfig.ADMIN_USER_ID, 
+                text=admin_message,
+                parse_mode='Markdown',
+                reply_markup=admin_reply_markup
+            )
+            await context.bot.send_photo(
+                chat_id=BotConfig.ADMIN_USER_ID, 
+                photo=file_id,
+                caption=f"📸 Deposit screenshot from {user.first_name}\nUID: {uid}"
+            )
+            logger.info(f"Admin notification sent for user {user_id}")
+        except Exception as e:
+            logger.error(f"Failed to notify admin: {e}")
     
     # Cancel any scheduled follow-ups since verification is complete
     from telegram_bot.utils.follow_up_scheduler import get_follow_up_scheduler
@@ -218,14 +267,13 @@ async def signup_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     query = update.callback_query
     await query.answer()
     
-    # TODO: Replace with actual video or instructions
     await query.message.reply_text(
         "Here's how to sign up with our broker partner:\n\n"
         "1. Click the registration link\n"
         "2. Enter your details\n"
         "3. Verify your email\n"
         "4. Complete your profile\n\n"
-        "A detailed video guide will be available soon."
+        "💡 Need additional help? Contact our support team."
     )
 
 @error_handler
@@ -234,14 +282,13 @@ async def deposit_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     query = update.callback_query
     await query.answer()
     
-    # TODO: Replace with actual video or instructions
     await query.message.reply_text(
         "Here's how to make a deposit with our broker partner:\n\n"
         "1. Log in to your account\n"
         "2. Navigate to the Deposit section\n"
         "3. Choose your preferred payment method\n"
         "4. Follow the instructions to complete your deposit\n\n"
-        "A detailed video guide will be available soon."
+        "💡 Need additional help? Contact our support team."
     )
 
 @error_handler
@@ -527,3 +574,243 @@ async def handle_remove_from_list(update: Update, context: ContextTypes.DEFAULT_
     scheduler = get_follow_up_scheduler()
     if scheduler:
         await scheduler.cancel_follow_ups(query.from_user.id)
+
+# New engagement callback handlers
+@error_handler
+async def free_tips_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle free trading tips callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    tips_text = (
+        "📈 **FREE TRADING TIPS**\n\n"
+        "🎯 **Today's Market Insights:**\n"
+        "• Always use stop-loss orders to manage risk\n"
+        "• Never risk more than 2-3% of your account per trade\n"
+        "• Follow the trend - 'The trend is your friend'\n"
+        "• Keep a trading journal to track your progress\n"
+        "• Stay updated with economic news and events\n\n"
+        "💡 **Pro Tip:** Start small and scale up as you gain experience!\n\n"
+        "🚀 **Want more advanced strategies?** Get verified for premium access!"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("📊 Market Analysis", callback_data="market_analysis"),
+         InlineKeyboardButton("📚 Learning Resources", callback_data="learning_resources")],
+        [InlineKeyboardButton("🔙 Back", callback_data="back_to_verification")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(tips_text, parse_mode='Markdown', reply_markup=reply_markup)
+
+@error_handler
+async def join_community_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle join community callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    community_text = (
+        "💬 **JOIN OUR TRADING COMMUNITY**\n\n"
+        "🌟 **What you'll get:**\n"
+        "• Daily market discussions\n"
+        "• Trade ideas and analysis\n"
+        "• Support from fellow traders\n"
+        "• Educational content and webinars\n"
+        "• Real-time market alerts\n\n"
+        "👥 **Community Guidelines:**\n"
+        "• Be respectful to all members\n"
+        "• Share knowledge and help others\n"
+        "• No spam or promotional content\n"
+        "• Follow our trading ethics\n\n"
+        "🎉 **Ready to connect with 1000+ traders?**"
+    )
+    
+    keyboard = [
+        [InlineKeyboardButton("🚀 Join Now", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")],
+        [InlineKeyboardButton("📋 Community Rules", callback_data="community_rules"),
+         InlineKeyboardButton("🔙 Back", callback_data="back_to_verification")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.reply_text(community_text, parse_mode='Markdown', reply_markup=reply_markup)
+
+# Admin verification action handlers
+@error_handler
+async def approve_verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle admin approval of verification"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Check if user is admin
+    if str(query.from_user.id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to perform this action.")
+        return
+    
+    # Extract user_id from callback data
+    try:
+        user_id = int(query.data.split('_')[-1])
+    except (ValueError, IndexError):
+        await query.message.reply_text("❌ Invalid user ID in callback data.")
+        return
+    
+    try:
+        # TODO: Update verification status in database
+        # await update_verification_status(user_id, 'approved')
+        
+        # Notify the user about approval
+        approval_message = (
+            "🎉 **VERIFICATION APPROVED!**\n\n"
+            "✅ Congratulations! Your account has been verified successfully.\n\n"
+            "🚀 **You now have access to:**\n"
+            "• Premium trading signals\n"
+            "• VIP community group\n"
+            "• Advanced trading tools\n"
+            "• Priority customer support\n\n"
+            "📈 **Start trading smarter today!**\n\n"
+            "Welcome to the OPTRIXTRADES family! 🎊"
+        )
+        
+        user_keyboard = [
+            [InlineKeyboardButton("🚀 Access Premium Signals", callback_data="access_premium")],
+            [InlineKeyboardButton("💬 Join VIP Group", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+        ]
+        user_reply_markup = InlineKeyboardMarkup(user_keyboard)
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=approval_message,
+            parse_mode='Markdown',
+            reply_markup=user_reply_markup
+        )
+        
+        # Update admin message
+        await query.message.edit_text(
+            f"✅ **VERIFICATION APPROVED**\n\n"
+            f"User ID: `{user_id}` has been successfully verified.\n"
+            f"Approved by: {query.from_user.first_name}\n"
+            f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            parse_mode='Markdown'
+        )
+        
+        logger.info(f"Verification approved for user {user_id} by admin {query.from_user.id}")
+        
+    except Exception as e:
+        logger.error(f"Error approving verification for user {user_id}: {e}")
+        await query.message.reply_text("❌ Error occurred while approving verification.")
+
+@error_handler
+async def reject_verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle admin rejection of verification"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Check if user is admin
+    if str(query.from_user.id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to perform this action.")
+        return
+    
+    # Extract user_id from callback data
+    try:
+        user_id = int(query.data.split('_')[-1])
+    except (ValueError, IndexError):
+        await query.message.reply_text("❌ Invalid user ID in callback data.")
+        return
+    
+    try:
+        # TODO: Update verification status in database
+        # await update_verification_status(user_id, 'rejected')
+        
+        # Notify the user about rejection
+        rejection_message = (
+            "❌ **VERIFICATION REVIEW REQUIRED**\n\n"
+            "We've reviewed your submission and need additional information.\n\n"
+            "📋 **Common issues:**\n"
+            "• Screenshot not clear enough\n"
+            "• UID doesn't match the account\n"
+            "• Deposit amount not visible\n"
+            "• Wrong broker platform\n\n"
+            "🔄 **Next steps:**\n"
+            "• Please resubmit with a clearer screenshot\n"
+            "• Ensure your UID is correct\n"
+            "• Contact support if you need help\n\n"
+            "📞 **Need assistance?** Our team is here to help!"
+        )
+        
+        user_keyboard = [
+            [InlineKeyboardButton("🔄 Resubmit Verification", callback_data="activation_instructions")],
+            [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+        ]
+        user_reply_markup = InlineKeyboardMarkup(user_keyboard)
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=rejection_message,
+            parse_mode='Markdown',
+            reply_markup=user_reply_markup
+        )
+        
+        # Update admin message
+        await query.message.edit_text(
+            f"❌ **VERIFICATION REJECTED**\n\n"
+            f"User ID: `{user_id}` verification has been rejected.\n"
+            f"Rejected by: {query.from_user.first_name}\n"
+            f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            f"User has been notified and can resubmit.",
+            parse_mode='Markdown'
+        )
+        
+        logger.info(f"Verification rejected for user {user_id} by admin {query.from_user.id}")
+        
+    except Exception as e:
+        logger.error(f"Error rejecting verification for user {user_id}: {e}")
+        await query.message.reply_text("❌ Error occurred while rejecting verification.")
+
+@error_handler
+async def view_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle admin view user profile callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    # Check if user is admin
+    if str(query.from_user.id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to perform this action.")
+        return
+    
+    # Extract user_id from callback data
+    try:
+        user_id = int(query.data.split('_')[-1])
+    except (ValueError, IndexError):
+        await query.message.reply_text("❌ Invalid user ID in callback data.")
+        return
+    
+    try:
+        # TODO: Get user data from database
+        # user_data = await get_user_data(user_id)
+        
+        profile_text = (
+            f"👤 **USER PROFILE**\n\n"
+            f"**User ID:** `{user_id}`\n"
+            f"**Status:** Pending Verification\n"
+            f"**Join Date:** {datetime.now().strftime('%Y-%m-%d')}\n"
+            f"**Verification Attempts:** 1\n\n"
+            f"**Actions Available:**\n"
+            f"• Approve verification\n"
+            f"• Reject verification\n"
+            f"• View chat history\n"
+            f"• Send direct message"
+        )
+        
+        keyboard = [
+            [InlineKeyboardButton("✅ Approve", callback_data=f"approve_verification_{user_id}"),
+             InlineKeyboardButton("❌ Reject", callback_data=f"reject_verification_{user_id}")],
+            [InlineKeyboardButton("💬 Chat History", callback_data=f"user_chat_{user_id}"),
+             InlineKeyboardButton("📧 Send Message", callback_data=f"message_user_{user_id}")],
+            [InlineKeyboardButton("🔙 Back", callback_data="admin_dashboard")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.message.reply_text(profile_text, parse_mode='Markdown', reply_markup=reply_markup)
+        
+    except Exception as e:
+        logger.error(f"Error viewing user profile for user {user_id}: {e}")
+        await query.message.reply_text("❌ Error occurred while loading user profile.")

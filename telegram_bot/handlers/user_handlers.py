@@ -15,9 +15,17 @@ logger = logging.getLogger(__name__)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /start command"""
-    # Redirect to the verification flow
-    from telegram_bot.handlers.verification import start_verification
-    return await start_verification(update, context)
+    user_id = update.effective_user.id
+    
+    # Check if user is admin first
+    if str(user_id) == BotConfig.ADMIN_USER_ID:
+        # Show admin dashboard for admin users
+        from telegram_bot.handlers.admin_handlers import admin_command
+        return await admin_command(update, context)
+    else:
+        # Redirect to the verification flow for regular users
+        from telegram_bot.handlers.verification import start_verification
+        return await start_verification(update, context)
 
 async def vip_signals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /vipsignals command"""
