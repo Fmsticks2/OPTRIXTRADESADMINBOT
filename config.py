@@ -205,7 +205,15 @@ Development:
     @classmethod
     def is_railway_environment(cls) -> bool:
         """Check if running on Railway"""
-        return bool(os.getenv('RAILWAY_ENVIRONMENT'))
+        # Check for multiple Railway indicators since RAILWAY_ENVIRONMENT might not be set during build
+        railway_indicators = [
+            'RAILWAY_ENVIRONMENT',
+            'RAILWAY_SERVICE_NAME', 
+            'RAILWAY_PROJECT_ID',
+            'RAILWAY_PUBLIC_DOMAIN',
+            'RAILWAY_PRIVATE_DOMAIN'
+        ]
+        return any(os.getenv(indicator) for indicator in railway_indicators)
     
     @classmethod
     def get_webhook_url(cls) -> str:
@@ -249,7 +257,7 @@ def validate_and_report_config(force_validation=False):
     
     return validation_result
 
-# Railway-specific setup
+# Environment-specific setup
 if config.is_railway_environment():
     print(f"🚄 Railway Environment Detected")
     print(f"📡 Webhook Mode: {config.WEBHOOK_ENABLED}")
@@ -261,5 +269,9 @@ if config.is_railway_environment():
     # Validate configuration in Railway environment
     validate_and_report_config(force_validation=True)
 else:
-    print("🏠 Local Development Environment")
-    print("💡 Set VALIDATE_CONFIG=true to enable configuration validation locally")
+    # Only show local development message if we're actually in a local environment
+    # During Railway build, some variables might not be available yet
+    if not any(os.getenv(var) for var in ['PORT', 'RAILWAY_STATIC_URL', 'NIXPACKS_METADATA']):
+        print("🏠 Local Development Environment")
+        print("💡 Set VALIDATE_CONFIG=true to enable configuration validation locally")
+    # If we detect build-time Railway indicators, stay silent to avoid confusion
