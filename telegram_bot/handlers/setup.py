@@ -174,11 +174,10 @@ def setup_all_handlers(bot):
     # Admin callback handlers (not in conversation)
     bot.application.add_handler(CallbackQueryHandler(admin_dashboard_callback, pattern='^admin_dashboard$'))
     bot.application.add_handler(CallbackQueryHandler(admin_queue_callback, pattern='^admin_queue$'))
-    bot.application.add_handler(CallbackQueryHandler(admin_broadcast_callback, pattern='^admin_broadcast$'))
-    bot.application.add_handler(CallbackQueryHandler(admin_search_user_callback, pattern='^admin_search_user$'))
-    bot.application.add_handler(CallbackQueryHandler(admin_chat_history_callback, pattern='^admin_chat_history$'))
     bot.application.add_handler(CallbackQueryHandler(admin_recent_activity_callback, pattern='^admin_recent_activity$'))
     bot.application.add_handler(CallbackQueryHandler(admin_auto_verify_stats_callback, pattern='^admin_auto_verify_stats$'))
+    # Note: admin_broadcast_callback, admin_search_user_callback, and admin_chat_history_callback
+    # are handled by the ConversationHandler above, not as standalone handlers
     
     # Verification flow callback handlers
     bot.application.add_handler(CallbackQueryHandler(start_verification, pattern='^start_verification$'))
