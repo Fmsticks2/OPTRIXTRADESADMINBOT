@@ -97,7 +97,7 @@ class BotConfig:
     BOT_MODE: str = os.getenv('BOT_MODE', 'webhook')  # Default to webhook for Railway
     WEBHOOK_ENABLED: bool = os.getenv('WEBHOOK_ENABLED', 'true').lower() == 'true'  # Enable by default
     WEBHOOK_URL: str = os.getenv('WEBHOOK_URL', '')
-    WEBHOOK_PORT: int = int(os.getenv('PORT', os.getenv('WEBHOOK_PORT', '8080')))  # Railway uses PORT
+    WEBHOOK_PORT: int = int(os.getenv('PORT') or os.getenv('WEBHOOK_PORT') or '8080')  # Railway uses PORT
     WEBHOOK_SECRET_TOKEN: str = os.getenv('WEBHOOK_SECRET_TOKEN', '')
     WEBHOOK_PATH: str = os.getenv('WEBHOOK_PATH', '/webhook')
 
