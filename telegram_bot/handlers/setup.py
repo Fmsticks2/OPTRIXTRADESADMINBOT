@@ -170,15 +170,10 @@ def setup_all_handlers(bot):
     bot.application.add_handler(CommandHandler("admin_reject", admin_reject_command))
     bot.application.add_handler(CommandHandler("admin_queue", admin_queue_command))
     bot.application.add_handler(CommandHandler("admin_broadcast", admin_broadcast_command))
-    bot.application.add_handler(CommandHandler("admin_recent_activity", admin_recent_activity_command))
     bot.application.add_handler(CommandHandler("admin_search_user", admin_search_user_command))
-    bot.application.add_handler(CommandHandler("admin_auto_verify_stats", admin_auto_verify_stats_command))
     bot.application.add_handler(CommandHandler("broadcast", handle_broadcast))
     bot.application.add_handler(CommandHandler("lookup", handle_user_lookup))
     bot.application.add_handler(CommandHandler("searchuser", admin_search_user_command))
-    bot.application.add_handler(CommandHandler("activity", admin_recent_activity_command))
-    bot.application.add_handler(CommandHandler("autostats", admin_auto_verify_stats_command))
-    bot.application.add_handler(CommandHandler("chathistory", admin_chat_history_command))
     
     # Specific callback handlers
     bot.application.add_handler(CallbackQueryHandler(contact_support, pattern='^contact_support$'))

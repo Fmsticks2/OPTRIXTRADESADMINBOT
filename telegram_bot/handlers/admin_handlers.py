@@ -31,19 +31,13 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         admin_text += "Welcome to the admin control panel. Choose an action below:\n\n"
         admin_text += "📋 **Queue** - View pending verification requests\n"
         admin_text += "📢 **Broadcast** - Send message to all users\n"
-        admin_text += "🔍 **Search User** - Find user by ID or username\n"
-        admin_text += "📊 **Recent Activity** - View recent bot activity\n"
-        admin_text += "🤖 **Auto-Verify Stats** - Check auto-verification statistics\n"
-        admin_text += "💬 **Chat History** - View user chat logs\n\n"
+        admin_text += "🔍 **Search User** - Find user by ID or username\n\n"
         admin_text += "Use the buttons below or type commands directly."
         
         keyboard = [
             [InlineKeyboardButton("📋 Queue", callback_data="admin_queue"),
              InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
-            [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user"),
-             InlineKeyboardButton("📊 Recent Activity", callback_data="admin_recent_activity")],
-            [InlineKeyboardButton("🤖 Auto-Verify Stats", callback_data="admin_auto_verify_stats"),
-             InlineKeyboardButton("💬 Chat History", callback_data="admin_chat_history")],
+            [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
