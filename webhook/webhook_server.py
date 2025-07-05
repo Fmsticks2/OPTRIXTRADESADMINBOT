@@ -297,8 +297,8 @@ class WebhookServer:
         
         # Initialize database first
         try:
-            from database import initialize_db
-            await initialize_db()
+            from database import db_manager
+            await db_manager.initialize()
             logger.info("✅ Database initialized successfully")
         except Exception as e:
             logger.error(f"❌ Database initialization failed: {e}")
@@ -311,6 +311,14 @@ class WebhookServer:
         """Shutdown tasks"""
         logger.info("🛑 OPTRIXTRADES Webhook Server shutting down...")
         
+        # Close database connection
+        try:
+            from database import db_manager
+            await db_manager.close()
+            logger.info("✅ Database connection closed successfully")
+        except Exception as e:
+            logger.error(f"❌ Error closing database connection: {e}")
+
         if self.application:
             await self.application.stop()
             await self.application.shutdown()

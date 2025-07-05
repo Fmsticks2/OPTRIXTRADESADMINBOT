@@ -29,17 +29,7 @@ from telegram.error import TelegramError
 from config import BotConfig
 
 # Database imports
-from database import (
-    initialize_db,
-    get_user_data,
-    update_user_data,
-    create_user,
-    log_interaction,
-    get_pending_verifications,
-    get_all_users,
-    delete_user,
-    db_manager
-)
+from database.connection import DatabaseManager
 
 # Enable logging
 logging.basicConfig(
@@ -56,7 +46,7 @@ PREMIUM_GROUP_LINK = "https://t.me/+LTnKwBO54DRiOTNk"  # Premium group link
 REGISTER_UID, UPLOAD_SCREENSHOT, BROADCAST_MESSAGE, USER_LOOKUP = range(4)
 
 # Standalone utility functions
-# Removed obsolete init_database function - using initialize_db() from database package instead
+
 
 def is_admin(user_id):
     """Check if user is admin"""
@@ -84,17 +74,7 @@ async def get_my_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(id_info_text, parse_mode='Markdown')
     
     # Log the ID request
-    from database.db_manager import db_manager
-    await db_manager.log_chat_message(user_id, "command", "/getmyid", {
-        "username": username,
-        "first_name": first_name,
-        "current_admin_status": is_admin(user_id)
-    })
-    
-    await db_manager.log_chat_message(user_id, "bot_response", id_info_text, {
-        "action": "user_id_info",
-        "user_id_revealed": user_id
-    })
+
 
 async def admin_chat_history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin command to view chat history for a specific user"""
@@ -120,7 +100,7 @@ async def admin_chat_history_command(update: Update, context: ContextTypes.DEFAU
         return
     
     # Get chat history
-    from database.db_manager import db_manager
+    db_manager = DatabaseManager()
     chat_history = await db_manager.get_chat_history(target_user_id, limit)
     
     if not chat_history:
@@ -175,7 +155,8 @@ async def get_all_active_users():
             WHERE is_active = ?
         '''
     
-    result = await db_manager.execute_query(query, (True,), fetch=True)
+    db_manager = DatabaseManager()
+    result = await db_manager.execute(query, True)
     return [(user['user_id'], user['first_name']) for user in result] if result else []
 
 async def create_verification_request(user_id, uid, screenshot_file_id):
@@ -185,14 +166,14 @@ async def create_verification_request(user_id, uid, screenshot_file_id):
             INSERT INTO verification_requests (user_id, uid, screenshot_file_id)
             VALUES (%s, %s, %s) RETURNING id
         '''
-        result = await db_manager.execute_query(query, (user_id, uid, screenshot_file_id), fetch=True)
+        result = await db_manager.execute(query, user_id, uid, screenshot_file_id)
         return result[0]['id'] if result else None
     else:
         query = '''
             INSERT INTO verification_requests (user_id, uid, screenshot_file_id)
             VALUES (?, ?, ?)
         '''
-        await db_manager.execute_query(query, (user_id, uid, screenshot_file_id))
+        await db_manager.execute(query, user_id, uid, screenshot_file_id)
         return None
 
 async def update_verification_status(request_id, status, admin_response=""):
@@ -210,7 +191,7 @@ async def update_verification_status(request_id, status, admin_response=""):
             WHERE id = ?
         '''
     
-    await db_manager.execute_query(query, (status, admin_response, request_id))
+    await db_manager.execute(query, status, admin_response, request_id)
 
 def validate_uid(uid):
     """Validate UID format and patterns for auto-verification"""
@@ -267,7 +248,7 @@ def validate_uid(uid):
     
     return True, "UID format is valid"
 
-def should_auto_verify(user_id, uid):
+async def should_auto_verify(user_id, uid):
     """Determine if user should be auto-verified based on criteria"""
     if not BotConfig.AUTO_VERIFY_ENABLED:
         return False, "Auto-verification is disabled"
@@ -298,7 +279,8 @@ def should_auto_verify(user_id, uid):
             AND DATE(created_at) = ?
         '''
     
-    result = db_manager.execute_query(query, ('approved', True, today), fetch=True)
+    db_manager = DatabaseManager()
+    result = await db_manager.fetch(query, 'approved', True, today)
     daily_count = result[0]['count'] if result else 0
     
     if daily_count >= BotConfig.DAILY_AUTO_APPROVAL_LIMIT:
@@ -315,18 +297,18 @@ async def auto_verify_user(user_id, uid, screenshot_file_id, context):
                 INSERT INTO verification_requests (user_id, uid, screenshot_file_id, status, auto_verified, admin_response)
                 VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
             '''
-            result = await db_manager.execute_query(query, (
+            result = await db_manager.execute(query, 
                 user_id, uid, screenshot_file_id, 'approved', True, 'Auto-verified by system'
-            ), fetch=True)
+            )
             request_id = result[0]['id'] if result else None
         else:
             query = '''
                 INSERT INTO verification_requests (user_id, uid, screenshot_file_id, status, auto_verified, admin_response)
                 VALUES (?, ?, ?, ?, ?, ?)
             '''
-            await db_manager.execute_query(query, (
+            await db_manager.execute(query, 
                 user_id, uid, screenshot_file_id, 'approved', True, 'Auto-verified by system'
-            ))
+            )
             request_id = None
         
         # Update user status
@@ -377,13 +359,7 @@ async def auto_verify_user(user_id, uid, screenshot_file_id, context):
             parse_mode='Markdown'
         )
         
-        # Log chat history
-        await db_manager.log_chat_message(user_id, "bot_response", success_message, {
-            "verification_type": "auto_verified",
-            "uid": uid,
-            "request_id": request_id,
-            "status": "approved"
-        })
+
         
         logger.info(f"Auto-verified user {user_id} with UID {uid}")
         return True, request_id

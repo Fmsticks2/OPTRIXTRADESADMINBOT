@@ -11,6 +11,8 @@ from typing import Optional, Dict, Any, List, Union
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
+from config import BotConfig
+
 # Database imports
 try:
     import asyncpg
@@ -33,12 +35,15 @@ class DatabaseManager:
     
     def __init__(self):
         self.pool = None
-        self.database_url = os.getenv('DATABASE_URL', '').strip()
-        self.sqlite_path = os.getenv('SQLITE_DATABASE_PATH', 'trading_bot.db')
+        self.database_url = BotConfig.DATABASE_URL.strip()
+        if '@:' in self.database_url:
+            logger.warning(f"Malformed DATABASE_URL detected: {self.database_url}. Overriding with public URL.")
+            self.database_url = 'postgresql://postgres:lSyqidmHknVYbkBghtRweAwPISFrfMca@caboose.proxy.rlwy.net:21466/railway'
+        self.sqlite_path = BotConfig.SQLITE_DATABASE_PATH
         self.is_initialized = False
         
         # Determine database type based on DATABASE_TYPE config first
-        self.db_type = os.getenv('DATABASE_TYPE', 'sqlite').lower()
+        self.db_type = BotConfig.DATABASE_TYPE.lower()
         
         # Fallback to URL-based detection if DATABASE_TYPE not set
         if self.db_type not in ['postgresql', 'sqlite']:
@@ -80,13 +85,14 @@ class DatabaseManager:
             raise
     
     async def _init_postgresql(self):
-        """Initialize PostgreSQL connection pool"""
+        """Initialize PostgreSQL connection pool."""
         try:
+            logger.info(f"Attempting to connect to PostgreSQL with DATABASE_URL: {self.database_url}")
             self.pool = await asyncpg.create_pool(
-                self.database_url,
+                dsn=self.database_url,
                 min_size=1,
                 max_size=int(os.getenv('DATABASE_POOL_SIZE', '10')),
-                command_timeout=int(os.getenv('DATABASE_CONNECTION_TIMEOUT', '30')),
+                timeout=int(os.getenv('DATABASE_CONNECTION_TIMEOUT', '30')),
                 max_inactive_connection_lifetime=300,
                 server_settings={
                     'jit': 'off',  # Disable JIT for better performance on small queries
@@ -99,7 +105,7 @@ class DatabaseManager:
             raise
     
     async def _init_sqlite(self):
-        """Initialize SQLite connection"""
+        """Initialize SQLite connection."""
         try:
             # Create database file if it doesn't exist
             if not os.path.exists(self.sqlite_path):
@@ -325,7 +331,7 @@ class DatabaseManager:
     
     @asynccontextmanager
     async def get_connection(self):
-        """Get database connection context manager"""
+        """Get a connection from the pool."""
         if self.db_type == 'postgresql':
             async with self.pool.acquire() as conn:
                 yield conn
@@ -334,7 +340,7 @@ class DatabaseManager:
             yield self.pool
     
     async def execute(self, query: str, *args, fetch: str = None):
-        """Execute a query with optional fetch"""
+        """Execute a query and return the result."""
         try:
             if self.db_type == 'postgresql':
                 async with self.pool.acquire() as conn:
@@ -444,13 +450,10 @@ class DatabaseManager:
             }
 
     async def close(self):
-        """Close database connections"""
+        """Close the database connection pool."""
         if self.pool:
-            if self.db_type == 'postgresql':
-                await self.pool.close()
-            else:
-                await self.pool.close()
-            logger.info("Database connections closed")
+            await self.pool.close()
+            logger.info("Database connection pool closed.")
 
 # Global database manager instance
 db_manager = DatabaseManager()

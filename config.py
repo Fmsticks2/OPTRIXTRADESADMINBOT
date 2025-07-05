@@ -19,7 +19,7 @@ class BotConfig:
     DATABASE_PATH: str = os.getenv('DATABASE_PATH', 'trading_bot.db')
     SQLITE_DATABASE_PATH: str = os.path.join(os.path.dirname(__file__), os.getenv('SQLITE_DATABASE_PATH', 'trading_bot.db'))
     DATABASE_TYPE: str = os.getenv('DATABASE_TYPE', 'sqlite')
-    DATABASE_URL: str = os.getenv('DATABASE_URL', '')
+    DATABASE_URL: str = os.getenv('DATABASE_URL', 'postgresql://postgres:lSyqidmHknVYbkBghtRweAwPISFrfMca@caboose.proxy.rlwy.net:21466/railway')
     
     # PostgreSQL specific settings
     POSTGRES_HOST: str = os.getenv('PGHOST', os.getenv('POSTGRES_HOST', 'localhost'))
