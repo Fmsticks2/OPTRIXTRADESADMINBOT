@@ -223,17 +223,14 @@ class WebhookServer:
             # Create application
             self.application = Application.builder().token(config.BOT_TOKEN).build()
             
-            # Set the application instance in the bot
-            self.bot_instance.set_application(self.application)
+            # Set the application instance in the bot (fix: use correct attribute)
+            self.bot_instance.application = self.application
             
-            # Add handlers (same as polling mode)
-            from telegram.ext import CommandHandler, CallbackQueryHandler, MessageHandler, filters
+            # Store bot instance in application's bot_data for access from handlers
+            self.application.bot_data['bot_instance'] = self.bot_instance
             
-            self.application.add_handler(CommandHandler("start", self.bot_instance.start_command))
-            self.application.add_handler(CallbackQueryHandler(self.bot_instance.button_callback))
-            self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.bot_instance.handle_text_message))
-            self.application.add_handler(MessageHandler(filters.PHOTO, self.bot_instance.handle_photo))
-            self.application.add_error_handler(self.bot_instance.error_handler)
+            # Setup handlers using the bot's setup method
+            self.bot_instance._setup_handlers()
             
             # Initialize application
             await self.application.initialize()
