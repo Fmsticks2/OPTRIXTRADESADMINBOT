@@ -118,7 +118,8 @@ def register_error_handlers(application) -> None:
 
 
 # Create an alias for the decorator to match the expected usage
-error_handler = error_handler_decorator
+# Note: Keep original error_handler function intact for application.add_error_handler()
+# Use error_handler_decorator for function decorating
 
 
 class ErrorLogger:

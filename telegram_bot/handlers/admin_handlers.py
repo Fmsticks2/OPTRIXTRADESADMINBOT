@@ -137,18 +137,36 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
     
     broadcast_message = update.message.text
     
+    # Check if user is in broadcast conversation state
+    if context.user_data.get('admin_action') != 'broadcast':
+        logger.warning(f"User {user_id} sent broadcast message but not in broadcast state")
+        return ConversationHandler.END
+    
     try:
         # Get all users
         all_users = await get_all_users()
         
         if not all_users:
-            await update.message.reply_text("❌ No users found to broadcast to.")
+            confirmation_text = "❌ No users found to broadcast to."
+            keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(confirmation_text, reply_markup=reply_markup)
             return ConversationHandler.END
         
-        # Send confirmation
-        await update.message.reply_text(
-            f"📢 Broadcasting message to {len(all_users)} users...\n\n"
-            f"**Message Preview:**\n{broadcast_message}"
+        # Send confirmation with persistent message
+        confirmation_text = (
+            f"📢 **Broadcasting message to {len(all_users)} users...**\n\n"
+            f"**Message Preview:**\n{broadcast_message}\n\n"
+            f"⏳ Please wait while the message is being sent..."
+        )
+        
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        confirmation_msg = await update.message.reply_text(
+            confirmation_text, 
+            parse_mode='Markdown',
+            reply_markup=reply_markup
         )
         
         # Broadcast to all users
@@ -171,21 +189,31 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
                 logger.error(f"Failed to send broadcast to user {user['user_id']}: {e}")
                 failed_count += 1
         
-        # Send final report
+        # Update the confirmation message with final report
         report_text = f"✅ **Broadcast Complete!**\n\n"
         report_text += f"📊 **Results:**\n"
         report_text += f"• Successfully sent: {success_count}\n"
         report_text += f"• Failed: {failed_count}\n"
-        report_text += f"• Total users: {len(all_users)}"
+        report_text += f"• Total users: {len(all_users)}\n\n"
+        report_text += f"**Original Message:**\n{broadcast_message}"
         
-        await update.message.reply_text(report_text, parse_mode='Markdown')
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await confirmation_msg.edit_text(report_text, parse_mode='Markdown', reply_markup=reply_markup)
         
         # Log admin action
         await log_interaction(user_id, 'admin_broadcast', f"Sent to {success_count} users")
         
+        # Clear conversation state
+        context.user_data.clear()
+        
     except Exception as e:
         logger.error(f"Error in broadcast: {e}")
-        await update.message.reply_text("❌ Error occurred while broadcasting message.")
+        error_text = "❌ Error occurred while broadcasting message."
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(error_text, reply_markup=reply_markup)
     
     return ConversationHandler.END
 
@@ -394,7 +422,7 @@ async def admin_broadcast_callback(update: Update, context: ContextTypes.DEFAULT
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
     
     response_text = "📢 **Broadcast Message**\n\n"
@@ -407,7 +435,8 @@ async def admin_broadcast_callback(update: Update, context: ContextTypes.DEFAULT
     keyboard = [[InlineKeyboardButton("❌ Cancel", callback_data="admin_dashboard")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+    # Edit the existing message instead of creating a new one
+    await query.edit_message_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
     return BROADCAST_MESSAGE
 
 async def admin_search_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -417,7 +446,7 @@ async def admin_search_user_callback(update: Update, context: ContextTypes.DEFAU
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
     
     search_text = (
@@ -442,7 +471,8 @@ async def admin_search_user_callback(update: Update, context: ContextTypes.DEFAU
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.message.reply_text(search_text, parse_mode='Markdown', reply_markup=reply_markup)
+    # Edit the existing message instead of creating a new one
+    await query.edit_message_text(search_text, parse_mode='Markdown', reply_markup=reply_markup)
     
     # Set conversation state for search input
     context.user_data['admin_action'] = 'search_user'
@@ -456,7 +486,7 @@ async def admin_recent_activity_callback(update: Update, context: ContextTypes.D
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
         return
     
     try:
@@ -514,11 +544,12 @@ async def admin_recent_activity_callback(update: Update, context: ContextTypes.D
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        # Edit the existing message instead of creating a new one
+        await query.edit_message_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
         
     except Exception as e:
         logger.error(f"Error in admin_recent_activity_callback: {e}")
-        await query.message.reply_text("❌ Error retrieving recent activity data.")
+        await query.edit_message_text("❌ Error retrieving recent activity data.")
 
 async def admin_auto_verify_stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle admin auto verify stats callback"""
@@ -527,7 +558,7 @@ async def admin_auto_verify_stats_callback(update: Update, context: ContextTypes
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
         return
     
     try:
@@ -584,11 +615,12 @@ async def admin_auto_verify_stats_callback(update: Update, context: ContextTypes
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        # Edit the existing message instead of creating a new one
+        await query.edit_message_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
         
     except Exception as e:
         logger.error(f"Error in admin_auto_verify_stats_callback: {e}")
-        await query.message.reply_text("❌ Error retrieving verification statistics.")
+        await query.edit_message_text("❌ Error retrieving verification statistics.")
 
 async def admin_chat_history_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle admin chat history callback"""

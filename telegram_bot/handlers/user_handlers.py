@@ -54,11 +54,105 @@ async def support_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle the /stats command"""
-    # Placeholder
-    await update.message.reply_text(
-        "📊 Bot statistics will be displayed here."
-    )
+    """Handle the /status command - Show user verification status"""
+    user = update.effective_user
+    user_id = user.id
+    
+    try:
+        # Import database utilities
+        from telegram_bot.utils.database_utils import get_user_data
+        from database.connection import db_manager
+        
+        # Get user data from database
+        user_data = await get_user_data(user_id)
+        
+        if not user_data:
+            # User not found in database
+            status_text = "📊 **Account Status**\n\n"
+            status_text += "❌ **Status:** Not Registered\n"
+            status_text += "📝 **Action Required:** Please use /start to begin registration\n\n"
+            status_text += "💡 **Next Steps:**\n"
+            status_text += "• Complete account registration\n"
+            status_text += "• Provide your trading UID\n"
+            status_text += "• Submit verification documents"
+        else:
+            # Check verification status
+            verification_status = user_data.get('verification_status', 'not_verified')
+            registration_status = user_data.get('registration_status', 'incomplete')
+            
+            status_text = "📊 **Account Status**\n\n"
+            status_text += f"👤 **Name:** {user.first_name}\n"
+            status_text += f"🆔 **User ID:** {user_id}\n"
+            
+            # Show verification status with appropriate emoji and message
+            if verification_status == 'approved' or verification_status == 'verified':
+                status_text += "✅ **Verification Status:** Verified\n"
+                status_text += "🎉 **Access Level:** Premium Member\n\n"
+                status_text += "🚀 **Available Features:**\n"
+                status_text += "• VIP Trading Signals\n"
+                status_text += "• Premium Community Access\n"
+                status_text += "• Advanced Trading Tools\n"
+                status_text += "• Priority Support"
+            elif verification_status == 'pending':
+                status_text += "⏳ **Verification Status:** Pending Review\n"
+                status_text += "🔍 **Access Level:** Under Review\n\n"
+                status_text += "📋 **What's Next:**\n"
+                status_text += "• Our team is reviewing your submission\n"
+                status_text += "• Expected review time: 2-24 hours\n"
+                status_text += "• You'll be notified once approved\n"
+                status_text += f"• Need help? Contact @{BotConfig.ADMIN_USERNAME}"
+            elif verification_status == 'rejected':
+                status_text += "❌ **Verification Status:** Rejected\n"
+                status_text += "🔄 **Access Level:** Resubmission Required\n\n"
+                status_text += "📝 **Action Required:**\n"
+                status_text += "• Review rejection reason\n"
+                status_text += "• Submit new verification documents\n"
+                status_text += "• Ensure all requirements are met\n"
+                status_text += f"• Contact support: @{BotConfig.ADMIN_USERNAME}"
+            else:
+                status_text += "❌ **Verification Status:** Not Verified\n"
+                status_text += "📝 **Access Level:** Basic User\n\n"
+                status_text += "🎯 **To Get Verified:**\n"
+                status_text += "• Use /start to begin verification\n"
+                status_text += "• Provide your trading account UID\n"
+                status_text += "• Submit deposit screenshot\n"
+                status_text += "• Wait for admin approval"
+        
+        # Add helpful buttons
+        keyboard = []
+        if not user_data or user_data.get('verification_status') not in ['approved', 'verified']:
+            if user_data and user_data.get('verification_status') == 'rejected':
+                keyboard.append([InlineKeyboardButton("🔄 Retry Verification", callback_data="start_verification")])
+            else:
+                keyboard.append([InlineKeyboardButton("🚀 Start Verification", callback_data="start_verification")])
+            
+            # Add admin contact options for unverified users
+            keyboard.append([
+                InlineKeyboardButton("💬 Message Admin", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}"),
+                InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")
+            ])
+        else:
+            # For verified users, show support option
+            keyboard.append([InlineKeyboardButton("💬 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")])
+        
+        keyboard.append([InlineKeyboardButton("🔙 Main Menu", callback_data="start_verification")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            status_text,
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in stats_command: {e}")
+        await update.message.reply_text(
+            "❌ **Error**\n\n"
+            "Unable to retrieve your account status at the moment.\n"
+            f"Please try again later or contact support: @{BotConfig.ADMIN_USERNAME}",
+            parse_mode='Markdown'
+        )
 
 async def how_it_works(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /howitworks command"""

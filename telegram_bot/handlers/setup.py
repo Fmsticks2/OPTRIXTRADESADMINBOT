@@ -140,6 +140,7 @@ def setup_all_handlers(bot):
     bot.application.add_handler(CommandHandler("myaccount", my_account_command))
     bot.application.add_handler(CommandHandler("support", support_command))
     bot.application.add_handler(CommandHandler("stats", stats_command))
+    bot.application.add_handler(CommandHandler("status", stats_command))
     bot.application.add_handler(CommandHandler("howitworks", how_it_works))
     bot.application.add_handler(CommandHandler("menu", menu_command))
     bot.application.add_handler(CommandHandler("getmyid", get_my_id_command))

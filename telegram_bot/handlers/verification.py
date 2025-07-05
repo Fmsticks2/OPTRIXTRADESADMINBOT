@@ -7,7 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
 from config import BotConfig
-from telegram_bot.utils.error_handler import error_handler
+from telegram_bot.utils.error_handler import error_handler_decorator
 from telegram_bot.utils.monitoring import measure_time
 from telegram_bot.utils.decorators import rate_limit
 
@@ -24,7 +24,7 @@ FLOW_ACTIVATION = "activation"
 FLOW_CONFIRMATION = "confirmation"
 FLOW_FOLLOWUP = "followup"
 
-@error_handler
+@error_handler_decorator
 @measure_time
 @rate_limit(5, 60)  # 5 requests per minute
 async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -79,7 +79,7 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     return ConversationHandler.END
 
-@error_handler
+@error_handler_decorator
 @measure_time
 async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Show activation instructions (Flow 2)"""
@@ -127,7 +127,7 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     
     return ConversationHandler.END
 
-@error_handler
+@error_handler_decorator
 @measure_time
 async def registered_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle user confirmation of registration (Flow 3)"""
@@ -148,7 +148,7 @@ async def registered_confirmation(update: Update, context: ContextTypes.DEFAULT_
     # Set state for conversation handler
     return REGISTER_UID
 
-@error_handler
+@error_handler_decorator
 @measure_time
 async def handle_uid_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process the UID sent by the user"""
@@ -162,7 +162,7 @@ async def handle_uid_confirmation(update: Update, context: ContextTypes.DEFAULT_
     
     return UPLOAD_SCREENSHOT
 
-@error_handler
+@error_handler_decorator
 @measure_time
 async def handle_screenshot_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process the screenshot uploaded by the user"""
@@ -261,7 +261,7 @@ async def handle_screenshot_upload(update: Update, context: ContextTypes.DEFAULT
     
     return ConversationHandler.END
 
-@error_handler
+@error_handler_decorator
 async def signup_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Provide help with signing up"""
     query = update.callback_query
@@ -276,7 +276,7 @@ async def signup_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         "💡 Need additional help? Contact our support team."
     )
 
-@error_handler
+@error_handler_decorator
 async def deposit_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Provide help with making a deposit"""
     query = update.callback_query
@@ -291,7 +291,7 @@ async def deposit_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "💡 Need additional help? Contact our support team."
     )
 
-@error_handler
+@error_handler_decorator
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancel the verification process"""
     if update.message:
@@ -308,7 +308,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 # Follow-up message handlers for leads who stop interacting
-@error_handler
+@error_handler_decorator
 async def followup_day1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send follow-up message for day 1"""
     user = update.effective_user
@@ -334,7 +334,7 @@ async def followup_day1(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_markup=reply_markup
     )
 
-@error_handler
+@error_handler_decorator
 async def followup_day2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send follow-up message for day 2 (scarcity + social proof)"""
     user = update.effective_user
@@ -357,7 +357,7 @@ async def followup_day2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_markup=reply_markup
     )
 
-@error_handler
+@error_handler_decorator
 async def followup_day3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send follow-up message for day 3 (value recap)"""
     user = update.effective_user
@@ -382,7 +382,7 @@ async def followup_day3(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_markup=reply_markup
     )
 
-@error_handler
+@error_handler_decorator
 async def followup_day4(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send follow-up message for day 4 (personal + soft CTA)"""
     user = update.effective_user
@@ -404,7 +404,7 @@ async def followup_day4(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_markup=reply_markup
     )
 
-@error_handler
+@error_handler_decorator
 async def followup_day5(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send follow-up message for day 5 (last chance + exit option)"""
     user = update.effective_user
@@ -426,7 +426,7 @@ async def followup_day5(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_markup=reply_markup
     )
 
-@error_handler
+@error_handler_decorator
 async def followup_day6(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send follow-up message for day 6 (education + trust-building)"""
     user = update.effective_user
@@ -452,7 +452,7 @@ async def followup_day6(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_markup=reply_markup
     )
 
-@error_handler
+@error_handler_decorator
 async def followup_day7(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send follow-up message for day 7 (light humor + re-activation)"""
     user = update.effective_user
@@ -474,7 +474,7 @@ async def followup_day7(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_markup=reply_markup
     )
 
-@error_handler
+@error_handler_decorator
 async def followup_day8(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send follow-up message for day 8 (FOMO + new success update)"""
     user = update.effective_user
@@ -495,7 +495,7 @@ async def followup_day8(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_markup=reply_markup
     )
 
-@error_handler
+@error_handler_decorator
 async def followup_day9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send follow-up message for day 9 (let's help you start small offer)"""
     user = update.effective_user
@@ -517,7 +517,7 @@ async def followup_day9(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         reply_markup=reply_markup
     )
 
-@error_handler
+@error_handler_decorator
 async def followup_day10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send follow-up message for day 10 (hard close)"""
     user = update.effective_user
@@ -539,7 +539,7 @@ async def followup_day10(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reply_markup=reply_markup
     )
 
-@error_handler
+@error_handler_decorator
 async def handle_not_interested(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle when user indicates they are not interested"""
     query = update.callback_query
@@ -557,7 +557,7 @@ async def handle_not_interested(update: Update, context: ContextTypes.DEFAULT_TY
     if scheduler:
         await scheduler.cancel_follow_ups(query.from_user.id)
 
-@error_handler
+@error_handler_decorator
 async def handle_remove_from_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle when user wants to be removed from follow-up list"""
     query = update.callback_query
@@ -576,7 +576,7 @@ async def handle_remove_from_list(update: Update, context: ContextTypes.DEFAULT_
         await scheduler.cancel_follow_ups(query.from_user.id)
 
 # New engagement callback handlers
-@error_handler
+@error_handler_decorator
 async def free_tips_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle free trading tips callback"""
     query = update.callback_query
@@ -603,7 +603,7 @@ async def free_tips_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     await query.message.reply_text(tips_text, parse_mode='Markdown', reply_markup=reply_markup)
 
-@error_handler
+@error_handler_decorator
 async def join_community_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle join community callback"""
     query = update.callback_query
@@ -635,7 +635,7 @@ async def join_community_callback(update: Update, context: ContextTypes.DEFAULT_
     await query.message.reply_text(community_text, parse_mode='Markdown', reply_markup=reply_markup)
 
 # Admin verification action handlers
-@error_handler
+@error_handler_decorator
 async def approve_verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle admin approval of verification"""
     query = update.callback_query
@@ -698,7 +698,7 @@ async def approve_verification_callback(update: Update, context: ContextTypes.DE
         logger.error(f"Error approving verification for user {user_id}: {e}")
         await query.message.reply_text("❌ Error occurred while approving verification.")
 
-@error_handler
+@error_handler_decorator
 async def reject_verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle admin rejection of verification"""
     query = update.callback_query
@@ -765,7 +765,7 @@ async def reject_verification_callback(update: Update, context: ContextTypes.DEF
         logger.error(f"Error rejecting verification for user {user_id}: {e}")
         await query.message.reply_text("❌ Error occurred while rejecting verification.")
 
-@error_handler
+@error_handler_decorator
 async def view_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle admin view user profile callback"""
     query = update.callback_query
