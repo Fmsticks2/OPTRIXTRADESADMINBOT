@@ -36,7 +36,13 @@ from telegram_bot.handlers.admin_handlers import (
     admin_auto_verify_stats_command,
     handle_broadcast,
     handle_user_lookup,
-    admin_chat_history_command
+    admin_chat_history_command,
+    admin_queue_callback,
+    admin_broadcast_callback,
+    admin_search_user_callback,
+    admin_recent_activity_callback,
+    admin_auto_verify_stats_callback,
+    admin_chat_history_callback
 )
 
 from telegram_bot.handlers.verification import (
@@ -78,8 +84,7 @@ def setup_all_handlers(bot):
     # Conversation handler for verification flow
     verification_conv = ConversationHandler(
         entry_points=[
-            CallbackQueryHandler(start_verification, pattern="^start_verification$"),
-            CommandHandler("verify", start_verification)
+            CallbackQueryHandler(registered_confirmation, pattern="^registered$")
         ],
         states={
             REGISTER_UID: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_uid_confirmation)],
@@ -147,9 +152,17 @@ def setup_all_handlers(bot):
     # Specific callback handlers
     bot.application.add_handler(CallbackQueryHandler(contact_support, pattern='^contact_support$'))
     
+    # Admin callback handlers
+    bot.application.add_handler(CallbackQueryHandler(admin_queue_callback, pattern='^admin_queue$'))
+    bot.application.add_handler(CallbackQueryHandler(admin_broadcast_callback, pattern='^admin_broadcast$'))
+    bot.application.add_handler(CallbackQueryHandler(admin_search_user_callback, pattern='^admin_search_user$'))
+    bot.application.add_handler(CallbackQueryHandler(admin_recent_activity_callback, pattern='^admin_recent_activity$'))
+    bot.application.add_handler(CallbackQueryHandler(admin_auto_verify_stats_callback, pattern='^admin_auto_verify_stats$'))
+    bot.application.add_handler(CallbackQueryHandler(admin_chat_history_callback, pattern='^admin_chat_history$'))
+    
     # Verification flow callback handlers
+    bot.application.add_handler(CallbackQueryHandler(start_verification, pattern='^start_verification$'))
     bot.application.add_handler(CallbackQueryHandler(activation_instructions, pattern='^activation_instructions$'))
-    bot.application.add_handler(CallbackQueryHandler(registered_confirmation, pattern='^registered$'))
     bot.application.add_handler(CallbackQueryHandler(signup_help, pattern='^signup_help$'))
     bot.application.add_handler(CallbackQueryHandler(deposit_help, pattern='^deposit_help$'))
     bot.application.add_handler(CallbackQueryHandler(handle_not_interested, pattern='^not_interested$'))

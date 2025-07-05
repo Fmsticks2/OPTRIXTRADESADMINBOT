@@ -72,18 +72,149 @@ async def get_my_id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await update.message.reply_text(f"Your Telegram ID is: {user_id}")
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle text messages"""
-    # Placeholder
+    """Handle text messages with proper UID detection, UPGRADE command, and admin recognition"""
+    user = update.effective_user
+    user_id = str(user.id)
+    message_text = update.message.text.strip()
+    
+    # Check if user is admin first - delegate to admin handler
+    if str(user_id) == BotConfig.ADMIN_USER_ID:
+        from telegram_bot.handlers.admin_handlers import handle_text_message as admin_handle_text
+        await admin_handle_text(update, context)
+        return
+    
+    # Handle UPGRADE command
+    if message_text.upper() == "UPGRADE":
+        upgrade_text = "🚀 **PREMIUM UPGRADE AVAILABLE**\n\n"
+        upgrade_text += "Ready to unlock the full power of OPTRIXTRADES?\n\n"
+        upgrade_text += "**Premium Features Include:**\n"
+        upgrade_text += "✅ Advanced AI Trading Bot (Auto-trades for you)\n"
+        upgrade_text += "✅ VIP Signal Alerts (SMS + Email + Push)\n"
+        upgrade_text += "✅ Private 1-on-1 Strategy Sessions\n"
+        upgrade_text += "✅ Risk Management Blueprint\n"
+        upgrade_text += "✅ Priority Support (24/7)\n"
+        upgrade_text += "✅ Exclusive Market Analysis\n\n"
+        upgrade_text += "**Pricing:**\n"
+        upgrade_text += "• Monthly: $97/month\n"
+        upgrade_text += "• Quarterly: $247 (Save $44)\n"
+        upgrade_text += "• Annual: $797 (Save $367)\n\n"
+        upgrade_text += f"Contact our team for upgrade: @{BotConfig.ADMIN_USERNAME}"
+        
+        keyboard = [
+            [InlineKeyboardButton("💬 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")],
+            [InlineKeyboardButton("🔙 Back to Menu", callback_data="start_verification")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(upgrade_text, reply_markup=reply_markup, parse_mode='Markdown')
+        return
+    
+    # Check if message looks like a UID (6-20 alphanumeric characters)
+    if is_valid_uid(message_text):
+        # This looks like a UID - start verification flow
+        context.user_data['uid'] = message_text
+        await update.message.reply_text(
+            f"✅ UID received: {message_text}\n\n"
+            "Great! Now please send a screenshot of your deposit as proof to complete verification."
+        )
+        return
+    
+    # Default response for other text messages
     await update.message.reply_text(
-        "I've received your message. How can I help you?"
+        "I've received your message. How can I help you?\n\n"
+        "💡 **Quick Actions:**\n"
+        "• Send your UID to start verification\n"
+        "• Type 'UPGRADE' for premium features\n"
+        "• Use /start to see the main menu"
     )
 
+def is_valid_uid(text: str) -> bool:
+    """Check if text looks like a valid UID"""
+    if not text:
+        return False
+    
+    # Remove any whitespace
+    text = text.strip()
+    
+    # Check length
+    if len(text) < BotConfig.MIN_UID_LENGTH or len(text) > BotConfig.MAX_UID_LENGTH:
+        return False
+    
+    # Check if alphanumeric (letters and numbers only)
+    if not text.isalnum():
+        return False
+    
+    # Additional validation: should contain at least one number or letter
+    has_letter = any(c.isalpha() for c in text)
+    has_number = any(c.isdigit() for c in text)
+    
+    return has_letter or has_number
+
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle photo messages"""
-    # Placeholder
-    await update.message.reply_text(
-        "I've received your photo. How can I help you?"
-    )
+    """Handle photo messages for verification"""
+    user = update.effective_user
+    user_id = user.id
+    
+    # Check if user has provided UID and is in verification process
+    uid = context.user_data.get('uid')
+    
+    if uid:
+        # User has UID, this photo is likely a deposit screenshot
+        file_id = update.message.photo[-1].file_id
+        context.user_data['screenshot_file_id'] = file_id
+        
+        # Notify user
+        await update.message.reply_text(
+            "✅ **Verification Submitted Successfully!**\n\n"
+            f"**Your Details:**\n"
+            f"• UID: {uid}\n"
+            f"• Screenshot: Received\n\n"
+            "🔍 Our team will review your submission and grant you access to the premium channel shortly.\n\n"
+            "⏰ **Expected Review Time:** 2-24 hours\n"
+            "📞 **Need Help?** Contact @" + BotConfig.ADMIN_USERNAME,
+            parse_mode='Markdown'
+        )
+        
+        # Notify admin if configured
+        if BotConfig.ADMIN_USER_ID:
+            admin_message = (
+                f"🔔 **New Verification Request**\n\n"
+                f"**User Details:**\n"
+                f"• Name: {user.first_name} {user.last_name if user.last_name else ''}\n"
+                f"• Username: @{user.username if user.username else 'None'}\n"
+                f"• User ID: {user_id}\n"
+                f"• UID: {uid}\n\n"
+                f"**Actions:**\n"
+                f"/verify {user_id} - Approve verification\n"
+                f"/reject {user_id} - Reject verification"
+            )
+            
+            try:
+                await context.bot.send_message(
+                    chat_id=BotConfig.ADMIN_USER_ID, 
+                    text=admin_message,
+                    parse_mode='Markdown'
+                )
+                await context.bot.send_photo(
+                    chat_id=BotConfig.ADMIN_USER_ID, 
+                    photo=file_id,
+                    caption=f"Deposit screenshot from {user.first_name} (UID: {uid})"
+                )
+            except Exception as e:
+                logger.error(f"Failed to notify admin: {e}")
+        
+        # Clear the UID from context since verification is submitted
+        context.user_data.pop('uid', None)
+        
+    else:
+        # User sent photo without UID
+        await update.message.reply_text(
+            "📸 I received your photo!\n\n"
+            "To complete verification, please:\n"
+            "1️⃣ Send your UID first\n"
+            "2️⃣ Then send your deposit screenshot\n\n"
+            "💡 **Tip:** Send your UID as a text message, then upload your screenshot."
+        )
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle document messages"""
