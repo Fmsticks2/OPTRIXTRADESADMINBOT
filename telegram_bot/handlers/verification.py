@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 from config import BotConfig
 from telegram_bot.utils.error_handler import error_handler
 from telegram_bot.utils.monitoring import measure_time
-from telegram_bot.utils.security import rate_limit
+from telegram_bot.utils.decorators import rate_limit
 
 logger = logging.getLogger(__name__)
 
