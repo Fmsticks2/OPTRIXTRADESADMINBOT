@@ -238,44 +238,7 @@ class DatabaseManager:
                     CREATE INDEX IF NOT EXISTS idx_user_interactions_user_id ON user_interactions (user_id);
                     CREATE INDEX IF NOT EXISTS idx_verification_requests_status ON verification_requests (status);
                 '''),
-                ('005_create_chat_history_table', '''
-                    CREATE TABLE IF NOT EXISTS chat_history (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER,
-                        message_type TEXT,
-                        message_text TEXT,
-                        message_data TEXT,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users(user_id)
-                    )
-                '''),
-                ('006_fix_verification_table', '''
-                    -- Recreate verification_requests table with all required columns
-                    -- This handles the duplicate column error by recreating the table
-                    CREATE TABLE verification_requests_temp (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER,
-                        uid TEXT,
-                        screenshot_file_id TEXT,
-                        status TEXT DEFAULT 'pending',
-                        admin_notes TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        verified_at TIMESTAMP,
-                        verified_by INTEGER,
-                        auto_verified BOOLEAN DEFAULT FALSE,
-                        admin_response TEXT,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                    );
-                    INSERT INTO verification_requests_temp 
-                        (id, user_id, uid, screenshot_file_id, status, admin_notes, 
-                         created_at, verified_at, verified_by)
-                        SELECT id, user_id, uid, screenshot_file_id, status, admin_notes, 
-                               created_at, verified_at, verified_by
-                        FROM verification_requests;
-                    DROP TABLE verification_requests;
-                    ALTER TABLE verification_requests_temp RENAME TO verification_requests;
-                '''),
+
                 ('005_create_chat_history_table', '''
                     CREATE TABLE IF NOT EXISTS chat_history (
                         id SERIAL PRIMARY KEY,
@@ -288,9 +251,9 @@ class DatabaseManager:
                     )
                 '''),
                 ('006_add_verification_columns', '''
-                    ALTER TABLE verification_requests ADD COLUMN auto_verified BOOLEAN DEFAULT FALSE;
-                    ALTER TABLE verification_requests ADD COLUMN admin_response TEXT;
-                    ALTER TABLE verification_requests ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                    ALTER TABLE verification_requests ADD COLUMN IF NOT EXISTS auto_verified BOOLEAN DEFAULT FALSE;
+                    ALTER TABLE verification_requests ADD COLUMN IF NOT EXISTS admin_response TEXT;
+                    ALTER TABLE verification_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
                 ''')
             ]
         else:
@@ -302,14 +265,14 @@ class DatabaseManager:
                         first_name TEXT,
                         current_flow TEXT DEFAULT 'welcome',
                         registration_status TEXT DEFAULT 'not_started',
-                        deposit_confirmed BOOLEAN DEFAULT FALSE,
+                        deposit_confirmed BOOLEAN DEFAULT 0,
                         uid TEXT,
-                        join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        last_interaction TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        join_date TEXT,
+                        last_interaction TEXT,
                         follow_up_day INTEGER DEFAULT 0,
-                        is_active BOOLEAN DEFAULT TRUE,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        is_active INTEGER DEFAULT 1,
+                        created_at TEXT,
+                        updated_at TEXT
                     )
                 '''),
                 ('002_create_user_interactions_table', '''
@@ -318,7 +281,7 @@ class DatabaseManager:
                         user_id INTEGER,
                         interaction_type TEXT,
                         interaction_data TEXT,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        timestamp TEXT,
                         FOREIGN KEY (user_id) REFERENCES users (user_id)
                     )
                 '''),
@@ -330,8 +293,8 @@ class DatabaseManager:
                         screenshot_file_id TEXT,
                         status TEXT DEFAULT 'pending',
                         admin_notes TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        verified_at TIMESTAMP,
+                        created_at TEXT,
+                        verified_at TEXT,
                         verified_by INTEGER,
                         FOREIGN KEY (user_id) REFERENCES users (user_id)
                     )
@@ -349,14 +312,14 @@ class DatabaseManager:
                         message_type TEXT,
                         message_text TEXT,
                         message_data TEXT,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        timestamp TEXT,
                         FOREIGN KEY (user_id) REFERENCES users(user_id)
                     )
                 '''),
                 ('006_add_verification_columns', '''
-                    ALTER TABLE verification_requests ADD COLUMN auto_verified BOOLEAN DEFAULT FALSE;
+                    ALTER TABLE verification_requests ADD COLUMN auto_verified INTEGER DEFAULT 0;
                     ALTER TABLE verification_requests ADD COLUMN admin_response TEXT;
-                    ALTER TABLE verification_requests ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                    ALTER TABLE verification_requests ADD COLUMN updated_at TEXT;
                 ''')
             ]
     
