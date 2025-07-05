@@ -39,6 +39,7 @@ from telegram_bot.handlers.admin_handlers import (
     handle_user_lookup,
     handle_search_input,
     cancel_admin_action,
+    cancel_admin,
     admin_chat_history_command,
     admin_queue_callback,
     admin_broadcast_callback,
@@ -128,7 +129,10 @@ def setup_all_handlers(bot):
             USER_LOOKUP: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_search_input)],
             SEARCH_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_search_input)],
         },
-        fallbacks=[CommandHandler("cancel", cancel_admin_action)],
+        fallbacks=[
+            CommandHandler("cancel", cancel_admin_action),
+            CallbackQueryHandler(cancel_admin, pattern='^cancel_admin$')
+        ],
         per_message=False,
         per_chat=True,
         per_user=True,

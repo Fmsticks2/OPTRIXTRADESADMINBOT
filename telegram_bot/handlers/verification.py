@@ -8,6 +8,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
 from config import BotConfig
+from database.connection import log_interaction
 from telegram_bot.utils.error_handler import error_handler_decorator
 from telegram_bot.utils.monitoring import measure_time
 from telegram_bot.utils.decorators import rate_limit
@@ -39,6 +40,9 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         message = update.message
         user = update.effective_user
+    
+    # Log user interaction
+    await log_interaction(user.id, 'start_verification', 'User started verification process')
     
     # Store flow state
     if not context.user_data.get(FLOW_KEY):
@@ -86,6 +90,9 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     """Show activation instructions (Flow 2)"""
     query = update.callback_query
     await query.answer()
+    
+    # Log user interaction
+    await log_interaction(query.from_user.id, 'activation_instructions', 'User viewed activation instructions')
     
     # Update flow state
     context.user_data[FLOW_KEY] = FLOW_ACTIVATION
@@ -135,6 +142,9 @@ async def registered_confirmation(update: Update, context: ContextTypes.DEFAULT_
     query = update.callback_query
     await query.answer()
     
+    # Log user interaction
+    await log_interaction(query.from_user.id, 'registered_confirmation', 'User confirmed registration')
+    
     # Update flow state
     context.user_data[FLOW_KEY] = FLOW_CONFIRMATION
     
@@ -153,8 +163,14 @@ async def registered_confirmation(update: Update, context: ContextTypes.DEFAULT_
 @measure_time
 async def handle_uid_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process the UID sent by the user"""
+    user_id = update.effective_user.id
+    uid = update.message.text.strip()
+    
+    # Log user interaction
+    await log_interaction(user_id, 'uid_submission', f'User submitted UID: {uid}')
+    
     # Store the UID in context
-    context.user_data['uid'] = update.message.text.strip()
+    context.user_data['uid'] = uid
     
     # Ask for screenshot
     await update.message.reply_text(
@@ -176,6 +192,9 @@ async def handle_screenshot_upload(update: Update, context: ContextTypes.DEFAULT
         file_id = update.message.photo[-1].file_id
     else:  # Document
         file_id = update.message.document.file_id
+    
+    # Log user interaction
+    await log_interaction(user_id, 'screenshot_upload', f'User uploaded verification screenshot for UID: {uid}')
     
     # Store verification data
     context.user_data['screenshot_file_id'] = file_id

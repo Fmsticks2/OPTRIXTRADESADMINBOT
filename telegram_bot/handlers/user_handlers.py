@@ -7,6 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from config import BotConfig
+from database.connection import log_interaction
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,9 @@ logger = logging.getLogger(__name__)
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /start command"""
     user_id = update.effective_user.id
+    
+    # Log user interaction
+    await log_interaction(user_id, 'start_command', 'User started bot')
     
     # Check if user is admin first
     if str(user_id) == BotConfig.ADMIN_USER_ID:
@@ -29,6 +33,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def vip_signals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /vipsignals command"""
+    user_id = update.effective_user.id
+    await log_interaction(user_id, 'vip_signals_command', 'User accessed VIP signals')
+    
     # Placeholder
     await update.message.reply_text(
         "🔒 VIP Signals are available to verified users only."
@@ -43,6 +50,9 @@ async def my_account_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def support_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /support command"""
+    user_id = update.effective_user.id
+    await log_interaction(user_id, 'support_command', 'User requested support')
+    
     # Placeholder
     keyboard = [
         [InlineKeyboardButton("Contact Support", callback_data="contact_support")]
@@ -57,6 +67,9 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Handle the /status command - Show user verification status"""
     user = update.effective_user
     user_id = user.id
+    
+    # Log user interaction
+    await log_interaction(user_id, 'stats_command', 'User checked account status')
     
     try:
         # Import database utilities
@@ -163,6 +176,9 @@ async def how_it_works(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /menu command"""
+    user_id = update.effective_user.id
+    await log_interaction(user_id, 'menu_command', 'User accessed menu')
+    
     # Placeholder
     await update.message.reply_text(
         "📋 Menu options will be displayed here."
@@ -178,6 +194,9 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     user = update.effective_user
     user_id = str(user.id)
     message_text = update.message.text.strip()
+    
+    # Log user interaction
+    await log_interaction(int(user_id), 'text_message', f'User sent: {message_text[:50]}...')
     
     # Check if user is admin first - delegate to admin handler
     if str(user_id) == BotConfig.ADMIN_USER_ID:

@@ -149,8 +149,163 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         if not all_users:
             confirmation_text = "❌ No users found to broadcast to."
             keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await confirmation_msg.edit_text(
+            report_text, 
+            parse_mode='Markdown',
+            reply_markup=reply_markup
+        )
+        
+        # Clear conversation state
+        context.user_data.clear()
+        
+    except Exception as e:
+        logger.error(f"Error in handle_broadcast_message: {e}")
+        error_text = "❌ Error sending broadcast message."
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(error_text, reply_markup=reply_markup)
+    
+    return ConversationHandler.END
+
+async def handle_user_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle the /lookup command"""
+    user_id = update.effective_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await update.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    await update.message.reply_text("🔍 Please enter the User ID to lookup:")
+    context.user_data['admin_action'] = 'user_lookup'
+    return USER_LOOKUP
+
+async def handle_search_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle search input for user lookup"""
+    user_id = update.effective_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await update.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    search_term = update.message.text.strip()
+    
+    try:
+        # Search for users based on the input
+        if search_term.isdigit():
+            # Search by user ID
+            user_data = await get_user_data(int(search_term))
+            if user_data:
+                users = [user_data]
+            else:
+                users = []
+        else:
+            # Search by username or name
+            search_term_clean = search_term.replace('@', '').lower()
+            
+            if db_manager.db_type == 'postgresql':
+                search_query = '''
+                    SELECT * FROM users 
+                    WHERE LOWER(username) LIKE $1 OR LOWER(first_name) LIKE $1 OR uid LIKE $1
+                    LIMIT 10
+                '''
+                users = await db_manager.execute(search_query, f'%{search_term_clean}%', fetch='all')
+            else:
+                search_query = '''
+                    SELECT * FROM users 
+                    WHERE LOWER(username) LIKE ? OR LOWER(first_name) LIKE ? OR uid LIKE ?
+                    LIMIT 10
+                '''
+                users = await db_manager.execute(search_query, f'%{search_term_clean}%', f'%{search_term_clean}%', f'%{search_term_clean}%', fetch='all')
+        
+        if not users:
+            response_text = f"❌ No users found matching '{search_term}'"
+        else:
+            response_text = f"🔍 **Search Results for '{search_term}'**\n\n"
+            
+            for i, user in enumerate(users, 1):
+                username = user.get('username', 'N/A')
+                first_name = user.get('first_name', 'N/A')
+                status = user.get('registration_status', 'unknown')
+                uid = user.get('uid', 'N/A')
+                
+                response_text += f"{i}. **{first_name}** (@{username})\n"
+                response_text += f"   User ID: `{user['user_id']}`\n"
+                response_text += f"   UID: `{uid}`\n"
+                response_text += f"   Status: {status}\n\n"
+        
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        
+        # Clear conversation state
+        context.user_data.clear()
+        
+    except Exception as e:
+        logger.error(f"Error in handle_search_input: {e}")
+        error_text = "❌ Error searching for users."
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(error_text, reply_markup=reply_markup)
+    
+    return ConversationHandler.END
+
+async def cancel_admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancel admin action and return to dashboard"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    # Clear conversation state
+    context.user_data.clear()
+    
+    # Return to admin dashboard
+    await admin_dashboard_callback(update, context)
+    return ConversationHandler.END
+
+async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle text messages from admin in conversation states"""
+    user_id = update.effective_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await update.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    admin_action = context.user_data.get('admin_action')
+    
+    if admin_action == 'broadcast':
+        return await handle_broadcast_message(update, context)
+    elif admin_action == 'search_user' or admin_action == 'user_lookup':
+        return await handle_search_input(update, context)
+    else:
+        # No active admin action, treat as regular message
+        await update.message.reply_text("Please use the admin dashboard to perform actions.")
+        return ConversationHandler.END
+
+# Add missing callback handlers
+async def cancel_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle cancel admin callback"""
+    return await cancel_admin_action(update, context)
+
+async def broadcast_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle broadcast message functionality"""
+    try:
+        user_id = update.effective_user.id
+        broadcast_message = update.message.text
+        
+        # Get all users from database
+        all_users = await get_all_users()  # Assuming this function exists
+        
+        if not all_users:
+            keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(confirmation_text, reply_markup=reply_markup)
+            await update.message.reply_text(
+                "❌ No users found in the database.",
+                reply_markup=reply_markup
+            )
             return ConversationHandler.END
         
         # Send confirmation with persistent message
@@ -216,7 +371,7 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         await update.message.reply_text(error_text, reply_markup=reply_markup)
     
     return ConversationHandler.END
-
+    
 async def handle_user_lookup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle the /lookup command"""
     user_id = update.effective_user.id
@@ -493,35 +648,48 @@ async def admin_recent_activity_callback(update: Update, context: ContextTypes.D
         return
     
     try:
-        # Get recent user activity
-        all_users = await get_all_users()
-        
-        # Filter users with recent activity (last 7 days)
+        # Get recent user activity from interactions table
         recent_cutoff = datetime.now() - timedelta(days=7)
-        recent_users = []
         
-        for user in all_users:
-            try:
-                if user.get('last_interaction'):
-                    # Handle different datetime formats
-                    last_interaction = user['last_interaction']
-                    if isinstance(last_interaction, str):
-                        # Try to parse string datetime
-                        try:
-                            last_interaction = datetime.fromisoformat(last_interaction.replace('Z', '+00:00'))
-                        except:
-                            continue
-                    
-                    if last_interaction >= recent_cutoff:
-                        recent_users.append(user)
-            except Exception as e:
-                logger.error(f"Error processing user activity: {e}")
-                continue
+        if db_manager.db_type == 'postgresql':
+            # Get users with recent interactions
+            recent_query = '''
+                SELECT DISTINCT u.user_id, u.username, u.first_name, u.registration_status,
+                       MAX(ui.created_at) as last_activity
+                FROM users u
+                LEFT JOIN user_interactions ui ON u.user_id = ui.user_id
+                WHERE ui.created_at >= $1 OR u.last_interaction >= $1
+                GROUP BY u.user_id, u.username, u.first_name, u.registration_status
+                ORDER BY last_activity DESC
+            '''
+            recent_users = await db_manager.execute(recent_query, recent_cutoff, fetch='all')
+            
+            # Get total user count
+            total_query = 'SELECT COUNT(*) as total FROM users'
+            total_result = await db_manager.execute(total_query, fetch='one')
+            total_users = total_result['total'] if total_result else 0
+        else:
+            # SQLite version
+            recent_query = '''
+                SELECT DISTINCT u.user_id, u.username, u.first_name, u.registration_status,
+                       MAX(ui.created_at) as last_activity
+                FROM users u
+                LEFT JOIN user_interactions ui ON u.user_id = ui.user_id
+                WHERE ui.created_at >= ? OR u.last_interaction >= ?
+                GROUP BY u.user_id, u.username, u.first_name, u.registration_status
+                ORDER BY last_activity DESC
+            '''
+            recent_users = await db_manager.execute(recent_query, recent_cutoff, recent_cutoff, fetch='all')
+            
+            # Get total user count
+            total_query = 'SELECT COUNT(*) as total FROM users'
+            total_result = await db_manager.execute(total_query, fetch='one')
+            total_users = total_result['total'] if total_result else 0
         
         response_text = "📊 **Recent Activity (Last 7 Days)**\n\n"
         
         if not recent_users:
-            response_text += "📭 No recent user activity found."
+            response_text += "📭 No recent user activity found.\n\n"
         else:
             response_text += f"👥 **{len(recent_users)} active users:**\n\n"
             
@@ -535,11 +703,10 @@ async def admin_recent_activity_callback(update: Update, context: ContextTypes.D
                 response_text += f"   User ID: `{user['user_id']}`\n\n"
             
             if len(recent_users) > 15:
-                response_text += f"... and {len(recent_users) - 15} more active users."
+                response_text += f"... and {len(recent_users) - 15} more active users.\n\n"
         
-        # Add statistics
-        total_users = len(all_users)
-        response_text += f"\n📈 **Statistics:**\n"
+        # Add enhanced statistics
+        response_text += f"📈 **Statistics:**\n"
         response_text += f"• Total Users: {total_users}\n"
         response_text += f"• Active (7 days): {len(recent_users)}\n"
         response_text += f"• Activity Rate: {(len(recent_users)/total_users*100):.1f}%" if total_users > 0 else "• Activity Rate: 0%"
