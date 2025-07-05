@@ -123,11 +123,14 @@ def setup_all_handlers(bot):
     # Conversation handler for admin functions
     admin_conv = ConversationHandler(
         entry_points=[
-            CommandHandler("broadcast", handle_broadcast),
-            CommandHandler("lookup", handle_user_lookup),
+            CommandHandler("admin", admin_command),
+            CallbackQueryHandler(admin_dashboard_callback, pattern='^admin_dashboard$'),
             CallbackQueryHandler(admin_broadcast_callback, pattern='^admin_broadcast$'),
             CallbackQueryHandler(admin_search_user_callback, pattern='^admin_search_user$'),
-            CallbackQueryHandler(admin_chat_history_callback, pattern='^admin_chat_history$')
+            CallbackQueryHandler(admin_chat_history_callback, pattern='^admin_chat_history$'),
+            CallbackQueryHandler(admin_queue_callback, pattern='^admin_queue$'),
+            CallbackQueryHandler(admin_recent_activity_callback, pattern='^admin_recent_activity$'),
+            CallbackQueryHandler(admin_auto_verify_stats_callback, pattern='^admin_auto_verify_stats$')
         ],
         states={
             BROADCAST_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_broadcast_message)],
@@ -136,7 +139,8 @@ def setup_all_handlers(bot):
         },
         fallbacks=[
             CommandHandler("cancel", cancel_admin_action),
-            CallbackQueryHandler(cancel_admin, pattern='^cancel_admin$')
+            CallbackQueryHandler(cancel_admin, pattern='^cancel_admin$'),
+            CallbackQueryHandler(admin_dashboard_callback, pattern='^admin_dashboard$')
         ],
         per_message=False,
         per_chat=True,
@@ -159,7 +163,6 @@ def setup_all_handlers(bot):
     bot.application.add_handler(CommandHandler("getmyid", get_my_id_command))
     
     # Admin commands
-    bot.application.add_handler(CommandHandler("admin", admin_command))
     bot.application.add_handler(CommandHandler("verify", admin_verify_command))
     bot.application.add_handler(CommandHandler("reject", admin_reject_command))
     bot.application.add_handler(CommandHandler("queue", admin_queue_command))
@@ -179,12 +182,6 @@ def setup_all_handlers(bot):
     
     # Specific callback handlers
     bot.application.add_handler(CallbackQueryHandler(contact_support, pattern='^contact_support$'))
-    
-    # Admin callback handlers (not in conversation)
-    bot.application.add_handler(CallbackQueryHandler(admin_dashboard_callback, pattern='^admin_dashboard$'))
-    bot.application.add_handler(CallbackQueryHandler(admin_queue_callback, pattern='^admin_queue$'))
-    bot.application.add_handler(CallbackQueryHandler(admin_recent_activity_callback, pattern='^admin_recent_activity$'))
-    bot.application.add_handler(CallbackQueryHandler(admin_auto_verify_stats_callback, pattern='^admin_auto_verify_stats$'))
     # Note: admin_broadcast_callback, admin_search_user_callback, and admin_chat_history_callback
     # are handled by the ConversationHandler above, not as standalone handlers
     
