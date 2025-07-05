@@ -143,13 +143,61 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         if not all_users:
             confirmation_text = "❌ No users found to broadcast to."
             keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(confirmation_text, reply_markup=reply_markup)
+            return ConversationHandler.END
+        
+        # Send confirmation with persistent message
+        confirmation_text = (
+            f"📢 **Broadcasting message to {len(all_users)} users...**\n\n"
+            f"**Message Preview:**\n{broadcast_message}\n\n"
+            f"⏳ Please wait while the message is being sent..."
+        )
+        
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await confirmation_msg.edit_text(
-            report_text, 
+        confirmation_msg = await update.message.reply_text(
+            confirmation_text, 
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
+        
+        # Broadcast to all users
+        success_count = 0
+        failed_count = 0
+        
+        for user in all_users:
+            try:
+                await context.bot.send_message(
+                    chat_id=user['user_id'],
+                    text=f"📢 **OPTRIXTRADES Announcement**\n\n{broadcast_message}",
+                    parse_mode='Markdown'
+                )
+                success_count += 1
+                
+                # Log the broadcast
+                await log_interaction(user['user_id'], 'broadcast_received', broadcast_message)
+                
+            except Exception as e:
+                logger.error(f"Failed to send broadcast to user {user['user_id']}: {e}")
+                failed_count += 1
+        
+        # Update the confirmation message with final report
+        report_text = f"✅ **Broadcast Complete!**\n\n"
+        report_text += f"📊 **Results:**\n"
+        report_text += f"• Successfully sent: {success_count}\n"
+        report_text += f"• Failed: {failed_count}\n"
+        report_text += f"• Total users: {len(all_users)}\n\n"
+        report_text += f"**Original Message:**\n{broadcast_message}"
+        
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await confirmation_msg.edit_text(report_text, parse_mode='Markdown', reply_markup=reply_markup)
+        
+        # Log admin action
+        await log_interaction(user_id, 'admin_broadcast', f"Sent to {success_count} users")
         
         # Clear conversation state
         context.user_data.clear()
