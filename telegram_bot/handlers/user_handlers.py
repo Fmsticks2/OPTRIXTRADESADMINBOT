@@ -354,9 +354,13 @@ async def contact_support(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle button callbacks"""
-    # Placeholder
     query = update.callback_query
     await query.answer()
+    callback_data = query.data
+    # Ignore admin callbacks to avoid overriding admin handlers
+    if callback_data and callback_data.startswith('admin_'):
+        # Optionally log or ignore silently
+        return
     await query.message.reply_text(
         "Button callback received."
     )
