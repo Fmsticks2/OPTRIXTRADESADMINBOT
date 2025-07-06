@@ -130,6 +130,7 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         return ConversationHandler.END
     
     broadcast_message = update.message.text
+    logger.info(f"Admin {user_id} attempting to broadcast message: {broadcast_message[:50]}...")
     
     # Check if user is in broadcast conversation state
     if context.user_data.get('admin_action') != 'broadcast':
@@ -138,13 +139,33 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
     
     try:
         # Get all users
+        logger.info("Fetching all users from database...")
         all_users = await get_all_users()
+        logger.info(f"Retrieved {len(all_users)} total users from database")
+        
+        # Debug: Log user statuses
+        if all_users:
+            status_counts = {}
+            for user in all_users:
+                status = user.get('status', 'unknown')
+                status_counts[status] = status_counts.get(status, 0) + 1
+            logger.info(f"User status breakdown: {status_counts}")
         
         # Filter users to only include those with verified or approved status
-        verified_users = [user for user in all_users if user.get('verification_status') in ('approved', 'verified')]
+        verified_users = [user for user in all_users if user.get('status') in ('approved', 'verified')]
+        logger.info(f"Found {len(verified_users)} verified/approved users for broadcast")
         
         if not all_users:
+            logger.warning("No users found in database")
             confirmation_text = "❌ No users found to broadcast to."
+            keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(confirmation_text, reply_markup=reply_markup)
+            return ConversationHandler.END
+        
+        if not verified_users:
+            logger.warning("No verified users found for broadcast")
+            confirmation_text = f"❌ No verified users found to broadcast to.\n\nTotal users in database: {len(all_users)}\nVerified users: 0\n\n💡 Users need to have 'approved' or 'verified' status to receive broadcasts."
             keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(confirmation_text, reply_markup=reply_markup)
@@ -160,11 +181,13 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        logger.info(f"Sending confirmation message to admin")
         confirmation_msg = await update.message.reply_text(
             confirmation_text, 
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
+        logger.info(f"Confirmation message sent, starting broadcast to {len(verified_users)} users")
         
         # Broadcast to all users
         success_count = 0
@@ -172,8 +195,10 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         
         from security.security_manager import SecurityManager
         
-        for user in verified_users:
+        for i, user in enumerate(verified_users, 1):
             user_id_to_send = user.get('user_id')
+            logger.info(f"Processing user {i}/{len(verified_users)}: {user_id_to_send}")
+            
             # Validate user ID
             if not SecurityManager.validate_user_id(user_id_to_send):
                 logger.warning(f"Skipping invalid user ID {user_id_to_send} in broadcast")
@@ -193,6 +218,7 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
                     parse_mode='Markdown'
                 )
                 success_count += 1
+                logger.info(f"Broadcast sent successfully to user {user_id_to_send}")
                 
                 # Log the broadcast
                 await log_interaction(user_id_to_send, 'broadcast_received', broadcast_message)
@@ -200,6 +226,8 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
             except Exception as e:
                 logger.error(f"Failed to send broadcast to user {user_id_to_send}: {e}")
                 failed_count += 1
+        
+        logger.info(f"Broadcast complete. Success: {success_count}, Failed: {failed_count}")
         
         # Update the confirmation message with final report
         report_text = f"✅ **Broadcast Complete!**\n\n"
@@ -212,7 +240,9 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        logger.info("Updating confirmation message with final results")
         await confirmation_msg.edit_text(report_text, parse_mode='Markdown', reply_markup=reply_markup)
+        logger.info("Final broadcast report sent to admin")
         
         # Log admin action
         await log_interaction(user_id, 'admin_broadcast', f"Sent to {success_count} users")
