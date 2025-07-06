@@ -140,6 +140,9 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         # Get all users
         all_users = await get_all_users()
         
+        # Filter users to only include those with verified or approved status
+        verified_users = [user for user in all_users if user.get('verification_status') in ('approved', 'verified')]
+        
         if not all_users:
             confirmation_text = "❌ No users found to broadcast to."
             keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
@@ -149,7 +152,7 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         
         # Send confirmation with persistent message
         confirmation_text = (
-            f"📢 **Broadcasting message to {len(all_users)} users...**\n\n"
+            f"📢 **Broadcasting message to {len(verified_users)} users...**\n\n"
             f"**Message Preview:**\n{broadcast_message}\n\n"
             f"⏳ Please wait while the message is being sent..."
         )
@@ -169,7 +172,7 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         
         from security.security_manager import SecurityManager
         
-        for user in all_users:
+        for user in verified_users:
             user_id_to_send = user.get('user_id')
             # Validate user ID
             if not SecurityManager.validate_user_id(user_id_to_send):
@@ -203,7 +206,7 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         report_text += f"📊 **Results:**\n"
         report_text += f"• Successfully sent: {success_count}\n"
         report_text += f"• Failed: {failed_count}\n"
-        report_text += f"• Total users: {len(all_users)}\n\n"
+        report_text += f"• Total users: {len(verified_users)}\n\n"
         report_text += f"**Original Message:**\n{broadcast_message}"
         
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
