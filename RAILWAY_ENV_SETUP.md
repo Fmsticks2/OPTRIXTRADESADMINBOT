@@ -27,7 +27,7 @@ ADMIN_USER_ID=your_telegram_user_id
 ```
 BOT_MODE=webhook
 WEBHOOK_ENABLED=true
-WEBHOOK_URL=https://your-railway-app.railway.app
+WEBHOOK_URL=https://your-app-name-production.up.railway.app
 WEBHOOK_SECRET_TOKEN=your_optional_secret_token
 WEBHOOK_PATH=/webhook
 ```
@@ -160,7 +160,7 @@ The bot automatically validates required variables on startup. Check the logs fo
 
 4. **Webhook URL**
    - Auto-detected on Railway if not set
-   - Should be https://your-app.railway.app
+   - Should be https://your-app-name-production.up.railway.app
    - Don't include /webhook path in WEBHOOK_URL
 
 ### Checking Configuration

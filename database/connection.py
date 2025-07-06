@@ -49,8 +49,8 @@ class DatabaseManager:
                     logger.info(f"Reconstructed DATABASE_URL from components")
                 except Exception as e:
                     logger.error(f"Failed to reconstruct DATABASE_URL: {e}")
-                    # Fall back to default URL as last resort
-                    self.database_url = 'postgresql://postgres:lSyqidmHknVYbkBghtRweAwPISFrfMca@caboose.proxy.rlwy.net:21466/railway'
+                    # No fallback - let it fail if reconstruction fails
+                    raise RuntimeError(f"Invalid DATABASE_URL and failed to reconstruct from components: {e}")
         self.sqlite_path = BotConfig.SQLITE_DATABASE_PATH
         self.is_initialized = False
         

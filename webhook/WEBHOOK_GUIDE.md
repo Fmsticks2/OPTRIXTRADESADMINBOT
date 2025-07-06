@@ -90,7 +90,7 @@ WEBHOOK_PORT=8000
 WEBHOOK_SECRET_TOKEN=your-secret-token-here
 
 # Your webhook URL (Railway/production)
-WEBHOOK_URL=https://your-domain.com
+WEBHOOK_URL=https://your-app-name-production.up.railway.app
 \`\`\`
 
 ## Webhook Endpoints
@@ -108,12 +108,12 @@ Your webhook server provides these endpoints:
 
 ### 1. Health Check
 \`\`\`bash
-curl https://your-domain.com/health
+curl https://your-app-name-production.up.railway.app/health
 \`\`\`
 
 ### 2. Webhook Info
 \`\`\`bash
-curl https://your-domain.com/admin/webhook_info
+curl https://your-app-name-production.up.railway.app/admin/webhook_info
 \`\`\`
 
 ### 3. Test Bot
@@ -208,7 +208,7 @@ python webhook/webhook_setup.py
 tail -f webhook.log
 
 # Test webhook URL
-curl -X POST https://your-domain.com/webhook/YOUR_BOT_TOKEN \
+curl -X POST https://your-app-name-production.up.railway.app/webhook/YOUR_BOT_TOKEN \
   -H "Content-Type: application/json" \
   -d '{"update_id": 1, "message": {"message_id": 1, "date": 1234567890, "chat": {"id": 123, "type": "private"}, "from": {"id": 123, "is_bot": false, "first_name": "Test"}, "text": "/start"}}'
 \`\`\`
