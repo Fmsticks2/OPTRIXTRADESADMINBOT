@@ -118,8 +118,8 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Send activation instructions
-    await query.message.edit_text(activation_text, reply_markup=reply_markup)
+    # Send activation instructions as new message to keep welcome message
+    await query.message.reply_text(activation_text, reply_markup=reply_markup)
     
     # Send follow-up message about why it's free
     why_free_text = "Why is it free?\n"
@@ -791,23 +791,19 @@ async def vip_verification_requirements_callback(update: Update, context: Contex
     
     requirements_text = (
         "🌟 **VIP GROUP ACCESS REQUIREMENTS**\n\n"
-        "To join our exclusive VIP trading group, you need to complete an additional verification process:\n\n"
-        "💰 **Minimum Deposit Requirement:**\n"
-        "• Must have a deposit of $500+ in your trading account\n\n"
-        "📋 **Required Documents:**\n"
-        "• Valid trading account UID\n"
-        "• Recent deposit screenshot showing $500+ in your account\n"
-        "• Account balance verification\n\n"
+        "To join our exclusive VIP trading group\n\n"
+        "• Must have a min. deposit of $500+ in your trading account with OptrixTrades partnered broker.\n\n"
         "🔒 **Verification Process:**\n"
         "1. Submit your trading account UID\n"
         "2. Upload a clear screenshot of your $500+ deposit\n"
         "3. Wait for admin approval\n"
-        "4. Get instant access to VIP signals\n\n"
+        "4. Get instant access to Exclusive VIP trading tools\n\n"
         "💎 **VIP Benefits:**\n"
         "• Exclusive high-accuracy signals\n"
         "• Priority market analysis\n"
-        "• Direct access to expert traders\n"
-        "• Advanced trading strategies\n\n"
+        "• Direct access to 6 figures expert traders\n"
+        "• Advanced trading strategies & risk management blueprint\n"
+        "• Fully Automated and highly profitable trading bot\n\n"
         "Ready to unlock VIP access?"
     )
     
@@ -834,16 +830,14 @@ async def vip_continue_registration_callback(update: Update, context: ContextTyp
     
     # VIP verification instructions
     vip_instructions_text = (
-        "🌟 **VIP VERIFICATION PROCESS**\n\n"
-        "Welcome to the VIP verification process! Please follow these steps carefully:\n\n"
-        "📝 **Step 1: Submit Your UID**\n"
-        "Please send your trading account UID (User ID) from your broker platform.\n\n"
-        "📸 **Step 2: Upload Screenshot**\n"
+        "🌟 VIP VERIFICATION PROCESS\n\n"
+        "Please follow these steps carefully:\n\n"
+        "Step 1: Please send your trading account UID (User ID) from your broker platform.\n\n"
+        "Step 2: Upload Screenshot\n"
         "After submitting your UID, you'll need to upload a clear screenshot showing:\n"
         "• Your account balance\n"
         "• Recent deposit transaction\n"
         "• Account details matching your UID\n\n"
-        "⏱️ **Processing Time:** 24-48 hours\n\n"
         "Let's start with your UID. Please send it now:"
     )
     
