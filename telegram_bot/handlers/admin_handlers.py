@@ -167,20 +167,35 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         success_count = 0
         failed_count = 0
         
+        from security.security_manager import SecurityManager
+        
         for user in all_users:
+            user_id_to_send = user.get('user_id')
+            # Validate user ID
+            if not SecurityManager.validate_user_id(user_id_to_send):
+                logger.warning(f"Skipping invalid user ID {user_id_to_send} in broadcast")
+                failed_count += 1
+                continue
+            
+            # Optionally check if user is blocked (if SecurityManager has blocked_users set)
+            if hasattr(SecurityManager, 'blocked_users') and user_id_to_send in SecurityManager.blocked_users:
+                logger.info(f"Skipping blocked user {user_id_to_send} in broadcast")
+                failed_count += 1
+                continue
+            
             try:
                 await context.bot.send_message(
-                    chat_id=user['user_id'],
+                    chat_id=user_id_to_send,
                     text=f"📢 **OPTRIXTRADES Announcement**\n\n{broadcast_message}",
                     parse_mode='Markdown'
                 )
                 success_count += 1
                 
                 # Log the broadcast
-                await log_interaction(user['user_id'], 'broadcast_received', broadcast_message)
+                await log_interaction(user_id_to_send, 'broadcast_received', broadcast_message)
                 
             except Exception as e:
-                logger.error(f"Failed to send broadcast to user {user['user_id']}: {e}")
+                logger.error(f"Failed to send broadcast to user {user_id_to_send}: {e}")
                 failed_count += 1
         
         # Update the confirmation message with final report
