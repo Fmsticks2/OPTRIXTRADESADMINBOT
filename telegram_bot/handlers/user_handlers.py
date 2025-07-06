@@ -198,10 +198,12 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Log user interaction
     await log_interaction(int(user_id), 'text_message', f'User sent: {message_text[:50]}...')
     
-    # Check if user is admin first - delegate to admin handler
+    # Check if user is admin first - only handle specific admin commands outside conversation
     if str(user_id) == BotConfig.ADMIN_USER_ID:
-        from telegram_bot.handlers.admin_handlers import handle_text_message as admin_handle_text
-        await admin_handle_text(update, context)
+        # Let conversation handler process admin messages when in conversation states
+        # Only handle standalone admin commands here
+        from telegram_bot.handlers.admin_handlers import handle_text_message_admin_standalone
+        await handle_text_message_admin_standalone(update, context)
         return
     
     # Handle UPGRADE command

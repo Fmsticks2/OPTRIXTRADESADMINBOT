@@ -539,19 +539,13 @@ async def admin_chat_history_command(update: Update, context: ContextTypes.DEFAU
     else:
         await update.message.reply_text("⛔ You are not authorized to use admin commands.")
 
-async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle text messages for admin users"""
+async def handle_text_message_admin_standalone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle standalone admin text commands (not used in conversation handler)"""
     user_id = update.effective_user.id
     
     # Check if user is admin
     if str(user_id) != BotConfig.ADMIN_USER_ID:
         return  # Let other handlers process this
-    
-    # Check if we're in a conversation state that needs to handle this message
-    admin_action = context.user_data.get('admin_action')
-    if admin_action == 'broadcast' or admin_action == 'search_user' or admin_action == 'user_lookup':
-        # Let the conversation handler process this message
-        return
     
     message_text = update.message.text.strip()
     

@@ -210,6 +210,7 @@ def setup_all_handlers(bot):
     bot.application.add_handler(CallbackQueryHandler(button_callback))
     
     # Add text, photo, and document handlers (lower priority)
+    # Note: Admin text messages are handled by the admin conversation handler above
     bot.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
     bot.application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     bot.application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
