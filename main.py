@@ -52,13 +52,9 @@ async def main():
         from database.connection import db_manager
         await db_manager.initialize()
         
-        # Create a separate instance for the bot to avoid conflicts
-        bot_db_manager = DatabaseManager()
-        await bot_db_manager.initialize()
-        
-        # Initialize bot
+        # Initialize bot with the same database manager instance
         logger.info("Initializing Telegram bot...")
-        bot = TradingBot(db_manager=bot_db_manager)
+        bot = TradingBot(db_manager=db_manager)
         await bot.initialize()
         
         # Run the bot

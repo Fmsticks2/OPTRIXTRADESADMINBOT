@@ -67,6 +67,12 @@ class DatabaseManager:
     async def initialize(self):
         """Initialize database connection"""
         try:
+            logger.info(f"Starting database initialization...")
+            logger.info(f"Database type: {self.db_type}")
+            logger.info(f"Database URL configured: {bool(self.database_url)}")
+            logger.info(f"PostgreSQL available: {POSTGRES_AVAILABLE}")
+            logger.info(f"SQLite available: {SQLITE_AVAILABLE}")
+            
             # Try PostgreSQL first if properly configured
             if (self.db_type == 'postgresql' and POSTGRES_AVAILABLE and self.database_url):
                 try:
@@ -82,11 +88,16 @@ class DatabaseManager:
                         raise RuntimeError("PostgreSQL failed and SQLite not available")
             elif SQLITE_AVAILABLE:
                 # Use SQLite as default or fallback
+                logger.info("Initializing SQLite database...")
                 await self._init_sqlite()
                 self.db_type = 'sqlite'
                 logger.info("Using SQLite database")
             else:
                 raise RuntimeError("No suitable database backend available")
+            
+            # Verify pool was created
+            if self.pool is None:
+                raise RuntimeError(f"Database pool is None after initialization ({self.db_type})")
             
             await self._create_tables()
             self.is_initialized = True
@@ -94,6 +105,8 @@ class DatabaseManager:
             
         except Exception as e:
             logger.error(f"Database initialization failed: {e}")
+            logger.error(f"Pool state: {self.pool}")
+            logger.error(f"Is initialized: {self.is_initialized}")
             raise
     
     async def _init_postgresql(self):
@@ -354,6 +367,14 @@ class DatabaseManager:
     async def execute(self, query: str, *args, fetch: str = None):
         """Execute a query and return the result."""
         try:
+            # Check if database is initialized
+            if not self.is_initialized:
+                raise RuntimeError("Database not initialized. Call initialize() first.")
+            
+            # Check if pool exists
+            if self.pool is None:
+                raise RuntimeError(f"Database connection pool is None. Database type: {self.db_type}, Initialized: {self.is_initialized}")
+            
             if self.db_type == 'postgresql':
                 async with self.pool.acquire() as conn:
                     if fetch == 'all':
