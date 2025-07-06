@@ -21,23 +21,50 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     username = user.username or ""
     first_name = user.first_name or "User"
     
-    # Automatically register/update user in database
-    from database.connection import create_user
-    try:
-        await create_user(user_id, username, first_name)
-        logger.info(f"User {user_id} ({username}) automatically registered/updated in database")
-    except Exception as e:
-        logger.error(f"Failed to register user {user_id} in database: {e}")
+    # Enhanced logging for webhook debugging
+    logger.info(f"START_COMMAND: Processing /start for user {user_id} ({username}) - {first_name}")
     
-    # Log user interaction
-    await log_interaction(user_id, 'start_command', 'User started bot')
+    # Check database connection status before attempting user registration
+    from database.connection import create_user, db_manager
+    
+    try:
+        # Verify database connection
+        if not db_manager.pool:
+            logger.error(f"START_COMMAND: Database pool not initialized for user {user_id}")
+            await update.message.reply_text("⚠️ Service temporarily unavailable. Please try again in a moment.")
+            return
+        
+        logger.info(f"START_COMMAND: Database connection verified for user {user_id}")
+        
+        # Attempt user registration with detailed logging
+        logger.info(f"START_COMMAND: Attempting to register/update user {user_id} in database")
+        result = await create_user(user_id, username, first_name)
+        
+        if result:
+            logger.info(f"START_COMMAND: ✅ User {user_id} ({username}) successfully registered/updated in database")
+        else:
+            logger.warning(f"START_COMMAND: ⚠️ User registration returned False for user {user_id}")
+            
+    except Exception as e:
+        logger.error(f"START_COMMAND: ❌ Failed to register user {user_id} in database: {type(e).__name__}: {e}")
+        logger.error(f"START_COMMAND: Database error details - Pool status: {bool(db_manager.pool)}, DB type: {getattr(db_manager, 'db_type', 'unknown')}")
+        # Continue execution even if user registration fails
+    
+    # Log user interaction with error handling
+    try:
+        await log_interaction(user_id, 'start_command', 'User started bot')
+        logger.info(f"START_COMMAND: User interaction logged for {user_id}")
+    except Exception as e:
+        logger.error(f"START_COMMAND: Failed to log interaction for user {user_id}: {e}")
     
     # Check if user is admin first
     if str(user_id) == BotConfig.ADMIN_USER_ID:
+        logger.info(f"START_COMMAND: Redirecting admin user {user_id} to admin dashboard")
         # Show admin dashboard for admin users
         from telegram_bot.handlers.admin_handlers import admin_command
         return await admin_command(update, context)
     else:
+        logger.info(f"START_COMMAND: Redirecting regular user {user_id} to verification flow")
         # Redirect to the verification flow for regular users
         from telegram_bot.handlers.verification import start_verification
         return await start_verification(update, context)
