@@ -73,7 +73,35 @@ class TradingBot:
     async def start_polling(self):
         """Start bot in polling mode"""
         logger.info("🔄 Starting bot in polling mode...")
-        await self.application.run_polling(allowed_updates=Update.ALL_TYPES)
+        # Initialize the application
+        await self.application.initialize()
+        await self.application.start()
+        
+        # Start polling
+        await self.application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+        
+        logger.info("✅ Bot started successfully in polling mode")
+        
+        # Keep the application running
+        try:
+            import signal
+            import asyncio
+            
+            def signal_handler(signum, frame):
+                logger.info("Received shutdown signal")
+                
+            signal.signal(signal.SIGINT, signal_handler)
+            signal.signal(signal.SIGTERM, signal_handler)
+            
+            # Keep running until interrupted
+            while True:
+                await asyncio.sleep(1)
+                
+        except KeyboardInterrupt:
+            logger.info("Shutting down bot...")
+            await self.application.updater.stop()
+            await self.application.stop()
+            await self.application.shutdown()
     
     async def start_webhook(self):
         """Start bot in webhook mode"""
@@ -170,7 +198,9 @@ class TradingBot:
             
             # Start the bot
             logger.info("Bot is running...")
-            if self.webhook_url:
+            # Check BOT_MODE instead of webhook_url presence
+            from config import BotConfig
+            if BotConfig.BOT_MODE.lower() == 'webhook' and BotConfig.WEBHOOK_ENABLED:
                 await self.start_webhook()
             else:
                 await self.start_polling()

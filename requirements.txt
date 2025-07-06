@@ -31,3 +31,6 @@ pillow>=9.5.0
 
 # Logging
 structlog>=23.1.0
+
+# Scheduler (used by python-telegram-bot)
+apscheduler>=3.10.4

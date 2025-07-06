@@ -115,7 +115,7 @@ def setup_all_handlers(bot):
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
-        per_message=False,  # Fixed: Set to False since we use MessageHandler and CommandHandler
+        per_message=False,  # Set to False since we use MessageHandler in states
         per_chat=True,
         per_user=True,  # Changed to True for proper user-based conversation tracking
     )
@@ -142,7 +142,7 @@ def setup_all_handlers(bot):
             CallbackQueryHandler(cancel_admin, pattern='^cancel_admin$'),
             CallbackQueryHandler(admin_dashboard_callback, pattern='^admin_dashboard$')
         ],
-        per_message=False,
+        per_message=False,  # Set to False since we use MessageHandler in states
         per_chat=True,
         per_user=True,
     )

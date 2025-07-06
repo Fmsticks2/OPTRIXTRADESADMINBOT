@@ -15,10 +15,10 @@ from database.connection import (
 
 logger = logging.getLogger(__name__)
 
-# Conversation states
-BROADCAST_MESSAGE = 0
-USER_LOOKUP = 1
-SEARCH_USER = 2
+# Conversation states (must match setup.py)
+BROADCAST_MESSAGE = 2
+USER_LOOKUP = 3
+SEARCH_USER = 4
 
 # Placeholder functions that will need to be implemented with actual logic
 # These would be extracted from the original telegram_bot.py file
@@ -194,23 +194,23 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         success_count = 0
         failed_count = 0
         
-        from security.security_manager import SecurityManager
+        from security.security_manager import InputValidator
         
         for i, user in enumerate(verified_users, 1):
             user_id_to_send = user.get('user_id')
             logger.info(f"Processing user {i}/{len(verified_users)}: {user_id_to_send}")
             
             # Validate user ID
-            if not SecurityManager.validate_user_id(user_id_to_send):
+            if not InputValidator.validate_user_id(user_id_to_send):
                 logger.warning(f"Skipping invalid user ID {user_id_to_send} in broadcast")
                 failed_count += 1
                 continue
             
-            # Optionally check if user is blocked (if SecurityManager has blocked_users set)
-            if hasattr(SecurityManager, 'blocked_users') and user_id_to_send in SecurityManager.blocked_users:
-                logger.info(f"Skipping blocked user {user_id_to_send} in broadcast")
-                failed_count += 1
-                continue
+            # Skip blocked user check for now as it's not implemented
+            # if hasattr(SecurityManager, 'blocked_users') and user_id_to_send in SecurityManager.blocked_users:
+            #     logger.info(f"Skipping blocked user {user_id_to_send} in broadcast")
+            #     failed_count += 1
+            #     continue
             
             try:
                 await context.bot.send_message(
@@ -348,7 +348,7 @@ async def cancel_admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
     
     # Clear conversation state
@@ -625,7 +625,7 @@ async def admin_queue_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
         return
     
     try:
@@ -655,14 +655,14 @@ async def admin_queue_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
         
     except Exception as e:
         logger.error(f"Error in admin_queue_callback: {e}")
         error_text = "❌ Error retrieving verification queue."
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(error_text, reply_markup=reply_markup)
+        await query.message.reply_text(error_text, reply_markup=reply_markup)
 
 async def admin_broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle admin broadcast callback"""
@@ -671,7 +671,7 @@ async def admin_broadcast_callback(update: Update, context: ContextTypes.DEFAULT
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
     
     response_text = "📢 **Broadcast Message**\n\n"
@@ -684,8 +684,8 @@ async def admin_broadcast_callback(update: Update, context: ContextTypes.DEFAULT
     keyboard = [[InlineKeyboardButton("❌ Cancel", callback_data="admin_dashboard")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Edit the existing message instead of creating a new one
-    await query.edit_message_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+    # Send a new message instead of editing the existing one
+    await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
     return BROADCAST_MESSAGE
 
 async def admin_search_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -695,7 +695,7 @@ async def admin_search_user_callback(update: Update, context: ContextTypes.DEFAU
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
     
     response_text = "🔍 **Search User**\n\n"
@@ -711,18 +711,18 @@ async def admin_search_user_callback(update: Update, context: ContextTypes.DEFAU
     keyboard = [[InlineKeyboardButton("❌ Cancel", callback_data="admin_dashboard")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+    await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
     return SEARCH_USER
 
-async def admin_recent_activity_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def admin_recent_activity_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle admin recent activity callback"""
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
-        return
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
     
     try:
         # Get recent user activity from interactions table
@@ -791,25 +791,28 @@ async def admin_recent_activity_callback(update: Update, context: ContextTypes.D
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Edit the existing message instead of creating a new one
-        await query.edit_message_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        # Send a new message instead of editing the existing one
+        await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
         
     except Exception as e:
         logger.error(f"Error in admin_recent_activity_callback: {e}")
         error_text = "❌ Error retrieving recent activity data."
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(error_text, reply_markup=reply_markup)
+        await query.message.reply_text(error_text, reply_markup=reply_markup)
+        return ConversationHandler.END
+    
+    return ConversationHandler.END
 
-async def admin_auto_verify_stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def admin_auto_verify_stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle admin auto verify stats callback"""
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
-        return
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
     
     try:
         # Get verification statistics
@@ -865,15 +868,18 @@ async def admin_auto_verify_stats_callback(update: Update, context: ContextTypes
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Edit the existing message instead of creating a new one
-        await query.edit_message_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        # Send a new message instead of editing the existing one
+        await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
         
     except Exception as e:
         logger.error(f"Error in admin_auto_verify_stats_callback: {e}")
         error_text = "❌ Error retrieving verification statistics."
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(error_text, reply_markup=reply_markup)
+        await query.message.reply_text(error_text, reply_markup=reply_markup)
+        return ConversationHandler.END
+    
+    return ConversationHandler.END
 
 async def admin_chat_history_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle admin chat history callback"""
@@ -882,7 +888,7 @@ async def admin_chat_history_callback(update: Update, context: ContextTypes.DEFA
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
     
     response_text = "💬 **Chat History Lookup**\n\n"
@@ -898,19 +904,19 @@ async def admin_chat_history_callback(update: Update, context: ContextTypes.DEFA
     keyboard = [[InlineKeyboardButton("❌ Cancel", callback_data="admin_dashboard")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+    await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
     return USER_LOOKUP
 
 # Dashboard callback
-async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Return to admin dashboard"""
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
-        await query.edit_message_text("⛔ You are not authorized to use admin commands.")
-        return
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
     
     # Clear any conversation state
     context.user_data.clear()
@@ -930,8 +936,10 @@ async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await query.edit_message_text(
+    await query.message.reply_text(
         admin_text,
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
+    
+    return ConversationHandler.END

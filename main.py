@@ -19,6 +19,10 @@ import asyncio
 import logging
 import os
 import sys
+import warnings
+
+# Suppress pkg_resources deprecation warning from apscheduler
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated as an API")
 
 # Add the project root directory to the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -45,12 +49,16 @@ async def main():
         
         # Initialize database manager
         logger.info("Initializing database connection...")
-        db_manager = DatabaseManager()
+        from database.connection import db_manager
         await db_manager.initialize()
+        
+        # Create a separate instance for the bot to avoid conflicts
+        bot_db_manager = DatabaseManager()
+        await bot_db_manager.initialize()
         
         # Initialize bot
         logger.info("Initializing Telegram bot...")
-        bot = TradingBot(db_manager=db_manager)
+        bot = TradingBot(db_manager=bot_db_manager)
         await bot.initialize()
         
         # Run the bot

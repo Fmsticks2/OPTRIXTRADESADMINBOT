@@ -358,10 +358,10 @@ class DatabaseManager:
                 async with self.pool.acquire() as conn:
                     if fetch == 'all':
                         result = await conn.fetch(query, *args)
-                        return [dict(row) for row in result]
+                        return [dict(row.items()) for row in result]
                     elif fetch == 'one':
                         result = await conn.fetchrow(query, *args)
-                        return dict(result) if result else None
+                        return dict(result.items()) if result else None
                     else:
                         return await conn.execute(query, *args)
             else:
@@ -537,6 +537,11 @@ async def create_user(user_id: int, username: str, first_name: str) -> bool:
 async def log_interaction(user_id: int, interaction_type: str, interaction_data: str = "") -> bool:
     """Log user interaction"""
     try:
+        # Check if global db_manager is initialized, if not, skip logging
+        if not db_manager.is_initialized:
+            logger.warning("Database manager not initialized, skipping interaction logging")
+            return False
+            
         if db_manager.db_type == 'postgresql':
             query = 'INSERT INTO user_interactions (user_id, interaction_type, interaction_data) VALUES ($1, $2, $3)'
         else:
