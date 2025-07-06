@@ -547,6 +547,12 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     if str(user_id) != BotConfig.ADMIN_USER_ID:
         return  # Let other handlers process this
     
+    # Check if we're in a conversation state that needs to handle this message
+    admin_action = context.user_data.get('admin_action')
+    if admin_action == 'broadcast' or admin_action == 'search_user' or admin_action == 'user_lookup':
+        # Let the conversation handler process this message
+        return
+    
     message_text = update.message.text.strip()
     
     # Admin-specific text commands
@@ -565,8 +571,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif message_text.upper() == "HISTORY":
         await admin_chat_history_command(update, context)
     else:
-        # Show admin dashboard for any other text
-        await admin_command(update, context)
+        # Only respond to specific commands, don't show dashboard for every message
+        pass
 
 # Callback query handlers for admin buttons
 async def admin_queue_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
