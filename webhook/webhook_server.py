@@ -220,6 +220,15 @@ class WebhookServer:
                 logger.info("Application already initialized")
                 return
                 
+            # Ensure database is initialized first
+            if not self.db_manager.is_initialized:
+                logger.info("Database not initialized, initializing now...")
+                await self.db_manager.initialize()
+                logger.info("Database initialized successfully")
+            
+            # Initialize bot instance with database
+            await self.bot_instance.initialize()
+            
             # Create application
             self.application = Application.builder().token(config.BOT_TOKEN).build()
             
@@ -294,16 +303,28 @@ class WebhookServer:
         logger.info(f"📱 Bot Token: {config.BOT_TOKEN[:10]}...")
         logger.info(f"🔗 Webhook Mode: Enabled")
         
-        # Initialize database first
+        # Initialize database first - this is critical
         try:
+            logger.info("Initializing database connection...")
             await self.db_manager.initialize()
             logger.info("✅ Database initialized successfully")
+            
+            # Verify database is actually ready
+            if not self.db_manager.is_initialized or self.db_manager.pool is None:
+                raise RuntimeError("Database initialization completed but pool is not ready")
+                
         except Exception as e:
             logger.error(f"❌ Database initialization failed: {e}")
-            # Continue anyway to allow webhook server to start
+            # Don't continue if database fails - this will cause handler errors
+            raise RuntimeError(f"Cannot start webhook server without database: {e}")
         
-        # Initialize bot application
-        await self.initialize_application()
+        # Initialize bot application (this will also verify database is ready)
+        try:
+            await self.initialize_application()
+            logger.info("✅ Bot application initialized successfully")
+        except Exception as e:
+            logger.error(f"❌ Bot application initialization failed: {e}")
+            raise
 
         # Set webhook on startup
         if config.WEBHOOK_URL:
