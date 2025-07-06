@@ -16,7 +16,18 @@ logger = logging.getLogger(__name__)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /start command"""
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
+    username = user.username or ""
+    first_name = user.first_name or "User"
+    
+    # Automatically register/update user in database
+    from database.connection import create_user
+    try:
+        await create_user(user_id, username, first_name)
+        logger.info(f"User {user_id} ({username}) automatically registered/updated in database")
+    except Exception as e:
+        logger.error(f"Failed to register user {user_id} in database: {e}")
     
     # Log user interaction
     await log_interaction(user_id, 'start_command', 'User started bot')
