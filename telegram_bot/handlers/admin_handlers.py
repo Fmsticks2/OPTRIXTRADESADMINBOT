@@ -151,10 +151,10 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
                 status_counts[status] = status_counts.get(status, 0) + 1
             logger.info(f"User status breakdown: {status_counts}")
         
-        # Filter users to only include those with verified or approved status, excluding the admin sender
+        # Filter users to exclude only the admin sender (send to ALL users regardless of verification status)
         admin_user_id = int(BotConfig.ADMIN_USER_ID)
-        verified_users = [user for user in all_users if user.get('status') in ('approved', 'verified') and user.get('user_id') != admin_user_id]
-        logger.info(f"Found {len(verified_users)} verified/approved users for broadcast (excluding admin sender)")
+        target_users = [user for user in all_users if user.get('user_id') != admin_user_id]
+        logger.info(f"Found {len(target_users)} users for broadcast (excluding admin sender, including all verification statuses)")
         
         if not all_users:
             logger.warning("No users found in database")
@@ -164,9 +164,9 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
             await update.message.reply_text(confirmation_text, reply_markup=reply_markup)
             return ConversationHandler.END
         
-        if not verified_users:
-            logger.warning("No verified users found for broadcast")
-            confirmation_text = f"❌ No verified users found to broadcast to.\n\nTotal users in database: {len(all_users)}\nVerified users: 0\n\n💡 Users need to have 'approved' or 'verified' status to receive broadcasts."
+        if not target_users:
+            logger.warning("No users found for broadcast (excluding admin)")
+            confirmation_text = f"❌ No users found to broadcast to.\n\nTotal users in database: {len(all_users)}\nTarget users: 0\n\n💡 Only the admin user was found in the database."
             keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await update.message.reply_text(confirmation_text, reply_markup=reply_markup)
@@ -174,7 +174,7 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         
         # Send confirmation with persistent message
         confirmation_text = (
-            f"📢 **Broadcasting message to {len(verified_users)} users...**\n\n"
+            f"📢 **Broadcasting message to {len(target_users)} users...**\n\n"
             f"**Message Preview:**\n{broadcast_message}\n\n"
             f"⏳ Please wait while the message is being sent..."
         )
@@ -188,7 +188,7 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
             parse_mode='Markdown',
             reply_markup=reply_markup
         )
-        logger.info(f"Confirmation message sent, starting broadcast to {len(verified_users)} users")
+        logger.info(f"Confirmation message sent, starting broadcast to {len(target_users)} users")
         
         # Broadcast to all users
         success_count = 0
@@ -196,9 +196,9 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         
         from security.security_manager import InputValidator
         
-        for i, user in enumerate(verified_users, 1):
+        for i, user in enumerate(target_users, 1):
             user_id_to_send = user.get('user_id')
-            logger.info(f"Processing user {i}/{len(verified_users)}: {user_id_to_send}")
+            logger.info(f"Processing user {i}/{len(target_users)}: {user_id_to_send}")
             
             # Validate user ID
             if not InputValidator.validate_user_id(user_id_to_send):
@@ -235,7 +235,7 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         report_text += f"📊 **Results:**\n"
         report_text += f"• Successfully sent: {success_count}\n"
         report_text += f"• Failed: {failed_count}\n"
-        report_text += f"• Total users: {len(verified_users)}\n\n"
+        report_text += f"• Total users: {len(target_users)}\n\n"
         report_text += f"**Original Message:**\n{broadcast_message}"
         
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
