@@ -1,6 +1,7 @@
 """Handler setup for OPTRIXTRADES Telegram Bot"""
 
 import logging
+import warnings
 from telegram.ext import (
     CommandHandler,
     MessageHandler,
@@ -8,6 +9,9 @@ from telegram.ext import (
     ConversationHandler,
     filters
 )
+
+# Suppress PTB warnings about per_message settings
+warnings.filterwarnings("ignore", message=".*per_message.*CallbackQueryHandler.*", category=UserWarning)
 
 from telegram_bot.handlers.user_handlers import (
     start_command,
@@ -115,9 +119,9 @@ def setup_all_handlers(bot):
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
-        per_message=False,  # Set to False since we use MessageHandler in states
+        per_message=False,  # Must be False when using MessageHandler in states
         per_chat=True,
-        per_user=True,  # Changed to True for proper user-based conversation tracking
+        per_user=True,
     )
     
     # Conversation handler for admin functions
@@ -142,7 +146,7 @@ def setup_all_handlers(bot):
             CallbackQueryHandler(cancel_admin, pattern='^cancel_admin$'),
             CallbackQueryHandler(admin_dashboard_callback, pattern='^admin_dashboard$')
         ],
-        per_message=False,  # Set to False since we use MessageHandler in states
+        per_message=False,  # Must be False when using MessageHandler in states
         per_chat=True,
         per_user=True,
     )

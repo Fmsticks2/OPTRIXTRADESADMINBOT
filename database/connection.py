@@ -33,7 +33,19 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """Manages database connections and operations for both PostgreSQL and SQLite"""
     
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(DatabaseManager, cls).__new__(cls)
+        return cls._instance
+    
     def __init__(self):
+        # Only initialize once
+        if hasattr(self, '_init_done'):
+            return
+            
         self.pool = None
         self.database_url = BotConfig.DATABASE_URL.strip()
         
@@ -63,10 +75,24 @@ class DatabaseManager:
                 self.db_type = 'postgresql'
             else:
                 self.db_type = 'sqlite'
+                
+        self._init_done = True
         
     async def initialize(self):
-        """Initialize database connection"""
+        """Initialize database connection (singleton pattern)"""
+        # Check if already initialized
+        if self.is_initialized:
+            logger.info("Database already initialized, skipping...")
+            return
+            
+        # Use class-level lock to prevent multiple initializations
+        if DatabaseManager._initialized:
+            self.is_initialized = True
+            logger.info("Database initialization already in progress or completed")
+            return
+            
         try:
+            DatabaseManager._initialized = True
             logger.info(f"Starting database initialization...")
             logger.info(f"Database type: {self.db_type}")
             logger.info(f"Database URL configured: {bool(self.database_url)}")
@@ -104,6 +130,8 @@ class DatabaseManager:
             logger.info(f"Database initialized successfully ({self.db_type})")
             
         except Exception as e:
+            # Reset the class-level flag on failure
+            DatabaseManager._initialized = False
             logger.error(f"Database initialization failed: {e}")
             logger.error(f"Pool state: {self.pool}")
             logger.error(f"Is initialized: {self.is_initialized}")
