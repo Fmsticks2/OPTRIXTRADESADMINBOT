@@ -151,9 +151,10 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
                 status_counts[status] = status_counts.get(status, 0) + 1
             logger.info(f"User status breakdown: {status_counts}")
         
-        # Filter users to only include those with verified or approved status
-        verified_users = [user for user in all_users if user.get('status') in ('approved', 'verified')]
-        logger.info(f"Found {len(verified_users)} verified/approved users for broadcast")
+        # Filter users to only include those with verified or approved status, excluding the admin sender
+        admin_user_id = int(BotConfig.ADMIN_USER_ID)
+        verified_users = [user for user in all_users if user.get('status') in ('approved', 'verified') and user.get('user_id') != admin_user_id]
+        logger.info(f"Found {len(verified_users)} verified/approved users for broadcast (excluding admin sender)")
         
         if not all_users:
             logger.warning("No users found in database")

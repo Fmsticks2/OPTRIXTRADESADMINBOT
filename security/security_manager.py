@@ -302,7 +302,7 @@ class WebhookVerifier:
     """Webhook signature verification"""
     
     def __init__(self, secret_token: Optional[str] = None):
-        self.secret_token = secret_token or BotConfig.WEBHOOK_SECRET
+        self.secret_token = secret_token or BotConfig.WEBHOOK_SECRET_TOKEN
     
     def verify_signature(self, payload: bytes, signature: str) -> bool:
         """Verify webhook signature"""
