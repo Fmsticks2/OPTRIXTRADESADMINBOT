@@ -999,13 +999,15 @@ async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT
     admin_text += "Welcome to the admin control panel. Choose an action below:\n\n"
     admin_text += "📋 **Queue** - View pending verification requests\n"
     admin_text += "📢 **Broadcast** - Send message to all users\n"
-    admin_text += "🔍 **Search User** - Find user by ID or username\n\n"
+    admin_text += "🔍 **Search User** - Find user by ID or username\n"
+    admin_text += "👥 **All Users** - View all registered users\n\n"
     admin_text += "Use the buttons below or type commands directly."
     
     keyboard = [
         [InlineKeyboardButton("📋 Queue", callback_data="admin_queue"),
          InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
-        [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user")],
+        [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user"),
+         InlineKeyboardButton("👥 All Users", callback_data="admin_all_users")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
