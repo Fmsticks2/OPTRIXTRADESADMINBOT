@@ -1,9 +1,8 @@
 ✅ Flow 1: Welcome & Hook
 Text:
-Heyy (name)
+Hey (name)
 Welcome to OPTRIXTRADES
-you’re one step away from unlocking high-accuracy trading signals, expert strategies, and real
-trader bonuses, completely free.
+You're one step away from unlocking high-accuracy trading signals, expert strategies, and real trader bonuses, completely free.
 Here’s what you get as a member:
 ✅ Daily VIP trading signals
 ✅ Strategy sessions from 6-figure traders
@@ -16,11 +15,11 @@ Button:
 ✅ Flow 2: Activation Instructions
 Text:
 To activate your free access and join our VIP Signal Channel, follow these steps:
-1️⃣Click the link below to register with our official broker partner
+1️⃣ Click the link below to register with our official broker partner
 [https://affiliate.iqbroker.com/redir/?aff=755757&aff_model=revenue&afftrack= ]
-2️⃣Deposit $20 or more
-3️⃣Send your proof of deposit
-once your proof have been confirmed your access will be unlocked immediately
+2️⃣ Deposit $20 or more
+3️⃣ Send your proof of deposit
+Once your proof has been confirmed, your access will be unlocked immediately
 The more you deposit, the more powerful your AI access:
 ✅ $100+ → Full access to OPTRIX Web AI Portal, Live Signals & AI tools.
 ✅ $500+ → Includes:
@@ -28,35 +27,35 @@ The more you deposit, the more powerful your AI access:
 — VIP telegram group
 — Access to private sessions and risk management blueprint
 — OPTRIX AI Auto-Trading (trades for you automatically)
-—--------------------------------—------—----
-(seems the message is too long that's why demarcated it, it's still in one flow under flow
-to but should be sent separately)
+—————————————————————————————————————————————
+(Note: The message is too long, so it's demarcated here. It's still in one flow under Flow 2 but should be sent separately)
 Why is it free?
-We earn a small commission from the broker through your trading volume, not your money. So
-we are more focused on your success, the more you win, the better for both of us. ✅
+We earn a small commission from the broker through your trading volume, not your money. So we are more focused on your success - the more you win, the better for both of us. ✅
 Want to unlock even higher-tier bonuses or full bot access?
 Send “UPGRADE”
 Button:
-➡️ I’ve Registered
-➡️ Need help signing up
+➡️ I've Registered
 ➡️ Need support making a deposit
 If UPGRADE was sent 👇
-[ A human support will be needed here, some text/commands will be provided here
-before notification for human support, I haven't come up with that yet] ]
+[A human support will be needed here. Some text/commands will be provided here before notification for human support. I haven't come up with that yet.]
 I've registered button response 👇
 ✅ Flow 3: Confirmation
-Text: Send in your uid and deposit screenshot to gain access optrixtrades trades premium signal
-channel.
-BONUS: We’re hosting a live session soon with exclusive insights. Stay tuned. Get an early
-access now into our premium channel only limited slots are available.
-[ after confirming the uid and screenshot is valid, the channel link will be automatically
-sent to them, it will be more cool if they can be added automatically]
-If they clicked on ➡️ Need help signing up
-[ A short video on how to go about it will be sent, I'm working on that I don't have it yet]
+Text: Send in your uid and deposit screenshot on iq option to gain access optrixtrades trades premium signal channel.
+
+BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Get an early access now into our premium channel only limited slots are available.
+[After confirming the UID and screenshot is valid, the channel link will be automatically sent to them. It will be more cool if they can be added automatically.]
 If they clicked on ➡️ Need support making a deposit
-[[ A short video on how to go about it will be sent, I'm working on that I don't have it yet]
-FOLLOW UP SEQUENCES IF LEADS STOP INTERACTING WITH THE BOT (after some of
-hours)
+Here's how to make a deposit with our broker partner:
+
+1. Log in to your account
+2. Navigate to the Deposit section
+3. Choose your preferred payment method
+4. Follow the instructions to complete your deposit
+
+💡 Need additional help? Contact our support team.
+
+Then add the admin link: @Optrixtradesadmin
+FOLLOW UP SEQUENCES IF LEADS STOP INTERACTING WITH THE BOT (after some hours)
 Text:
 Hey (name) 👋 just checking in…
 You haven’t completed your free VIP access setup yet. If you still want:
@@ -69,7 +68,7 @@ Button:
 ➡️ Claim Free Access Now (THE WHOLE SEQUENCE WILL BE REPEATED FROM FLOW 2
 to flow 3 FROM HERE )
 ➡️ Contact support team (link to dm @Optrixtradesadmin)
-🔁 Follow-Up 2 (Day 2 after like 23 hours ) — Scarcity + Social Proof
+🔁 Follow-Up 2 (Day 2 after 23 hours) — Scarcity + Social Proof
 Text:
 🔥 Just an update…
 We’ve already had 42 traders activate their access this week and most of them are already
@@ -80,7 +79,7 @@ Button:
 ➡️ Complete My Free access. (THE WHOLE SEQUENCE WILL BE REPEATED FROM FLOW
 2 to FLOW 3, FROM HERE )
 ➡️ Contact support team (link to dm @Optrixtradesadmin)
-🔁 Follow-Up 3 (Day 3 after like 22 hours ) — Friendly Reminder + Value Recap
+🔁 Follow-Up 3 (Day 3 after 22 hours) — Friendly Reminder + Value Recap
 Text:
 Hey! Just wanted to remind you of everything you get for free once you sign up:
 ✅ Daily VIP signals
@@ -93,7 +92,7 @@ Button:
 ➡️ I’m Ready to Activate (THE WHOLE SEQUENCE WILL BE REPEATED FROM FLOW 2 to
 FLOW 3, FROM HERE )
 ➡️ Contact support team (link to dm @Optrixtradesadmin)
-🔁 Follow-Up 4 (Day 4 ) — Personal + Soft CTA
+🔁 Follow-Up 4 (Day 4) — Personal + Soft CTA
 Text:
 👀 You’ve been on our early access list for a few days…
 If you’re still interested but something’s holding you back, reply to this message and let’s help
@@ -103,7 +102,7 @@ Button:
 ➡️ I Have a Question (@Optrixtradesadmin)
 ➡️ Continue Activation (THE WHOLE SEQUENCE WILL BE REPEATED FROM FLOW 2 to
 3)
-🔁 Follow-Up 5 (Day5) — Last Chance + Exit Option
+🔁 Follow-Up 5 (Day 5) — Last Chance + Exit Option
 Text:
 📌 Last call to claim your free access to OPTRIXTRADES.
 This week’s onboarding closes in a few hours. After that, you’ll need to wait for the next batch,
@@ -113,8 +112,7 @@ Buttons:
 ✅ Yes, Activate Me Now (THE WHOLE SEQUENCE WILL BE REPEATED FROM FLOW 2 to
 3 FROM HERE )
 ❌ Not Interested
-If Not interested was pick send this text [ Alright feel free to reach us at any time
-@Optrixtradesadmin]
+If 'Not interested' was picked, send this text: [Alright, feel free to reach us at any time @Optrixtradesadmin]
 🔁 Follow-Up 6 (Day 6) Education + Trust-Building
 Text:
 Wondering if OPTRIXTRADES is legit?
@@ -168,5 +166,5 @@ Buttons:
 ➡️ ✅ Count Me In (THE WHOLE SEQUENCE WILL BE REPEATED FROM FLOW 2 to FLOW
 3, FROM HERE )
 ➡️ ❌ Remove Me From This List
-If remove me was clicked on, this pops up
-(feel free to reach out to us if you ever need supper @Optrixtradesadmin)
+If 'Remove me' was clicked on, this pops up:
+(Feel free to reach out to us if you ever need support @Optrixtradesadmin)

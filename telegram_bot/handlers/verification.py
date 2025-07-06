@@ -58,10 +58,9 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_name = user.first_name or user.username or "there"
     
     # Welcome message (Flow 1)
-    welcome_text = f"Heyy {user_name}\n"
+    welcome_text = f"Hey {user_name}\n"
     welcome_text += "Welcome to OPTRIXTRADES\n"
-    welcome_text += "you're one step away from unlocking high-accuracy trading signals, expert strategies, and real\n"
-    welcome_text += "trader bonuses, completely free.\n"
+    welcome_text += "You're one step away from unlocking high-accuracy trading signals, expert strategies, and real trader bonuses, completely free.\n"
     welcome_text += "Here's what you get as a member:\n"
     welcome_text += "✅ Daily VIP trading signals\n"
     welcome_text += "✅ Strategy sessions from 6-figure traders\n"
@@ -99,11 +98,11 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     
     # Activation instructions text
     activation_text = "To activate your free access and join our VIP Signal Channel, follow these steps:\n"
-    activation_text += "1️⃣Click the link below to register with our official broker partner\n"
+    activation_text += "1️⃣ Click the link below to register with our official broker partner\n"
     activation_text += f"[{BotConfig.BROKER_LINK}]\n"
-    activation_text += "2️⃣Deposit $20 or more\n"
-    activation_text += "3️⃣Send your proof of deposit\n"
-    activation_text += "once your proof have been confirmed your access will be unlocked immediately\n\n"
+    activation_text += "2️⃣ Deposit $20 or more\n"
+    activation_text += "3️⃣ Send your proof of deposit\n"
+    activation_text += "Once your proof has been confirmed, your access will be unlocked immediately\n\n"
     activation_text += "The more you deposit, the more powerful your AI access:\n"
     activation_text += "✅ $100+ → Full access to OPTRIX Web AI Portal, Live Signals & AI tools.\n"
     activation_text += "✅ $500+ → Includes:\n"
@@ -115,7 +114,6 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     # Create keyboard with registration buttons
     keyboard = [
         [InlineKeyboardButton("➡️ I've Registered", callback_data="registered")],
-        [InlineKeyboardButton("➡️ Need help signing up", callback_data="signup_help")],
         [InlineKeyboardButton("➡️ Need support making a deposit", callback_data="deposit_help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -125,8 +123,7 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     
     # Send follow-up message about why it's free
     why_free_text = "Why is it free?\n"
-    why_free_text += "We earn a small commission from the broker through your trading volume, not your money. So\n"
-    why_free_text += "we are more focused on your success, the more you win, the better for both of us. ✅\n\n"
+    why_free_text += "We earn a small commission from the broker through your trading volume, not your money. So we are more focused on your success - the more you win, the better for both of us. ✅\n\n"
     why_free_text += "Want to unlock even higher-tier bonuses or full bot access?\n"
     why_free_text += "Send \"UPGRADE\""
     
@@ -149,9 +146,8 @@ async def registered_confirmation(update: Update, context: ContextTypes.DEFAULT_
     context.user_data[FLOW_KEY] = FLOW_CONFIRMATION
     
     # Confirmation text
-    confirmation_text = "Send in your uid and deposit screenshot to gain access optrixtrades trades premium signal channel.\n\n"
-    confirmation_text += "BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Get an early\n"
-    confirmation_text += "access now into our premium channel only limited slots are available."
+    confirmation_text = "Send in your uid and deposit screenshot on iq option to gain access optrixtrades trades premium signal channel.\n\n"
+    confirmation_text += "BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Get an early access now into our premium channel only limited slots are available."
     
     # Send confirmation message as new message instead of editing
     await query.message.reply_text(confirmation_text)
@@ -314,13 +310,22 @@ async def deposit_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     query = update.callback_query
     await query.answer()
     
+    deposit_text = "Here's how to make a deposit with our broker partner:\n\n"
+    deposit_text += "1. Log in to your account\n"
+    deposit_text += "2. Navigate to the Deposit section\n"
+    deposit_text += "3. Choose your preferred payment method\n"
+    deposit_text += "4. Follow the instructions to complete your deposit\n\n"
+    deposit_text += "💡 Need additional help? Contact our support team."
+    
+    # Add admin contact button
+    keyboard = [
+        [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await query.message.reply_text(
-        "Here's how to make a deposit with our broker partner:\n\n"
-        "1. Log in to your account\n"
-        "2. Navigate to the Deposit section\n"
-        "3. Choose your preferred payment method\n"
-        "4. Follow the instructions to complete your deposit\n\n"
-        "💡 Need additional help? Contact our support team."
+        deposit_text,
+        reply_markup=reply_markup
     )
 
 @error_handler_decorator

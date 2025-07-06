@@ -31,13 +31,15 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         admin_text += "Welcome to the admin control panel. Choose an action below:\n\n"
         admin_text += "📋 **Queue** - View pending verification requests\n"
         admin_text += "📢 **Broadcast** - Send message to all users\n"
-        admin_text += "🔍 **Search User** - Find user by ID or username\n\n"
+        admin_text += "🔍 **Search User** - Find user by ID or username\n"
+        admin_text += "👥 **All Users** - View all registered users\n\n"
         admin_text += "Use the buttons below or type commands directly."
         
         keyboard = [
             [InlineKeyboardButton("📋 Queue", callback_data="admin_queue"),
              InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
-            [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user")],
+            [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user"),
+             InlineKeyboardButton("👥 All Users", callback_data="admin_all_users")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
@@ -906,6 +908,77 @@ async def admin_chat_history_callback(update: Update, context: ContextTypes.DEFA
     
     await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
     return USER_LOOKUP
+
+async def admin_all_users_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle admin all users callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    try:
+        # Get all users from database
+        all_users = await get_all_users()
+        
+        if not all_users:
+            response_text = "👥 **All Users List**\n\n"
+            response_text += "📭 No users found in the database."
+        else:
+            response_text = f"👥 **All Users List ({len(all_users)} total)**\n\n"
+            
+            # Sort users by registration date (newest first)
+            sorted_users = sorted(all_users, key=lambda x: x.get('created_at', ''), reverse=True)
+            
+            # Show first 20 users to avoid message length limits
+            display_users = sorted_users[:20]
+            
+            for i, user in enumerate(display_users, 1):
+                user_id_display = user.get('user_id', 'N/A')
+                username = user.get('username', 'N/A')
+                first_name = user.get('first_name', 'N/A')
+                status = user.get('registration_status', 'unknown')
+                verification_status = user.get('verification_status', 'not_verified')
+                
+                # Format username display
+                username_display = f"@{username}" if username and username != 'N/A' else 'No username'
+                
+                response_text += f"{i}. **{first_name}**\n"
+                response_text += f"   🆔 ID: `{user_id_display}`\n"
+                response_text += f"   👤 Username: {username_display}\n"
+                response_text += f"   📊 Status: {status}\n"
+                response_text += f"   ✅ Verified: {verification_status}\n\n"
+            
+            if len(all_users) > 20:
+                response_text += f"... and {len(all_users) - 20} more users.\n\n"
+            
+            # Add summary statistics
+            verified_count = sum(1 for user in all_users if user.get('verification_status') in ['approved', 'verified'])
+            pending_count = sum(1 for user in all_users if user.get('verification_status') == 'pending')
+            
+            response_text += f"📈 **Summary:**\n"
+            response_text += f"• Total Users: {len(all_users)}\n"
+            response_text += f"• Verified: {verified_count}\n"
+            response_text += f"• Pending: {pending_count}\n"
+            response_text += f"• Unverified: {len(all_users) - verified_count - pending_count}"
+        
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Send a new message instead of editing the existing one
+        await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        
+    except Exception as e:
+        logger.error(f"Error in admin_all_users_callback: {e}")
+        error_text = "❌ Error retrieving users list."
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.reply_text(error_text, reply_markup=reply_markup)
+        return ConversationHandler.END
+    
+    return ConversationHandler.END
 
 # Dashboard callback
 async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

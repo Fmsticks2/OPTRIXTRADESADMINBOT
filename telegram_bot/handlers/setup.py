@@ -51,7 +51,8 @@ from telegram_bot.handlers.admin_handlers import (
     admin_recent_activity_callback,
     admin_auto_verify_stats_callback,
     admin_chat_history_callback,
-    admin_dashboard_callback
+    admin_dashboard_callback,
+    admin_all_users_callback
 )
 
 from telegram_bot.handlers.verification import (
@@ -134,7 +135,8 @@ def setup_all_handlers(bot):
             CallbackQueryHandler(admin_chat_history_callback, pattern='^admin_chat_history$'),
             CallbackQueryHandler(admin_queue_callback, pattern='^admin_queue$'),
             CallbackQueryHandler(admin_recent_activity_callback, pattern='^admin_recent_activity$'),
-            CallbackQueryHandler(admin_auto_verify_stats_callback, pattern='^admin_auto_verify_stats$')
+            CallbackQueryHandler(admin_auto_verify_stats_callback, pattern='^admin_auto_verify_stats$'),
+            CallbackQueryHandler(admin_all_users_callback, pattern='^admin_all_users$')
         ],
         states={
             BROADCAST_MESSAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_broadcast_message)],
