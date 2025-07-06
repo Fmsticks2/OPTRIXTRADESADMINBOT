@@ -794,7 +794,7 @@ async def admin_recent_activity_callback(update: Update, context: ContextTypes.D
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Send a new message instead of editing the existing one
-        await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        await query.message.reply_text(response_text, reply_markup=reply_markup)
         
     except Exception as e:
         logger.error(f"Error in admin_recent_activity_callback: {e}")
@@ -871,7 +871,7 @@ async def admin_auto_verify_stats_callback(update: Update, context: ContextTypes
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Send a new message instead of editing the existing one
-        await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        await query.message.reply_text(response_text, reply_markup=reply_markup)
         
     except Exception as e:
         logger.error(f"Error in admin_auto_verify_stats_callback: {e}")
@@ -924,10 +924,10 @@ async def admin_all_users_callback(update: Update, context: ContextTypes.DEFAULT
         all_users = await get_all_users()
         
         if not all_users:
-            response_text = "👥 **All Users List**\n\n"
+            response_text = "👥 All Users List\n\n"
             response_text += "📭 No users found in the database."
         else:
-            response_text = f"👥 **All Users List ({len(all_users)} total)**\n\n"
+            response_text = f"👥 All Users List ({len(all_users)} total)\n\n"
             
             # Sort users by registration date (newest first)
             sorted_users = sorted(all_users, key=lambda x: x.get('created_at', ''), reverse=True)
@@ -945,8 +945,8 @@ async def admin_all_users_callback(update: Update, context: ContextTypes.DEFAULT
                 # Format username display
                 username_display = f"@{username}" if username and username != 'N/A' else 'No username'
                 
-                response_text += f"{i}. **{first_name}**\n"
-                response_text += f"   🆔 ID: `{user_id_display}`\n"
+                response_text += f"{i}. {first_name}\n"
+                response_text += f"   🆔 ID: {user_id_display}\n"
                 response_text += f"   👤 Username: {username_display}\n"
                 response_text += f"   📊 Status: {status}\n"
                 response_text += f"   🔢 UID: {uid}\n\n"
@@ -958,7 +958,7 @@ async def admin_all_users_callback(update: Update, context: ContextTypes.DEFAULT
             registered_count = sum(1 for user in all_users if user.get('registration_status') not in ['not_started', 'unknown'])
             with_uid_count = sum(1 for user in all_users if user.get('uid') and user.get('uid') != 'N/A')
             
-            response_text += f"📈 **Summary:**\n"
+            response_text += f"📈 Summary:\n"
             response_text += f"• Total Users: {len(all_users)}\n"
             response_text += f"• Registered: {registered_count}\n"
             response_text += f"• With UID: {with_uid_count}\n"
@@ -968,7 +968,7 @@ async def admin_all_users_callback(update: Update, context: ContextTypes.DEFAULT
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Send a new message instead of editing the existing one
-        await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        await query.message.reply_text(response_text, reply_markup=reply_markup)
         
     except Exception as e:
         logger.error(f"Error in admin_all_users_callback: {e}")
