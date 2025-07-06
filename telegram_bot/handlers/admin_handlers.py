@@ -940,7 +940,7 @@ async def admin_all_users_callback(update: Update, context: ContextTypes.DEFAULT
                 username = user.get('username', 'N/A')
                 first_name = user.get('first_name', 'N/A')
                 status = user.get('registration_status', 'unknown')
-                verification_status = user.get('verification_status', 'not_verified')
+                uid = user.get('uid', 'N/A')
                 
                 # Format username display
                 username_display = f"@{username}" if username and username != 'N/A' else 'No username'
@@ -949,20 +949,20 @@ async def admin_all_users_callback(update: Update, context: ContextTypes.DEFAULT
                 response_text += f"   🆔 ID: `{user_id_display}`\n"
                 response_text += f"   👤 Username: {username_display}\n"
                 response_text += f"   📊 Status: {status}\n"
-                response_text += f"   ✅ Verified: {verification_status}\n\n"
+                response_text += f"   🔢 UID: {uid}\n\n"
             
             if len(all_users) > 20:
                 response_text += f"... and {len(all_users) - 20} more users.\n\n"
             
             # Add summary statistics
-            verified_count = sum(1 for user in all_users if user.get('verification_status') in ['approved', 'verified'])
-            pending_count = sum(1 for user in all_users if user.get('verification_status') == 'pending')
+            registered_count = sum(1 for user in all_users if user.get('registration_status') not in ['not_started', 'unknown'])
+            with_uid_count = sum(1 for user in all_users if user.get('uid') and user.get('uid') != 'N/A')
             
             response_text += f"📈 **Summary:**\n"
             response_text += f"• Total Users: {len(all_users)}\n"
-            response_text += f"• Verified: {verified_count}\n"
-            response_text += f"• Pending: {pending_count}\n"
-            response_text += f"• Unverified: {len(all_users) - verified_count - pending_count}"
+            response_text += f"• Registered: {registered_count}\n"
+            response_text += f"• With UID: {with_uid_count}\n"
+            response_text += f"• Not Started: {len(all_users) - registered_count}"
         
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
