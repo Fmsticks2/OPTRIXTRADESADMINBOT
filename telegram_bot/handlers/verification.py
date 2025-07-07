@@ -122,6 +122,10 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     # Send activation instructions as new message to keep welcome message
     await query.message.reply_text(activation_text, reply_markup=reply_markup)
     
+    # Add 10-15 second delay before showing "Why is it free?" message
+    import asyncio
+    await asyncio.sleep(10)  # 10 seconds delay
+    
     # Send follow-up message about why it's free
     why_free_text = "Why is it free?\n"
     why_free_text += "We earn a small commission from the broker through your trading volume, not your money. So we are more focused on your success - the more you win, the better for both of us. ✅\n\n"
