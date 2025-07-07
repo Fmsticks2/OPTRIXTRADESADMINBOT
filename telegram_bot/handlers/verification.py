@@ -65,7 +65,7 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
     welcome_text += "✅ Daily VIP trading signals\n"
     welcome_text += "✅ Strategy sessions from 6-figure traders\n"
     welcome_text += "✅ Access to our private trader community\n"
-    welcome_text += "✅ Exclusive signup bonuses (up to $500)\n"
+    welcome_text += "✅ Exclusive signup bonuses (up to $500)\n\n"
     welcome_text += "👇 Tap below to activate your free VIP access and get started."
     
     # Create keyboard with activation button and contact support
