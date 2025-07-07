@@ -58,20 +58,20 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_name = user.first_name or user.username or "there"
     
     # Welcome message (Flow 1)
-    welcome_text = f"Hey {user_name}\n"
+    welcome_text = f"Hey {user_name}\n\n"
     welcome_text += "Welcome to OPTRIXTRADES\n"
-    welcome_text += "You're one step away from unlocking high-accuracy trading signals, expert strategies, and real trader bonuses, completely free.\n"
+    welcome_text += "You're one step away from unlocking high-accuracy trading signals, expert strategies, and real trader bonuses, completely free.\n\n"
     welcome_text += "Here's what you get as a member:\n"
     welcome_text += "✅ Daily VIP trading signals\n"
     welcome_text += "✅ Strategy sessions from 6-figure traders\n"
     welcome_text += "✅ Access to our private trader community\n"
     welcome_text += "✅ Exclusive signup bonuses (up to $500)\n"
-    welcome_text += "✅ Automated trading bot – trade while you sleep\n"
     welcome_text += "👇 Tap below to activate your free VIP access and get started."
     
-    # Create keyboard with activation button
+    # Create keyboard with activation button and contact support
     keyboard = [
-        [InlineKeyboardButton("➡️ Get Free VIP Access", callback_data="activation_instructions")]
+        [InlineKeyboardButton("➡️ Get Free VIP Access", callback_data="activation_instructions")],
+        [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -97,24 +97,25 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     context.user_data[FLOW_KEY] = FLOW_ACTIVATION
     
     # Activation instructions text
-    activation_text = "To activate your free access and join our VIP Signal Channel, follow these steps:\n"
+    activation_text = "To activate your free access and join our VIP Signal Channel, follow these steps:\n\n"
     activation_text += "1️⃣ Click the link below to register with our official broker partner\n"
     activation_text += f"[{BotConfig.BROKER_LINK}]\n"
     activation_text += "2️⃣ Deposit $20 or more\n"
     activation_text += "3️⃣ Send your proof of deposit\n"
     activation_text += "Once your proof has been confirmed, your access will be unlocked immediately\n\n"
     activation_text += "The more you deposit, the more powerful your AI access:\n"
-    activation_text += "✅ $100+ → Full access to OPTRIX Web AI Portal, Live Signals & AI tools.\n"
+    activation_text += "✅ $100+ → Full access to OPTRIX Web AI Portal, Live Signals & AI tools.\n\n"
     activation_text += "✅ $500+ → Includes:\n"
-    activation_text += "— All available signal alert options\n"
-    activation_text += "— VIP telegram group\n"
-    activation_text += "— Access to private sessions and risk management blueprint\n"
-    activation_text += "— OPTRIX AI Auto-Trading (trades for you automatically)"
+    activation_text += "All available signal alert options\n"
+    activation_text += "VIP telegram group\n"
+    activation_text += "Access to private sessions and risk management blueprint\n"
+    activation_text += "OPTRIX AI Auto-Trading (trades for you automatically)"
     
-    # Create keyboard with registration buttons
+    # Create keyboard with registration buttons and contact support
     keyboard = [
         [InlineKeyboardButton("➡️ I've Registered", callback_data="registered")],
-        [InlineKeyboardButton("➡️ Need support making a deposit", callback_data="deposit_help")]
+        [InlineKeyboardButton("➡️ Need support making a deposit", callback_data="deposit_help")],
+        [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -127,8 +128,14 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     why_free_text += "Want to unlock even higher-tier bonuses or full bot access?\n"
     why_free_text += "Send \"UPGRADE\""
     
-    # Send as a separate message
-    await query.message.reply_text(why_free_text)
+    # Add contact support button for UPGRADE section
+    upgrade_keyboard = [
+        [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+    ]
+    upgrade_reply_markup = InlineKeyboardMarkup(upgrade_keyboard)
+    
+    # Send as a separate message with contact support button
+    await query.message.reply_text(why_free_text, reply_markup=upgrade_reply_markup)
     
     return ConversationHandler.END
 
@@ -149,8 +156,14 @@ async def registered_confirmation(update: Update, context: ContextTypes.DEFAULT_
     confirmation_text = "Send in your uid and deposit screenshot on iq option to gain access optrixtrades trades premium signal channel.\n\n"
     confirmation_text += "BONUS: We're hosting a live session soon with exclusive insights. Stay tuned. Get an early access now into our premium channel only limited slots are available."
     
+    # Add contact support button for UID submission section
+    confirmation_keyboard = [
+        [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+    ]
+    confirmation_reply_markup = InlineKeyboardMarkup(confirmation_keyboard)
+    
     # Send confirmation message as new message instead of editing
-    await query.message.reply_text(confirmation_text)
+    await query.message.reply_text(confirmation_text, reply_markup=confirmation_reply_markup)
     
     # Set state for conversation handler
     return REGISTER_UID
@@ -205,7 +218,7 @@ async def handle_screenshot_upload(update: Update, context: ContextTypes.DEFAULT
         f"• UID: `{uid}`\n"
         f"• Screenshot: Received ✅\n\n"
         "🔍 **What happens next?**\n"
-        "• Our team will review your submission within 2-24 hours\n"
+        "• Our team will review your submission as soon as possible\n"
         "• You'll receive a notification once approved\n"
         "• Access to premium signals will be granted immediately\n\n"
         "🎯 **While you wait:**\n"
@@ -295,13 +308,22 @@ async def signup_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     query = update.callback_query
     await query.answer()
     
+    signup_text = "Here's how to sign up with our broker partner:\n\n"
+    signup_text += "1. Click the registration link\n"
+    signup_text += "2. Enter your details\n"
+    signup_text += "3. Verify your email\n"
+    signup_text += "4. Complete your profile\n\n"
+    signup_text += "💡 Need additional help? Contact our support team."
+    
+    # Add admin contact button
+    keyboard = [
+        [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await query.message.reply_text(
-        "Here's how to sign up with our broker partner:\n\n"
-        "1. Click the registration link\n"
-        "2. Enter your details\n"
-        "3. Verify your email\n"
-        "4. Complete your profile\n\n"
-        "💡 Need additional help? Contact our support team."
+        signup_text,
+        reply_markup=reply_markup
     )
 
 @error_handler_decorator
