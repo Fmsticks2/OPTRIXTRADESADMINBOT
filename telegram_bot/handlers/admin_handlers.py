@@ -217,7 +217,7 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
             try:
                 await context.bot.send_message(
                     chat_id=user_id_to_send,
-                    text={broadcast_message},
+                    text=broadcast_message,
                     parse_mode='Markdown'
                 )
                 success_count += 1
