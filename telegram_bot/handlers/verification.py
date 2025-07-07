@@ -124,17 +124,20 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     
     # Add 10-15 second delay before showing "Why is it free?" message
     import asyncio
-    await asyncio.sleep(10)  # 10 seconds delay
+    await asyncio.sleep(30)  # 10 seconds delay
     
     # Send follow-up message about why it's free
     why_free_text = "Why is it free?\n"
     why_free_text += "We earn a small commission from the broker through your trading volume, not your money. So we are more focused on your success - the more you win, the better for both of us. ✅\n\n"
     why_free_text += "Want to unlock even higher-tier bonuses or full bot access?\n"
-    why_free_text += "Send \"UPGRADE\""
+    why_free_text += "Send \"UPGRADE\" or contact Admin Support "
     
-    # Add contact support button for UPGRADE section
+    # Add contact support button for UPGRADE section with pre-filled message
+    import urllib.parse
+    upgrade_message = "Hello there, I'll like to UPGRADE to access higher tiers and trading tools."
+    encoded_message = urllib.parse.quote(upgrade_message)
     upgrade_keyboard = [
-        [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+        [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}?text={encoded_message}")]
     ]
     upgrade_reply_markup = InlineKeyboardMarkup(upgrade_keyboard)
     
