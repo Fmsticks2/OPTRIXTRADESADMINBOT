@@ -7,7 +7,7 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 import uvicorn
@@ -25,12 +25,12 @@ from config import config
 from telegram_bot.bot import TradingBot
 from database.connection import DatabaseManager
 
-# Configure logging
+# Configure logging with UTF-8 encoding for Windows compatibility
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=getattr(logging, config.LOG_LEVEL),
     handlers=[
-        logging.FileHandler('webhook.log'),
+        logging.FileHandler('webhook.log', encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
@@ -336,31 +336,31 @@ class WebhookServer:
 
     async def startup(self):
         """Startup tasks"""
-        logger.info("🚀 OPTRIXTRADES Webhook Server starting...")
-        logger.info(f"📱 Bot Token: {config.BOT_TOKEN[:10]}...")
-        logger.info(f"🔗 Webhook Mode: Enabled")
+        logger.info("[STARTUP] OPTRIXTRADES Webhook Server starting...")
+        logger.info(f"[BOT] Bot Token: {config.BOT_TOKEN[:10]}...")
+        logger.info(f"[WEBHOOK] Webhook Mode: Enabled")
         
         # Initialize database first - this is critical
         try:
             logger.info("Initializing database connection...")
             await self.db_manager.initialize()
-            logger.info("✅ Database initialized successfully")
+            logger.info("[SUCCESS] Database initialized successfully")
             
             # Verify database is actually ready
             if not self.db_manager.is_initialized or self.db_manager.pool is None:
                 raise RuntimeError("Database initialization completed but pool is not ready")
                 
         except Exception as e:
-            logger.error(f"❌ Database initialization failed: {e}")
+            logger.error(f"[ERROR] Database initialization failed: {e}")
             # Don't continue if database fails - this will cause handler errors
             raise RuntimeError(f"Cannot start webhook server without database: {e}")
         
         # Initialize bot application (this will also verify database is ready)
         try:
             await self.initialize_application()
-            logger.info("✅ Bot application initialized successfully")
+            logger.info("[SUCCESS] Bot application initialized successfully")
         except Exception as e:
-            logger.error(f"❌ Bot application initialization failed: {e}")
+            logger.error(f"[ERROR] Bot application initialization failed: {e}")
             raise
 
         # Set webhook on startup
@@ -368,22 +368,22 @@ class WebhookServer:
             logger.info(f"Attempting to set webhook to: {config.WEBHOOK_URL}")
             success = await self.set_telegram_webhook(config.WEBHOOK_URL)
             if success:
-                logger.info("✅ Webhook set successfully on startup.")
+                logger.info("[SUCCESS] Webhook set successfully on startup.")
             else:
-                logger.error("❌ Failed to set webhook on startup.")
+                logger.error("[ERROR] Failed to set webhook on startup.")
         else:
             logger.warning("WEBHOOK_URL not configured. Skipping webhook setup.")
 
     async def shutdown(self):
         """Shutdown tasks"""
-        logger.info("🛑 OPTRIXTRADES Webhook Server shutting down...")
+        logger.info("[SHUTDOWN] OPTRIXTRADES Webhook Server shutting down...")
         
         # Close database connection
         try:
             await self.db_manager.close()
-            logger.info("✅ Database connection closed successfully")
+            logger.info("[SUCCESS] Database connection closed successfully")
         except Exception as e:
-            logger.error(f"❌ Error closing database connection: {e}")
+            logger.error(f"[ERROR] Error closing database connection: {e}")
 
         if self.application:
             await self.application.stop()
