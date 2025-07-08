@@ -7,8 +7,8 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 import uvicorn
 from telegram import Update
@@ -64,6 +64,15 @@ class WebhookServer:
                 logger.error(f"Error serving landing page: {e}")
                 # Fallback to JSON response
                 return JSONResponse({"message": "OPTRIXTRADES Bot Webhook Server", "status": "running"})
+        
+        @app.get("/favicon.svg")
+        async def favicon():
+            """Serve the favicon"""
+            favicon_path = os.path.join(os.path.dirname(__file__), "templates", "favicon.svg")
+            if os.path.exists(favicon_path):
+                return FileResponse(favicon_path, media_type="image/svg+xml")
+            else:
+                raise HTTPException(status_code=404, detail="Favicon not found")
         
         @app.get("/health")
         async def health_check():
