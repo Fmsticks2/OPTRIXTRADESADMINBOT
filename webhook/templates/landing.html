@@ -207,10 +207,13 @@
             
             .container {
                 max-width: 100%;
+                padding: 0 10px;
             }
             
-            h1 {
-                font-size: 2.5em;
+            .logo {
+                font-size: 2.5rem;
+                word-break: break-word;
+                line-height: 1.1;
             }
             
             .subtitle {
@@ -233,6 +236,14 @@
             .cta-button {
                 padding: 15px 30px;
                 font-size: 1.1em;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .logo {
+                font-size: 2rem;
+                word-break: break-word;
+                line-height: 1.1;
             }
         }
         
