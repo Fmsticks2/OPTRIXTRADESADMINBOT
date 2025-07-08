@@ -8,7 +8,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 import uvicorn
 from telegram import Update
 from telegram.ext import Application
@@ -40,13 +41,29 @@ class WebhookServer:
         self.db_manager = db_manager
         self.bot_instance = TradingBot(db_manager)
         self.application: Optional[Application] = None
+        # Setup templates
+        self.templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
         
     def setup_routes(self, app: FastAPI):
         """Setup FastAPI routes"""
         
-        @app.get("/")
-        async def root():
-            return {"message": "OPTRIXTRADES Bot Webhook Server", "status": "running"}
+        @app.get("/", response_class=HTMLResponse)
+        async def root(request: Request):
+            """Serve professional landing page"""
+            try:
+                # Get bot username for the Telegram link
+                bot_username = await self.get_bot_username()
+                return self.templates.TemplateResponse(
+                    "landing.html", 
+                    {
+                        "request": request,
+                        "bot_username": bot_username
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error serving landing page: {e}")
+                # Fallback to JSON response
+                return JSONResponse({"message": "OPTRIXTRADES Bot Webhook Server", "status": "running"})
         
         @app.get("/health")
         async def health_check():
@@ -156,6 +173,17 @@ class WebhookServer:
                 logger.error(f"Webhook info error: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
+    async def get_bot_username(self) -> str:
+        """Get bot username for Telegram link"""
+        try:
+            from telegram import Bot
+            bot = Bot(token=config.BOT_TOKEN)
+            bot_info = await bot.get_me()
+            return bot_info.username or "optrixtrades_bot"
+        except Exception as e:
+            logger.error(f"Error getting bot username: {e}")
+            return "optrixtrades_bot"  # Fallback username
+    
     def verify_webhook_signature(self, request: Request) -> bool:
         """Verify webhook signature for security"""
         try:
