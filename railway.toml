@@ -18,7 +18,13 @@ variables = {
     POSTGRES_DB = "${{Postgres.POSTGRES_DB}}",
     POSTGRES_USER = "${{Postgres.POSTGRES_USER}}",
     POSTGRES_PASSWORD = "${{Postgres.POSTGRES_PASSWORD}}",
-    WEBHOOK_PORT = "${{PORT}}"
+    WEBHOOK_PORT = "${{PORT}}",
+    # These must be set manually in Railway dashboard
+    BOT_TOKEN = "${{BOT_TOKEN}}",
+    BROKER_LINK = "${{BROKER_LINK}}",
+    PREMIUM_CHANNEL_ID = "${{PREMIUM_CHANNEL_ID}}",
+    ADMIN_USERNAME = "${{ADMIN_USERNAME}}",
+    ADMIN_USER_ID = "${{ADMIN_USER_ID}}"
 }
 
 [environments.development]

@@ -72,7 +72,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return await admin_command(update, context)
     else:
         # Get user data to check verification status
-        from telegram_bot.utils.database_utils import get_user_data
+        from database.connection import get_user_data
         user_data = await get_user_data(user_id)
         
         # Handle different start scenarios
@@ -150,8 +150,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     try:
         # Import database utilities
-        from telegram_bot.utils.database_utils import get_user_data
-        from database.connection import db_manager
+        from database.connection import get_user_data
         
         # Get user data from database
         user_data = await get_user_data(user_id)

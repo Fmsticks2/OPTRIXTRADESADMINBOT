@@ -12,6 +12,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import JSONResponse
 import uvicorn
+
+# Add the project root directory to the Python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from config import config
 
 logger = logging.getLogger(__name__)
@@ -136,26 +140,19 @@ def run_polling_mode():
 def run_webhook_mode():
     """Run bot in webhook mode (production) with FastAPI - FIXED VERSION"""
     try:
-        # Import webhook server
-        from webhook.webhook_server import run_webhook_server
         print("🌐 Starting bot in WEBHOOK mode with FastAPI...")
         
-        # DON'T start a separate health server - let webhook server handle it
-        # The webhook server should include health endpoints
-        
-        # Check if webhook server already has health endpoints
-        try:
-            from webhook.webhook_server import app as webhook_app
-            # If webhook server has its own FastAPI app, use that
-            logger.info("Using webhook server's own FastAPI app")
-            run_webhook_server()
-        except ImportError:
-            # Fallback: webhook server doesn't have health endpoints
-            logger.info("Webhook server doesn't have health endpoints, starting combined server")
-            run_combined_webhook_health_server()
+        # Import and run the webhook server directly
+        from webhook.webhook_server import run_webhook_server
+        logger.info("Starting webhook server...")
+        run_webhook_server()
         
     except ImportError as e:
         logger.error(f"Webhook dependencies not found: {e}")
+        logger.info("Falling back to polling mode...")
+        run_polling_mode()
+    except Exception as e:
+        logger.error(f"Webhook mode failed: {e}")
         logger.info("Falling back to polling mode...")
         run_polling_mode()
 
