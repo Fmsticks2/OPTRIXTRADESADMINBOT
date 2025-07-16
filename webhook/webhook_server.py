@@ -115,6 +115,38 @@ class WebhookServer:
             else:
                 raise HTTPException(status_code=404, detail="Favicon not found")
         
+        @app.get("/Forex%20Photos%20-%20Download%20Free%20High-Quality%20Pictures%20_%20Freepik.jpeg")
+        async def forex_image():
+            """Serve the forex image"""
+            image_path = os.path.join(os.path.dirname(__file__), "templates", "Forex Photos - Download Free High-Quality Pictures _ Freepik.jpeg")
+            if os.path.exists(image_path):
+                return FileResponse(image_path, media_type="image/jpeg")
+            else:
+                raise HTTPException(status_code=404, detail="Image not found")
+        
+        @app.get("/static/{filename}")
+        async def serve_static(filename: str):
+            """Serve static files from templates directory"""
+            static_path = os.path.join(os.path.dirname(__file__), "templates", filename)
+            if os.path.exists(static_path):
+                # Determine media type based on file extension
+                if filename.endswith('.jpeg') or filename.endswith('.jpg'):
+                    media_type = "image/jpeg"
+                elif filename.endswith('.png'):
+                    media_type = "image/png"
+                elif filename.endswith('.svg'):
+                    media_type = "image/svg+xml"
+                elif filename.endswith('.css'):
+                    media_type = "text/css"
+                elif filename.endswith('.js'):
+                    media_type = "application/javascript"
+                else:
+                    media_type = "application/octet-stream"
+                
+                return FileResponse(static_path, media_type=media_type)
+            else:
+                raise HTTPException(status_code=404, detail="File not found")
+        
         @app.get("/health")
         async def health_check():
             return {
