@@ -409,10 +409,17 @@ class WebhookServer:
             logger.error(f"[ERROR] Bot application initialization failed: {e}")
             raise
 
-        # Set webhook on startup
-        if config.WEBHOOK_URL:
-            logger.info(f"Attempting to set webhook to: {config.WEBHOOK_URL}")
-            success = await self.set_telegram_webhook(config.WEBHOOK_URL)
+        # Set webhook on startup - ensure correct URL format with bot token path
+        base_webhook_url = config.WEBHOOK_URL or "https://bot.optrixtrades.com"
+        # Ensure the webhook URL includes the bot token path
+        if "/webhook/" not in base_webhook_url:
+            webhook_url = f"{base_webhook_url}/webhook/{config.BOT_TOKEN}"
+        else:
+            webhook_url = base_webhook_url
+            
+        if webhook_url:
+            logger.info(f"Attempting to set webhook to: {webhook_url}")
+            success = await self.set_telegram_webhook(webhook_url)
             if success:
                 logger.info("[SUCCESS] Webhook set successfully on startup.")
             else:

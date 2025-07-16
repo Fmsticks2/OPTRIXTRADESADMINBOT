@@ -10,6 +10,7 @@
   <meta http-equiv="Expires" content="0" />
 
   <style>
+    /* Version 2.0 - Black Background with Green Blur Effects */
     * {
       margin: 0;
       padding: 0;
@@ -126,16 +127,34 @@
       <div class="feature">Professional Support</div>
     </div>
 
-    <a href="https://t.me/optrixtrades_bot" class="cta-button" id="joinBtn" onclick="trackConversion()">
-      Open Bot
+    <a href="https://t.me/optrixtrades_bot?start=welcome" class="cta-button" id="joinBtn" onclick="trackConversion()">
+      Open Trading Bot
     </a>
+    
+    <!-- Force refresh timestamp: 2025-01-16-15:15 -->
 
     <div class="redirect-info">
-      <span id="redirectText">Click the button above to access our Telegram bot!</span>
+      <p><strong>Important:</strong> After opening Telegram, please click the <strong>"START"</strong> button to begin!</p>
+      <p class="auto-redirect">Auto-redirecting in <span id="countdown">5</span> seconds...</p>
+      <p style="font-size: 0.8em; margin-top: 10px; opacity: 0.7;">💡 This is required by Telegram for your security</p>
     </div>
   </div>
 
   <script>
+    // Auto-redirect countdown timer (5 seconds)
+    let countdown = 5;
+    const countdownElement = document.getElementById('countdown');
+    
+    const timer = setInterval(function() {
+      countdown--;
+      countdownElement.textContent = countdown;
+      
+      if (countdown <= 0) {
+        clearInterval(timer);
+        window.location.href = 'https://t.me/optrixtrades_bot?start=welcome';
+      }
+    }, 1000);
+
     // Configuration (static)
     const config = {
       facebookPixelEnabled: false,

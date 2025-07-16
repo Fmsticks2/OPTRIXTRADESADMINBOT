@@ -21,8 +21,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     username = user.username or ""
     first_name = user.first_name or "User"
     
+    # Check if user came from landing page with start parameter
+    start_param = None
+    if context.args:
+        start_param = context.args[0] if context.args else None
+    
     # Enhanced logging for webhook debugging
     logger.info(f"START_COMMAND: Processing /start for user {user_id} ({username}) - {first_name}")
+    logger.info(f"START_COMMAND: context.args = {context.args}")
+    logger.info(f"START_COMMAND: start_param = {start_param}")
     
     # Check database connection status before attempting user registration
     from database.connection import create_user, db_manager
@@ -52,7 +59,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     # Log user interaction with error handling
     try:
-        await log_interaction(user_id, 'start_command', 'User started bot')
+        await log_interaction(user_id, 'start_command', f'User started bot with param: {start_param}')
         logger.info(f"START_COMMAND: User interaction logged for {user_id}")
     except Exception as e:
         logger.error(f"START_COMMAND: Failed to log interaction for user {user_id}: {e}")
@@ -64,10 +71,42 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         from telegram_bot.handlers.admin_handlers import admin_command
         return await admin_command(update, context)
     else:
-        logger.info(f"START_COMMAND: Redirecting regular user {user_id} to verification flow")
-        # Redirect to the verification flow for regular users
-        from telegram_bot.handlers.verification import start_verification
-        return await start_verification(update, context)
+        # Get user data to check verification status
+        from telegram_bot.utils.database_utils import get_user_data
+        user_data = await get_user_data(user_id)
+        
+        # Handle different start scenarios
+        if start_param == 'welcome':
+            logger.info(f"START_COMMAND: New user {user_id} from landing page, starting verification")
+            welcome_message = (
+                f"🎉 Welcome to OPTRIXTRADES, {first_name}!\n\n"
+                f"🚀 You're about to join our premium trading community.\n\n"
+                f"Let's get you verified and ready to receive exclusive trading signals!"
+            )
+            await update.message.reply_text(welcome_message)
+            # Start verification flow
+            from telegram_bot.handlers.verification import start_verification
+            return await start_verification(update, context)
+        else:
+            # Regular start command - check user status
+            if user_data and user_data.get('verification_status') == 'approved':
+                # Existing verified user
+                logger.info(f"START_COMMAND: Verified user {user_id} accessing main menu")
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📊 Main Menu", callback_data="main_menu")],
+                    [InlineKeyboardButton("👤 My Account", callback_data="account_menu")]
+                ])
+                await update.message.reply_text(
+                    f"👋 Welcome back, {first_name}!\n\n"
+                    f"Your account is verified and active.\n"
+                    f"Ready to access premium trading signals!",
+                    reply_markup=keyboard
+                )
+            else:
+                # New or unverified user
+                logger.info(f"START_COMMAND: Starting verification flow for user {user_id}")
+                from telegram_bot.handlers.verification import start_verification
+                return await start_verification(update, context)
 
 async def vip_signals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /vipsignals command"""
