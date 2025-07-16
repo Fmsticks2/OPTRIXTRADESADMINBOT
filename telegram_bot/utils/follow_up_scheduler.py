@@ -7,6 +7,9 @@ from typing import Dict, Any, Optional, List, Callable, Coroutine
 
 from telegram import Bot
 from telegram.ext import ContextTypes
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.jobstores.memory import MemoryJobStore
+from apscheduler.executors.asyncio import AsyncIOExecutor
 
 from config import BotConfig
 from telegram_bot.utils.error_handler import error_handler
@@ -20,6 +23,26 @@ class FollowUpScheduler:
         """Initialize the scheduler"""
         self.bot = bot
         self.scheduled_tasks = {}
+        
+        # Initialize APScheduler
+        jobstores = {
+            'default': MemoryJobStore()
+        }
+        executors = {
+            'default': AsyncIOExecutor()
+        }
+        job_defaults = {
+            'coalesce': False,
+            'max_instances': 3
+        }
+        
+        self.scheduler = AsyncIOScheduler(
+            jobstores=jobstores,
+            executors=executors,
+            job_defaults=job_defaults
+        )
+        self.scheduler.start()
+        
         self.follow_up_handlers = {
             1: self._get_day1_handler,
             2: self._get_day2_handler,
@@ -30,76 +53,106 @@ class FollowUpScheduler:
             7: self._get_day7_handler,
             8: self._get_day8_handler,
             9: self._get_day9_handler,
-            10: self._get_day10_handler
+            10: self._get_day10_handler,
         }
-        logger.info("Follow-up scheduler initialized")
+        logger.info("Follow-up scheduler initialized with APScheduler")
     
     async def schedule_follow_ups(self, user_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Schedule follow-up messages for a user"""
         # Cancel any existing follow-ups for this user
         await self.cancel_follow_ups(user_id)
         
+        # Store user context data for later use
+        user_data = {
+            'first_name': context.user_data.get('first_name', ''),
+            'username': context.user_data.get('username', ''),
+            'verified': context.user_data.get('verified', False)
+        }
+        
         # Schedule new follow-ups
         self.scheduled_tasks[user_id] = []
         
         # Schedule follow-ups for days 1-10
         for day in range(1, 11):
-            # Schedule task
-            task = asyncio.create_task(
-                self._schedule_follow_up(user_id, day, context)
+            # Calculate delay based on day (hours)
+            if day == 1:
+                delay_hours = 4  # First follow-up after 4 hours
+            else:
+                delay_hours = (day - 1) * 23  # Subsequent follow-ups approximately daily
+            
+            # Calculate run time
+            run_time = datetime.now() + timedelta(hours=delay_hours)
+            
+            # Schedule job with APScheduler
+            job = self.scheduler.add_job(
+                self._send_follow_up,
+                'date',
+                run_date=run_time,
+                args=[user_id, day, user_data],
+                id=f"followup_{user_id}_{day}",
+                replace_existing=True
             )
-            self.scheduled_tasks[user_id].append(task)
-        
-        logger.info(f"Scheduled follow-ups for user {user_id}")
+            
+            self.scheduled_tasks[user_id].append(job.id)
+            
+        logger.info(f"Scheduled {len(self.scheduled_tasks[user_id])} follow-ups for user {user_id}")
     
     async def cancel_follow_ups(self, user_id: int) -> None:
         """Cancel all scheduled follow-ups for a user"""
         if user_id in self.scheduled_tasks:
-            for task in self.scheduled_tasks[user_id]:
-                if not task.done():
-                    task.cancel()
+            for job_id in self.scheduled_tasks[user_id]:
+                try:
+                    self.scheduler.remove_job(job_id)
+                except Exception as e:
+                    logger.warning(f"Could not remove job {job_id}: {e}")
             del self.scheduled_tasks[user_id]
             logger.info(f"Cancelled follow-ups for user {user_id}")
     
-    async def _schedule_follow_up(self, user_id: int, day: int, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Schedule a follow-up message for a specific day"""
-        # Calculate delay based on day (hours)
-        if day == 1:
-            delay_hours = 4  # First follow-up after 4 hours
-        else:
-            delay_hours = (day - 1) * 23  # Subsequent follow-ups approximately daily
-        
-        # Sleep until it's time to send the follow-up
-        await asyncio.sleep(delay_hours * 3600)  # Convert hours to seconds
-        
-        # Check if user has completed verification
-        # This would need to be implemented based on your verification tracking
-        is_verified = context.user_data.get('verified', False)
-        
-        if not is_verified:
-            # Get the appropriate handler for this day
-            handler = self.follow_up_handlers.get(day)
-            if handler:
-                try:
+    async def _send_follow_up(self, user_id: int, day: int, user_data: Dict[str, Any]) -> None:
+        """Send a follow-up message for a specific day"""
+        try:
+            # Check if user has completed verification
+            is_verified = user_data.get('verified', False)
+            
+            if not is_verified:
+                # Get the appropriate handler for this day
+                handler = self.follow_up_handlers.get(day)
+                if handler:
                     # Create a fake update object with the user_id
                     class FakeUpdate:
-                        def __init__(self, user_id):
-                            self.effective_user = FakeUser(user_id)
+                        def __init__(self, user_id, user_data):
+                            self.effective_user = FakeUser(user_id, user_data)
                     
                     class FakeUser:
-                        def __init__(self, user_id):
+                        def __init__(self, user_id, user_data):
                             self.id = user_id
-                            # Try to get user data from context
-                            self.first_name = context.user_data.get('first_name', '')
-                            self.username = context.user_data.get('username', '')
+                            self.first_name = user_data.get('first_name', '')
+                            self.username = user_data.get('username', '')
                     
-                    fake_update = FakeUpdate(user_id)
+                    fake_update = FakeUpdate(user_id, user_data)
+                    
+                    # Create a minimal context for the handler
+                    from telegram.ext import ApplicationBuilder
+                    application = ApplicationBuilder().token(self.bot.token).build()
+                    context = ContextTypes.DEFAULT_TYPE(application=application)
+                    context.user_data = user_data
                     
                     # Call the handler
                     await handler()(fake_update, context)
                     logger.info(f"Sent day {day} follow-up to user {user_id}")
-                except Exception as e:
-                    logger.error(f"Error sending follow-up to user {user_id}: {e}")
+                else:
+                    logger.warning(f"No handler found for day {day} follow-up")
+            else:
+                logger.info(f"User {user_id} is verified, skipping day {day} follow-up")
+                
+        except Exception as e:
+            logger.error(f"Error sending day {day} follow-up to user {user_id}: {e}")
+            
+        # Remove this job from scheduled tasks
+        if user_id in self.scheduled_tasks:
+            job_id = f"followup_{user_id}_{day}"
+            if job_id in self.scheduled_tasks[user_id]:
+                self.scheduled_tasks[user_id].remove(job_id)
     
     def _get_day1_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for day 1 follow-up"""

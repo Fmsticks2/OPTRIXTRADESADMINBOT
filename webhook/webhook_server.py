@@ -319,6 +319,11 @@ class WebhookServer:
             # Setup handlers using the bot's setup method
             self.bot_instance._setup_handlers()
             
+            # Initialize follow-up scheduler (CRITICAL: This was missing!)
+            from telegram_bot.utils.follow_up_scheduler import init_follow_up_scheduler
+            self.bot_instance.follow_up_scheduler = init_follow_up_scheduler(self.application.bot)
+            logger.info("Follow-up scheduler initialized for webhook mode")
+            
             # Initialize application
             await self.application.initialize()
             await self.application.start()
