@@ -1,13 +1,250 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta http-equiv="refresh" content="0; url=https://t.me/{{bot_username}}">
-    <title>Redirecting to OPTRIXTRADES Bot</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OPTRIXTRADES - Premium Trading Signals</title>
+  <meta name="description" content="Join OPTRIXTRADES for premium trading signals and expert market analysis. Start your profitable trading journey today!"/>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+
+    .container {
+      text-align: center;
+      max-width: 500px;
+      padding: 40px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .logo {
+      font-size: 2.5em;
+      font-weight: bold;
+      margin-bottom: 20px;
+      background: linear-gradient(45deg, #FFD700, #FFA500);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 1.2em;
+      margin-bottom: 30px;
+      opacity: 0.9;
+    }
+
+    .features {
+      margin: 30px 0;
+      text-align: left;
+    }
+
+    .feature {
+      display: flex;
+      align-items: center;
+      margin: 15px 0;
+      font-size: 1.1em;
+    }
+
+    .feature::before {
+      content: "✓";
+      color: #4CAF50;
+      font-weight: bold;
+      margin-right: 15px;
+      font-size: 1.2em;
+    }
+
+    .cta-button {
+      display: inline-block;
+      background: linear-gradient(45deg, #4CAF50, #45a049);
+      color: white;
+      padding: 15px 30px;
+      text-decoration: none;
+      border-radius: 50px;
+      font-size: 1.2em;
+      font-weight: bold;
+      margin: 20px 0;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+    }
+
+    .cta-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+    }
+
+    .redirect-info {
+      margin-top: 20px;
+      font-size: 0.9em;
+      opacity: 0.8;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        margin: 20px;
+        padding: 30px 15px;
+      }
+
+      .logo {
+        font-size: 2em;
+      }
+
+      .subtitle {
+        font-size: 1em;
+      }
+    }
+  </style>
 </head>
 <body>
-    <p>Redirecting to OPTRIXTRADES Bot...</p>
-    <script>
-        window.location.href = "https://t.me/{{bot_username}}";
-    </script>
+  <div class="container">
+    <div class="logo">OPTRIXTRADES</div>
+    <div class="subtitle">Premium Trading Signals & Market Analysis</div>
+
+    <div class="features">
+      <div class="feature">Daily Premium Trading Signals</div>
+      <div class="feature">Expert Market Analysis</div>
+      <div class="feature">Real-time Trade Alerts</div>
+      <div class="feature">Professional Support</div>
+    </div>
+
+    <a href="https://t.me/optrixtrades_bot" class="cta-button" id="joinBtn" onclick="trackConversion()">
+      Join Our Telegram Bot
+    </a>
+
+    <div class="redirect-info">
+      <span id="redirectText">Click above to start trading with us!</span>
+      <span class="loading" id="loading" style="display: none;"></span>
+      <div id="countdown" style="margin-top: 10px; font-weight: bold;"></div>
+    </div>
+  </div>
+
+  <script>
+    // Configuration (static)
+    const config = {
+      autoRedirectDelay: 30,
+      engagementDelay: 5,
+      facebookPixelEnabled: false,
+      trackEngagement: false,
+      trackLeadConversion: false,
+      botUsername: "optrixtrades_bot"
+    };
+
+    function trackLead() {
+      if (config.facebookPixelEnabled && typeof fbq !== 'undefined') {
+        fbq('track', 'Lead', {
+          content_name: 'OPTRIXTRADES Bot Access',
+          content_category: 'Trading Bot',
+          value: 1.00,
+          currency: 'USD'
+        });
+      }
+    }
+
+    function trackEngagement() {
+      if (config.facebookPixelEnabled && typeof fbq !== 'undefined') {
+        fbq('track', 'ViewContent', {
+          content_name: 'Landing Page Engagement',
+          content_category: 'User Interaction'
+        });
+      }
+    }
+
+    function trackCheckout() {
+      if (config.facebookPixelEnabled && typeof fbq !== 'undefined') {
+        fbq('track', 'InitiateCheckout', {
+          content_name: 'Bot Registration Intent',
+          content_category: 'Trading Bot'
+        });
+      }
+    }
+
+    function trackConversion() {
+      if (config.facebookPixelEnabled) {
+        trackLead();
+      }
+    }
+
+    let countdownValue = Math.max(config.autoRedirectDelay, 10);
+    const redirectText = document.getElementById('redirectText');
+    const loading = document.getElementById('loading');
+    const countdownElement = document.getElementById('countdown');
+
+    function updateCountdown() {
+      if (countdownValue > 0) {
+        countdownElement.textContent = `Auto-redirecting in ${countdownValue} seconds...`;
+        countdownValue--;
+        setTimeout(updateCountdown, 1000);
+      } else {
+        redirectText.textContent = 'Redirecting to Telegram...';
+        countdownElement.textContent = '';
+        loading.style.display = 'inline-block';
+
+        if (config.facebookPixelEnabled && config.trackLeadConversion) {
+          trackCheckout();
+        }
+
+        setTimeout(() => {
+          window.location.href = `https://t.me/${config.botUsername}`;
+        }, 1000);
+      }
+    }
+
+    window.addEventListener('load', () => {
+      countdownElement.textContent = 'Welcome! Preparing your trading experience...';
+      setTimeout(() => {
+        updateCountdown();
+      }, 3000);
+    });
+
+    if (config.facebookPixelEnabled && config.trackEngagement) {
+      let engagementTracked = false;
+      setTimeout(() => {
+        if (!engagementTracked) {
+          trackEngagement();
+          engagementTracked = true;
+        }
+      }, config.engagementDelay * 1000);
+    }
+
+    window.addEventListener('beforeunload', (e) => {
+      if (countdownValue > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+  </script>
 </body>
 </html>
