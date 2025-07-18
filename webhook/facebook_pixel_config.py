@@ -12,7 +12,7 @@ class FacebookPixelConfig:
     """
     
     # Facebook Pixel Settings
-    FACEBOOK_PIXEL_ID: str = os.getenv('FACEBOOK_PIXEL_ID', 'YOUR_PIXEL_ID')
+    FACEBOOK_PIXEL_ID: str = os.getenv('FACEBOOK_PIXEL_ID', '4028331754048614')
     FACEBOOK_PIXEL_ENABLED: bool = os.getenv('FACEBOOK_PIXEL_ENABLED', 'true').lower() == 'true'
     
     # Tracking Events Configuration
