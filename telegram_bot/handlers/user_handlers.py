@@ -79,8 +79,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if start_param == 'welcome':
             logger.info(f"START_COMMAND: New user {user_id} from landing page, starting verification")
             welcome_message = (
-                f"🎉 Welcome to OPTRIXTRADES, {first_name}!\n\n"
-                f"🚀 You're about to join our premium trading community.\n\n"
+                f"🎉 Welcome!\n\n"
+                f"🚀 Its good to have you onboard with us\n\n"
                 f"Let's get you verified and ready to receive exclusive trading signals!"
             )
             await update.message.reply_text(welcome_message)
