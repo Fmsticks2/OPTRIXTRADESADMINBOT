@@ -58,8 +58,8 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_name = user.first_name or user.username or "there"
     
     # Welcome message (Flow 1)
-   # welcome_text = f"Hey {user_name}\n\n"
-    #welcome_text += "Welcome to OPTRIXTRADES\n"
+    welcome_text = f"Hey {user_name}\n\n"
+    welcome_text += "Welcome to OPTRIXTRADES\n"
     welcome_text += "You're one step away from unlocking high-accuracy trading signals, expert strategies, and real trader bonuses, completely free.\n\n"
     welcome_text += "Here's what you get as a member:\n"
     welcome_text += "✅ Daily VIP trading signals\n"
