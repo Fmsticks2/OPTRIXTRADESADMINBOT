@@ -15,6 +15,7 @@ warnings.filterwarnings("ignore", message=".*per_message.*CallbackQueryHandler.*
 
 from telegram_bot.handlers.user_handlers import (
     start_command,
+    get_started_callback,
     vip_signals_command,
     my_account_command,
     support_command,
@@ -183,6 +184,7 @@ def setup_all_handlers(bot):
     
     # Specific callback handlers
     bot.application.add_handler(CallbackQueryHandler(contact_support, pattern='^contact_support$'))
+    bot.application.add_handler(CallbackQueryHandler(get_started_callback, pattern='^get_started$'))
     # Note: admin_broadcast_callback, admin_search_user_callback, and admin_chat_history_callback
     # are handled by the ConversationHandler above, not as standalone handlers
     

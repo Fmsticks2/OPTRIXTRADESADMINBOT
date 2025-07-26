@@ -14,7 +14,60 @@ logger = logging.getLogger(__name__)
 # Placeholder functions that will need to be implemented with actual logic
 # These would be extracted from the original telegram_bot.py file
 
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle the Get Started button callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    first_name = query.from_user.first_name or "User"
+    
+    logger.info(f"GET_STARTED: User {user_id} clicked Get Started button")
+    
+    # Get user data from database
+    user_data = await get_user_data(user_id)
+    
+    # Check user verification status for the regular welcome flow
+    if user_data and user_data.get('verification_status') == 'approved':
+        # Existing verified user
+        logger.info(f"GET_STARTED: Verified user {user_id} accessing main menu")
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 Main Menu", callback_data="main_menu")],
+            [InlineKeyboardButton("👤 My Account", callback_data="account_menu")]
+        ])
+        await query.edit_message_text(
+            f"👋 Welcome back, {first_name}!\n\n"
+            f"Your account is verified and active.\n"
+            f"Ready to access premium trading signals!",
+            reply_markup=keyboard
+        )
+    else:
+        # New or unverified user - start verification flow
+        logger.info(f"GET_STARTED: Starting verification flow for user {user_id}")
+        
+        # Send the welcome message
+        welcome_text = f"Hey {first_name}\n\n"
+        welcome_text += "Welcome to OPTRIXTRADES\n"
+        welcome_text += "You're one step away from unlocking high-accuracy trading signals, expert strategies, and real trader bonuses, completely free.\n\n"
+        welcome_text += "Here's what you get as a member:\n"
+        welcome_text += "✅ Daily VIP trading signals\n"
+        welcome_text += "✅ Strategy sessions from 6-figure traders\n"
+        welcome_text += "✅ Access to our private trader community\n"
+        welcome_text += "✅ Exclusive signup bonuses (up to $500)\n\n"
+        welcome_text += "👇 Tap below to activate your free VIP access and get started."
+        
+        # Create keyboard with activation button and contact support
+        welcome_keyboard = [
+            [InlineKeyboardButton("➡️ Get Free VIP Access", callback_data="activation_instructions")],
+            [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+        ]
+        welcome_reply_markup = InlineKeyboardMarkup(welcome_keyboard)
+        
+        await query.edit_message_text(welcome_text, reply_markup=welcome_reply_markup)
+    
+    return ConversationHandler.END
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle the /start command"""
     user = update.effective_user
     user_id = user.id
@@ -88,7 +141,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             # Create inline keyboard with channel links
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("📱 Join Telegram Channel", url="https://t.me/Optrixtradeschannel")],
-                [InlineKeyboardButton("📱 Join WhatsApp Channel", url="https://whatsapp.com/channel/0029VbALds8GufIqYtg4uY1W")]
+                [InlineKeyboardButton("📱 Join WhatsApp Channel", url="https://whatsapp.com/channel/0029VbALds8GufIqYtg4uY1W")],
+                [InlineKeyboardButton("🚀 Get Started", callback_data="get_started")]
             ])
             
             await update.message.reply_text(welcome_message, reply_markup=keyboard, parse_mode='Markdown')
