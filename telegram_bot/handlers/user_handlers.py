@@ -4,10 +4,10 @@ import logging
 from typing import Dict, Any, Optional, List
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, ConversationHandler
 
 from config import BotConfig
-from database.connection import log_interaction
+from database.connection import log_interaction, get_user_data
 
 logger = logging.getLogger(__name__)
 
@@ -15,28 +15,30 @@ logger = logging.getLogger(__name__)
 # These would be extracted from the original telegram_bot.py file
 
 async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle the Get Started button callback"""
+    """Handle the Get Started button callback by simulating /start command"""
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
-    first_name = query.from_user.first_name or "User"
+    logger.info(f"GET_STARTED: User {user_id} clicked Get Started button - triggering normal /start flow")
     
-    logger.info(f"GET_STARTED: User {user_id} clicked Get Started button")
+    # Create a new update object that simulates a /start command
+    # We'll modify the update to look like a regular message instead of callback
+    from telegram import Message, Chat, User
     
     # Get user data from database
     user_data = await get_user_data(user_id)
     
     # Check user verification status for the regular welcome flow
     if user_data and user_data.get('verification_status') == 'approved':
-        # Existing verified user
+        # Existing verified user - show main menu
         logger.info(f"GET_STARTED: Verified user {user_id} accessing main menu")
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("📊 Main Menu", callback_data="main_menu")],
             [InlineKeyboardButton("👤 My Account", callback_data="account_menu")]
         ])
         await query.edit_message_text(
-            f"👋 Welcome back, {first_name}!\n\n"
+            f"👋 Welcome back, {query.from_user.first_name or 'User'}!\n\n"
             f"Your account is verified and active.\n"
             f"Ready to access premium trading signals!",
             reply_markup=keyboard
@@ -44,28 +46,35 @@ async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         # New or unverified user - start verification flow
         logger.info(f"GET_STARTED: Starting verification flow for user {user_id}")
+        from telegram_bot.handlers.verification import start_verification
         
-        # Send the welcome message
-        welcome_text = f"Hey {first_name}\n\n"
-        welcome_text += "Welcome to OPTRIXTRADES\n"
-        welcome_text += "You're one step away from unlocking high-accuracy trading signals, expert strategies, and real trader bonuses, completely free.\n\n"
-        welcome_text += "Here's what you get as a member:\n"
-        welcome_text += "✅ Daily VIP trading signals\n"
-        welcome_text += "✅ Strategy sessions from 6-figure traders\n"
-        welcome_text += "✅ Access to our private trader community\n"
-        welcome_text += "✅ Exclusive signup bonuses (up to $500)\n\n"
-        welcome_text += "👇 Tap below to activate your free VIP access and get started."
+        # Create a mock message update to pass to start_verification
+        # We need to delete the current message and send a new one
+        await query.delete_message()
         
-        # Create keyboard with activation button and contact support
-        welcome_keyboard = [
-            [InlineKeyboardButton("➡️ Get Free VIP Access", callback_data="activation_instructions")],
-            [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
-        ]
-        welcome_reply_markup = InlineKeyboardMarkup(welcome_keyboard)
+        # Create a new message to the user to trigger verification
+        await context.bot.send_message(
+            chat_id=user_id,
+            text="Starting your verification process..."
+        )
         
-        await query.edit_message_text(welcome_text, reply_markup=welcome_reply_markup)
+        # Create a mock update for start_verification
+        mock_message = type('MockMessage', (), {
+            'from_user': query.from_user,
+            'chat': query.message.chat,
+            'reply_text': lambda text, reply_markup=None, parse_mode=None: context.bot.send_message(
+                chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode
+            )
+        })()
+        
+        mock_update = type('MockUpdate', (), {
+            'message': mock_message,
+            'effective_user': query.from_user
+        })()
+        
+        return await start_verification(mock_update, context)
     
-    return ConversationHandler.END
+    return None
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle the /start command"""
