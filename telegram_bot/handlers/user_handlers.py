@@ -33,7 +33,8 @@ async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             [InlineKeyboardButton("📊 Main Menu", callback_data="main_menu")],
             [InlineKeyboardButton("👤 My Account", callback_data="account_menu")]
         ])
-        await query.edit_message_text(
+        # Send new message instead of editing to keep original message visible
+        await query.message.reply_text(
             f"👋 Welcome back, {query.from_user.first_name or 'User'}!\n\n"
             f"Your account is verified and active.\n"
             f"Ready to access premium trading signals!",
@@ -44,9 +45,27 @@ async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         logger.info(f"GET_STARTED: Starting verification flow for user {user_id}")
         from telegram_bot.handlers.verification import start_verification
         
-        # Call start_verification directly with the current update (callback query)
-        # The start_verification function can handle callback queries
-        return await start_verification(update, context)
+        # Create a new update object that simulates a regular message instead of callback query
+        # This prevents start_verification from editing the original message
+        class MockMessage:
+            def __init__(self, original_message):
+                self.chat = original_message.chat
+                self.from_user = original_message.from_user
+                self.message_id = original_message.message_id
+                
+            async def reply_text(self, text, **kwargs):
+                # Send new message to chat instead of editing
+                return await query.message.chat.send_message(text, **kwargs)
+        
+        class MockUpdate:
+            def __init__(self, original_update):
+                self.message = MockMessage(original_update.callback_query.message)
+                self.effective_user = original_update.effective_user
+                self.effective_chat = original_update.effective_chat
+                self.callback_query = None  # Remove callback query to simulate regular message
+        
+        mock_update = MockUpdate(update)
+        return await start_verification(mock_update, context)
     
     return None
 
