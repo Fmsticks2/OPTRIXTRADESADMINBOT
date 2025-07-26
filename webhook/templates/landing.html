@@ -165,18 +165,16 @@
       <div class="feature">Live training sessions</div>
     </div>
 
-    <a href="https://t.me/Optrixtradeschannel" class="cta-button" id="joinBtn" onclick="trackConversion()">
+    <a href="https://t.me/optrixtrades_bot?start=welcome" class="cta-button" id="joinBtn" onclick="trackConversion()">
       Join channel
     </a>
     
     <!-- Force refresh timestamp: 2025-01-16-15:15 -->
 
     <div class="redirect-info">
-      <p><strong>Welcome!</strong></p>
-      <p>Glad to have you onboard with us, join these channels to get access to our free trading tools and signals</p>
-      <p><strong>Telegram channel</strong> - <a href="https://t.me/Optrixtradeschannel" style="color: #4CAF50;">https://t.me/Optrixtradeschannel</a></p>
-      <p><strong>WhatsApp channel</strong> - <a href="https://whatsapp.com/channel/0029VbALds8GufIqYtg4uY1W" style="color: #4CAF50;">https://whatsapp.com/channel/0029VbALds8GufIqYtg4uY1W</a></p>
+      <p><strong>Important:</strong> After opening Telegram, please click the <strong>"START"</strong> button to begin!</p>
       <p class="auto-redirect">Auto-redirecting in <span id="countdown">5</span> seconds...</p>
+      <p style="font-size: 0.8em; margin-top: 10px; opacity: 0.7;">💡 This is required by Telegram for your security</p>
     </div>
   </div>
 
@@ -191,7 +189,7 @@
       
       if (countdown <= 0) {
         clearInterval(timer);
-        window.location.href = 'https://t.me/Optrixtradeschannel';
+        window.location.href = 'https://t.me/optrixtrades_bot?start=welcome';
       }
     }, 1000);
 
