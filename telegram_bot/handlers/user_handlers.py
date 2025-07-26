@@ -77,16 +77,22 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         # Handle different start scenarios
         if start_param == 'welcome':
-            logger.info(f"START_COMMAND: New user {user_id} from landing page, starting verification")
+            logger.info(f"START_COMMAND: New user {user_id} from landing page, showing channel links")
             welcome_message = (
                 f"🎉 Welcome!\n\n"
-                f"🚀 Its good to have you onboard with us\n\n"
-                f"Let's get you verified and ready to receive exclusive trading signals!"
+                f"Glad to have you onboard with us, join these channels to get access to our free trading tools and signals\n\n"
+                f"📱 **Telegram channel** - https://t.me/Optrixtradeschannel\n\n"
+                f"📱 **WhatsApp channel** - https://whatsapp.com/channel/0029VbALds8GufIqYtg4uY1W"
             )
-            await update.message.reply_text(welcome_message)
-            # Start verification flow
-            from telegram_bot.handlers.verification import start_verification
-            return await start_verification(update, context)
+            
+            # Create inline keyboard with channel links
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📱 Join Telegram Channel", url="https://t.me/Optrixtradeschannel")],
+                [InlineKeyboardButton("📱 Join WhatsApp Channel", url="https://whatsapp.com/channel/0029VbALds8GufIqYtg4uY1W")]
+            ])
+            
+            await update.message.reply_text(welcome_message, reply_markup=keyboard, parse_mode='Markdown')
+            return
         else:
             # Regular start command - check user status
             if user_data and user_data.get('verification_status') == 'approved':
