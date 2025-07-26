@@ -15,16 +15,12 @@ logger = logging.getLogger(__name__)
 # These would be extracted from the original telegram_bot.py file
 
 async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle the Get Started button callback by simulating /start command"""
+    """Handle the Get Started button callback by triggering verification flow"""
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
-    logger.info(f"GET_STARTED: User {user_id} clicked Get Started button - triggering normal /start flow")
-    
-    # Create a new update object that simulates a /start command
-    # We'll modify the update to look like a regular message instead of callback
-    from telegram import Message, Chat, User
+    logger.info(f"GET_STARTED: User {user_id} clicked Get Started button - starting verification flow")
     
     # Get user data from database
     user_data = await get_user_data(user_id)
@@ -48,31 +44,9 @@ async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         logger.info(f"GET_STARTED: Starting verification flow for user {user_id}")
         from telegram_bot.handlers.verification import start_verification
         
-        # Create a mock message update to pass to start_verification
-        # We need to delete the current message and send a new one
-        await query.delete_message()
-        
-        # Create a new message to the user to trigger verification
-        await context.bot.send_message(
-            chat_id=user_id,
-            text="Starting your verification process..."
-        )
-        
-        # Create a mock update for start_verification
-        mock_message = type('MockMessage', (), {
-            'from_user': query.from_user,
-            'chat': query.message.chat,
-            'reply_text': lambda text, reply_markup=None, parse_mode=None: context.bot.send_message(
-                chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode=parse_mode
-            )
-        })()
-        
-        mock_update = type('MockUpdate', (), {
-            'message': mock_message,
-            'effective_user': query.from_user
-        })()
-        
-        return await start_verification(mock_update, context)
+        # Call start_verification directly with the current update (callback query)
+        # The start_verification function can handle callback queries
+        return await start_verification(update, context)
     
     return None
 
