@@ -134,10 +134,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         if start_param == 'welcome':
             logger.info(f"START_COMMAND: New user {user_id} from landing page, showing channel links")
             welcome_message = (
-                f"🎉 Welcome!\n\n"
-                f"Glad to have you onboard with us, join these channels to get access to our free trading tools and signals\n\n"
-                f"📱 **Telegram channel** - https://t.me/Optrixtradeschannel\n\n"
-                f"📱 **WhatsApp channel** - https://whatsapp.com/channel/0029VbALds8GufIqYtg4uY1W"
+                f"🎉 Welcome to OPTRIXTRADES\n\n"
+                f"Glad to have you onboard with us, join these channels to get access to our free trading tools and signals (either vip signals or our auto trading bot)\n\n"
+                f"DO WELL TO PIN AND UNMUTE THE CHANNEL\n\n"
+                f"📱 Telegram channel - `https://t.me/Optrixtradeschannel`\n\n"
+                f"📱 WhatsApp channel - `https://whatsapp.com/channel/0029VbALds8GufIqYtg4uY1W`"
             )
             
             # Create inline keyboard with channel links

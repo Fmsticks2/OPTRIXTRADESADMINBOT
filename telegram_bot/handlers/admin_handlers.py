@@ -32,7 +32,8 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         admin_text += "📋 **Queue** - View pending verification requests\n"
         admin_text += "📢 **Broadcast** - Send message to all users\n"
         admin_text += "🔍 **Search User** - Find user by ID or username\n"
-        admin_text += "👥 **All Users** - View all registered users\n\n"
+        admin_text += "👥 **All Users** - View all registered users\n"
+        admin_text += "📊 **User Activity** - View recent user interactions\n\n"
         admin_text += "Use the buttons below or type commands directly."
         
         keyboard = [
@@ -40,6 +41,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
              InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
             [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user"),
              InlineKeyboardButton("👥 All Users", callback_data="admin_all_users")],
+            [InlineKeyboardButton("📊 User Activity", callback_data="admin_user_activity")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
@@ -120,24 +122,50 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
     
-    await update.message.reply_text("📢 Please enter the message to broadcast to all users:")
+    broadcast_text = (
+        "📢 **Broadcast Message**\n\n"
+        "You can send either:\n"
+        "• **Text message** - Just type your message\n"
+        "• **Image with caption** - Send a photo with text caption\n\n"
+        "The message will be sent to all registered users."
+    )
+    
+    keyboard = [[InlineKeyboardButton("❌ Cancel", callback_data="admin_dashboard")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(broadcast_text, parse_mode='Markdown', reply_markup=reply_markup)
     context.user_data['admin_action'] = 'broadcast'
     return BROADCAST_MESSAGE
 
 async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle broadcast message input"""
+    """Handle broadcast message input (text or photo with caption)"""
     user_id = update.effective_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
         await update.message.reply_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
     
-    broadcast_message = update.message.text
-    logger.info(f"Admin {user_id} attempting to broadcast message: {broadcast_message[:50]}...")
-    
     # Check if user is in broadcast conversation state
     if context.user_data.get('admin_action') != 'broadcast':
         logger.warning(f"User {user_id} sent broadcast message but not in broadcast state")
         return ConversationHandler.END
+    
+    # Determine message type and content
+    message_type = 'text'
+    broadcast_message = None
+    photo_file_id = None
+    
+    if update.message.photo:
+        message_type = 'photo'
+        photo_file_id = update.message.photo[-1].file_id  # Get highest resolution
+        broadcast_message = update.message.caption or ""  # Caption can be empty
+        logger.info(f"Admin {user_id} attempting to broadcast photo with caption: {broadcast_message[:50] if broadcast_message else 'No caption'}...")
+    elif update.message.text:
+        message_type = 'text'
+        broadcast_message = update.message.text
+        logger.info(f"Admin {user_id} attempting to broadcast text message: {broadcast_message[:50]}...")
+    else:
+        await update.message.reply_text("❌ Please send either a text message or a photo with caption.")
+        return BROADCAST_MESSAGE
     
     try:
         # Get all users
@@ -175,11 +203,18 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
             return ConversationHandler.END
         
         # Send confirmation with persistent message
-        confirmation_text = (
-            f"📢 **Broadcasting message to {len(target_users)} users...**\n\n"
-            f"**Message Preview:**\n{broadcast_message}\n\n"
-            f"⏳ Please wait while the message is being sent..."
-        )
+        if message_type == 'photo':
+            confirmation_text = (
+                f"📢 **Broadcasting photo to {len(target_users)} users...**\n\n"
+                f"**Caption Preview:**\n{broadcast_message if broadcast_message else 'No caption'}\n\n"
+                f"⏳ Please wait while the photo is being sent..."
+            )
+        else:
+            confirmation_text = (
+                f"📢 **Broadcasting message to {len(target_users)} users...**\n\n"
+                f"**Message Preview:**\n{broadcast_message}\n\n"
+                f"⏳ Please wait while the message is being sent..."
+            )
         
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -215,16 +250,25 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
             #     continue
             
             try:
-                await context.bot.send_message(
-                    chat_id=user_id_to_send,
-                    text=broadcast_message,
-                    parse_mode='Markdown'
-                )
+                if message_type == 'photo':
+                    await context.bot.send_photo(
+                        chat_id=user_id_to_send,
+                        photo=photo_file_id,
+                        caption=broadcast_message if broadcast_message else None,
+                        parse_mode='Markdown' if broadcast_message else None
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=user_id_to_send,
+                        text=broadcast_message,
+                        parse_mode='Markdown'
+                    )
                 success_count += 1
                 logger.info(f"Broadcast sent successfully to user {user_id_to_send}")
                 
                 # Log the broadcast
-                await log_interaction(user_id_to_send, 'broadcast_received', broadcast_message)
+                log_message = f"{message_type}: {broadcast_message if broadcast_message else 'Photo without caption'}"
+                await log_interaction(user_id_to_send, 'broadcast_received', log_message)
                 
             except Exception as e:
                 logger.error(f"Failed to send broadcast to user {user_id_to_send}: {e}")
@@ -238,7 +282,11 @@ async def handle_broadcast_message(update: Update, context: ContextTypes.DEFAULT
         report_text += f"• Successfully sent: {success_count}\n"
         report_text += f"• Failed: {failed_count}\n"
         report_text += f"• Total users: {len(target_users)}\n\n"
-        report_text += f"**Original Message:**\n{broadcast_message}"
+        
+        if message_type == 'photo':
+            report_text += f"**Original Photo Caption:**\n{broadcast_message if broadcast_message else 'No caption'}"
+        else:
+            report_text += f"**Original Message:**\n{broadcast_message}"
         
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -799,6 +847,78 @@ async def admin_recent_activity_callback(update: Update, context: ContextTypes.D
     except Exception as e:
         logger.error(f"Error in admin_recent_activity_callback: {e}")
         error_text = "❌ Error retrieving recent activity data."
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.reply_text(error_text, reply_markup=reply_markup)
+        return ConversationHandler.END
+    
+    return ConversationHandler.END
+
+async def admin_user_activity_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle admin user activity callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    try:
+        # Import the function to get recent activity
+        from telegram_bot.utils.database_utils import get_recent_activity
+        
+        # Get recent user interactions (last 50 interactions)
+        recent_interactions = await get_recent_activity(limit=50)
+        
+        response_text = "📊 **Recent User Activity**\n\n"
+        
+        if recent_interactions:
+            response_text += f"📈 **Last {len(recent_interactions)} Interactions:**\n\n"
+            
+            for i, interaction in enumerate(recent_interactions[:20], 1):  # Show only first 20
+                user_id_int = interaction.get('user_id', 'Unknown')
+                action = interaction.get('action', 'Unknown')
+                details = interaction.get('details', '')
+                timestamp = interaction.get('timestamp', 'Unknown')
+                
+                # Format timestamp if it's a datetime object
+                if hasattr(timestamp, 'strftime'):
+                    time_str = timestamp.strftime('%Y-%m-%d %H:%M')
+                else:
+                    time_str = str(timestamp)
+                
+                response_text += f"{i}. **User {user_id_int}**\n"
+                response_text += f"   Action: {action}\n"
+                if details and len(details) > 50:
+                    response_text += f"   Details: {details[:50]}...\n"
+                elif details:
+                    response_text += f"   Details: {details}\n"
+                response_text += f"   Time: {time_str}\n\n"
+            
+            if len(recent_interactions) > 20:
+                response_text += f"... and {len(recent_interactions) - 20} more interactions.\n\n"
+            
+            # Add summary statistics
+            action_counts = {}
+            for interaction in recent_interactions:
+                action = interaction.get('action', 'Unknown')
+                action_counts[action] = action_counts.get(action, 0) + 1
+            
+            response_text += "📋 **Action Summary:**\n"
+            for action, count in sorted(action_counts.items(), key=lambda x: x[1], reverse=True):
+                response_text += f"• {action}: {count}\n"
+        else:
+            response_text += "📭 No recent user interactions found."
+        
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.message.reply_text(response_text, parse_mode='Markdown', reply_markup=reply_markup)
+        
+    except Exception as e:
+        logger.error(f"Error in admin_user_activity_callback: {e}")
+        error_text = "❌ Error retrieving user activity data."
         keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.message.reply_text(error_text, reply_markup=reply_markup)

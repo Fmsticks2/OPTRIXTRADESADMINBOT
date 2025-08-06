@@ -13,6 +13,7 @@ from apscheduler.executors.asyncio import AsyncIOExecutor
 
 from config import BotConfig
 from telegram_bot.utils.error_handler import error_handler
+from telegram_bot.utils.follow_up_handlers import FollowUpHandlers
 
 logger = logging.getLogger(__name__)
 
@@ -43,17 +44,32 @@ class FollowUpScheduler:
         )
         self.scheduler.start()
         
+        self.handlers = FollowUpHandlers(bot)
         self.follow_up_handlers = {
-            1: self._get_day1_handler,
-            2: self._get_day2_handler,
-            3: self._get_day3_handler,
-            4: self._get_day4_handler,
-            5: self._get_day5_handler,
-            6: self._get_day6_handler,
-            7: self._get_day7_handler,
-            8: self._get_day8_handler,
-            9: self._get_day9_handler,
-            10: self._get_day10_handler,
+            1: self.handlers.get_sequence1_handler,
+            2: self.handlers.get_sequence2_handler,
+            3: self.handlers.get_sequence3_handler,
+            4: self.handlers.get_sequence4_handler,
+            5: self.handlers.get_sequence5_handler,
+            6: self.handlers.get_sequence6_handler,
+            7: self.handlers.get_sequence7_handler,
+            8: self.handlers.get_sequence8_handler,
+            9: self.handlers.get_sequence9_handler,
+            10: self.handlers.get_sequence10_handler,
+            11: self.handlers.get_sequence11_handler,
+            12: self.handlers.get_sequence12_handler,
+            13: self.handlers.get_sequence13_handler,
+            14: self.handlers.get_sequence14_handler,
+            15: self.handlers.get_sequence15_handler,
+            16: self.handlers.get_sequence16_handler,
+            17: self.handlers.get_sequence17_handler,
+            18: self.handlers.get_sequence18_handler,
+            19: self.handlers.get_sequence19_handler,
+            20: self.handlers.get_sequence20_handler,
+            21: self.handlers.get_sequence21_handler,
+            22: self.handlers.get_sequence22_handler,
+            23: self.handlers.get_sequence23_handler,
+            24: self.handlers.get_sequence24_handler,
         }
         logger.info("Follow-up scheduler initialized with APScheduler")
     
@@ -72,13 +88,10 @@ class FollowUpScheduler:
         # Schedule new follow-ups
         self.scheduled_tasks[user_id] = []
         
-        # Schedule follow-ups for days 1-10
-        for day in range(1, 11):
-            # Calculate delay based on day (hours)
-            if day == 1:
-                delay_hours = 4  # First follow-up after 4 hours
-            else:
-                delay_hours = (day - 1) * 23  # Subsequent follow-ups approximately daily
+        # Schedule follow-ups with 7.5-8 hour intervals
+        for sequence in range(1, 25):  # Extended to 24 sequences based on newfollowup.txt
+            # Calculate delay based on sequence (7.5-8 hours between each)
+            delay_hours = sequence * 8  # 8 hours between each follow-up
             
             # Calculate run time
             run_time = datetime.now() + timedelta(hours=delay_hours)
@@ -88,8 +101,8 @@ class FollowUpScheduler:
                 self._send_follow_up,
                 'date',
                 run_date=run_time,
-                args=[user_id, day, user_data],
-                id=f"followup_{user_id}_{day}",
+                args=[user_id, sequence, user_data],
+                id=f"followup_{user_id}_{sequence}",
                 replace_existing=True
             )
             
@@ -108,15 +121,15 @@ class FollowUpScheduler:
             del self.scheduled_tasks[user_id]
             logger.info(f"Cancelled follow-ups for user {user_id}")
     
-    async def _send_follow_up(self, user_id: int, day: int, user_data: Dict[str, Any]) -> None:
-        """Send a follow-up message for a specific day"""
+    async def _send_follow_up(self, user_id: int, sequence: int, user_data: Dict[str, Any]) -> None:
+        """Send a follow-up message for a specific sequence"""
         try:
             # Check if user has completed verification
             is_verified = user_data.get('verified', False)
             
             if not is_verified:
-                # Get the appropriate handler for this day
-                handler = self.follow_up_handlers.get(day)
+                # Get the appropriate handler for this sequence
+                handler = self.follow_up_handlers.get(sequence)
                 if handler:
                     # Create a fake update object with the user_id
                     class FakeUpdate:
@@ -139,256 +152,22 @@ class FollowUpScheduler:
                     
                     # Call the handler
                     await handler()(fake_update, context)
-                    logger.info(f"Sent day {day} follow-up to user {user_id}")
+                    logger.info(f"Sent sequence {sequence} follow-up to user {user_id}")
                 else:
-                    logger.warning(f"No handler found for day {day} follow-up")
+                    logger.warning(f"No handler found for sequence {sequence} follow-up")
             else:
-                logger.info(f"User {user_id} is verified, skipping day {day} follow-up")
+                logger.info(f"User {user_id} is verified, skipping sequence {sequence} follow-up")
                 
         except Exception as e:
-            logger.error(f"Error sending day {day} follow-up to user {user_id}: {e}")
+            logger.error(f"Error sending sequence {sequence} follow-up to user {user_id}: {e}")
             
         # Remove this job from scheduled tasks
         if user_id in self.scheduled_tasks:
-            job_id = f"followup_{user_id}_{day}"
+            job_id = f"followup_{user_id}_{sequence}"
             if job_id in self.scheduled_tasks[user_id]:
                 self.scheduled_tasks[user_id].remove(job_id)
     
-    def _get_day1_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
-        """Get handler for day 1 follow-up"""
-        from telegram_bot.handlers.verification import followup_day1
-        return followup_day1
-    
-    def _get_day2_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
-        """Get handler for day 2 follow-up"""
-        from telegram_bot.handlers.verification import followup_day2
-        return followup_day2
-    
-    def _get_day3_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
-        """Get handler for day 3 follow-up"""
-        # This would be implemented in verification.py
-        @error_handler
-        async def followup_day3(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
-            """Send follow-up message for day 3 (value recap)"""
-            user = update.effective_user
-            
-            followup_text = "Hey! Just wanted to remind you of everything you get for free once you sign up:\n"
-            followup_text += "✅ Daily VIP signals\n"
-            followup_text += "✅ Auto-trading bot\n"
-            followup_text += "✅ Strategy sessions\n"
-            followup_text += "✅ Private trader group\n"
-            followup_text += "✅ Up to $500 in deposit bonuses\n"
-            followup_text += "And yes, it's still 100% free when you use our broker link 👇"
-            
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [InlineKeyboardButton("➡️ I'm Ready to Activate", callback_data="activation_instructions")],
-                [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await self.bot.send_message(
-                chat_id=user.id,
-                text=followup_text,
-                reply_markup=reply_markup
-            )
-        
-        return followup_day3
-    
-    def _get_day4_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
-        """Get handler for day 4 follow-up"""
-        # This would be implemented in verification.py
-        @error_handler
-        async def followup_day4(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
-            """Send follow-up message for day 4 (personal + soft CTA)"""
-            user = update.effective_user
-            
-            followup_text = "👀 You've been on our early access list for a few days…\n"
-            followup_text += "If you're still interested but something's holding you back, reply to this message and let's help\n"
-            followup_text += "you sort it out.\n"
-            followup_text += "Even if you don't have a big budget right now, we'll guide you to start small and smart."
-            
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [InlineKeyboardButton("➡️ I Have a Question", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")],
-                [InlineKeyboardButton("➡️ Continue Activation", callback_data="activation_instructions")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await self.bot.send_message(
-                chat_id=user.id,
-                text=followup_text,
-                reply_markup=reply_markup
-            )
-        
-        return followup_day4
-    
-    def _get_day5_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
-        """Get handler for day 5 follow-up"""
-        # This would be implemented in verification.py
-        @error_handler
-        async def followup_day5(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
-            """Send follow-up message for day 5 (last chance + exit option)"""
-            user = update.effective_user
-            
-            followup_text = "📌 Last call to claim your free access to OPTRIXTRADES.\n"
-            followup_text += "This week's onboarding closes in a few hours. After that, you'll need to wait for the next batch,\n"
-            followup_text += "no guarantees it'll still be free.\n"
-            followup_text += "Want in?"
-            
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [InlineKeyboardButton("✅ Yes, Activate Me Now", callback_data="activation_instructions")],
-                [InlineKeyboardButton("❌ Not Interested", callback_data="not_interested")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await self.bot.send_message(
-                chat_id=user.id,
-                text=followup_text,
-                reply_markup=reply_markup
-            )
-        
-        return followup_day5
-    
-    # Implement the remaining handlers similarly
-    def _get_day6_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
-        """Get handler for day 6 follow-up"""
-        @error_handler
-        async def followup_day6(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
-            """Send follow-up message for day 6 (education + trust-building)"""
-            user = update.effective_user
-            
-            followup_text = "Wondering if OPTRIXTRADES is legit?\n"
-            followup_text += "We totally get it. That's why we host free sessions, give access to our AI, and don't charge\n"
-            followup_text += "upfront.\n"
-            followup_text += "✅ Real traders use us.\n"
-            followup_text += "✅ Real results.\n"
-            followup_text += "✅ Real support, 24/7.\n"
-            followup_text += "We only earn a small % when you win. That's why we want to help you trade smarter.\n"
-            followup_text += "Want to test us out with just $20?"
-            
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [InlineKeyboardButton("➡️ Try With $20 I'm Curious", callback_data="activation_instructions")],
-                [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await self.bot.send_message(
-                chat_id=user.id,
-                text=followup_text,
-                reply_markup=reply_markup
-            )
-        
-        return followup_day6
-    
-    def _get_day7_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
-        """Get handler for day 7 follow-up"""
-        @error_handler
-        async def followup_day7(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
-            """Send follow-up message for day 7 (light humor + re-activation)"""
-            user = update.effective_user
-            
-            followup_text = "Okay… we're starting to think you're ghosting us 😂\n"
-            followup_text += "But seriously, if you've been busy, no stress. Just pick up where you left off and grab your free\n"
-            followup_text += "access before this week closes.\n"
-            followup_text += "The AI bot is still available for new traders using our link."
-            
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [InlineKeyboardButton("➡️ Okay, Let's Do This", callback_data="activation_instructions")],
-                [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await self.bot.send_message(
-                chat_id=user.id,
-                text=followup_text,
-                reply_markup=reply_markup
-            )
-        
-        return followup_day7
-    
-    def _get_day8_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
-        """Get handler for day 8 follow-up"""
-        @error_handler
-        async def followup_day8(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
-            """Send follow-up message for day 8 (FOMO + new success update)"""
-            user = update.effective_user
-            
-            followup_text = "Another trader just flipped a $100 deposit into $390 using our AI bot + signal combo in 4 days.\n"
-            followup_text += "We can't guarantee profits, but the tools work when used right.\n"
-            followup_text += "If you missed your shot last time, you're still eligible now 👇"
-            
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [InlineKeyboardButton("➡️ Activate My Tools Now", callback_data="activation_instructions")],
-                [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await self.bot.send_message(
-                chat_id=user.id,
-                text=followup_text,
-                reply_markup=reply_markup
-            )
-        
-        return followup_day8
-    
-    def _get_day9_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
-        """Get handler for day 9 follow-up"""
-        @error_handler
-        async def followup_day9(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
-            """Send follow-up message for day 9 (let's help you start small offer)"""
-            user = update.effective_user
-            
-            followup_text = "💡 Still on the fence?\n"
-            followup_text += "What if you start small with $20, get access to our signals, and scale up when you're ready?\n"
-            followup_text += "No pressure. We've helped hundreds of new traders start from scratch and grow step by step.\n"
-            followup_text += "Ready to test it out?"
-            
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [InlineKeyboardButton("➡️ Start Small, Grow Fast", callback_data="activation_instructions")],
-                [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await self.bot.send_message(
-                chat_id=user.id,
-                text=followup_text,
-                reply_markup=reply_markup
-            )
-        
-        return followup_day9
-    
-    def _get_day10_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
-        """Get handler for day 10 follow-up"""
-        @error_handler
-        async def followup_day10(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
-            """Send follow-up message for day 10 (hard close)"""
-            user = update.effective_user
-            
-            followup_text = "⏳ FINAL REMINDER\n"
-            followup_text += "We're closing registrations today for this round of free VIP access. No promises it'll open again,\n"
-            followup_text += "especially not at this level of access.\n"
-            followup_text += "If you want in, this is it."
-            
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            keyboard = [
-                [InlineKeyboardButton("➡️ ✅ Count Me In", callback_data="activation_instructions")],
-                [InlineKeyboardButton("➡️ ❌ Remove Me From This List", callback_data="remove_from_list")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await self.bot.send_message(
-                chat_id=user.id,
-                text=followup_text,
-                reply_markup=reply_markup
-            )
-        
-        return followup_day10
+
 
 # Singleton instance
 follow_up_scheduler = None
