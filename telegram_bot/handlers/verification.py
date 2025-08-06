@@ -340,11 +340,9 @@ async def deposit_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await query.answer()
     
     deposit_text = "Here's how to make a deposit with our broker partner:\n\n"
-    deposit_text += "1. Log in to your account\n"
-    deposit_text += "2. Navigate to the Deposit section\n"
-    deposit_text += "3. Choose your preferred payment method\n"
-    deposit_text += "4. Follow the instructions to complete your deposit\n\n"
-    deposit_text += "💡 Need additional help? Contact our support team."
+    deposit_text += "◽Check the pinned post on our public channel https://t.me/Optrixtradeschannel/668\n"
+    deposit_text += "◽Watch the video, follow the instructions and you will get access to our trading tools\n\n"
+    deposit_text += "💡 Need additional help? Contact our support team"
     
     # Add admin contact button
     keyboard = [
