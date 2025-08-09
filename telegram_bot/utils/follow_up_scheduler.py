@@ -2,8 +2,10 @@
 
 import asyncio
 import logging
+import random
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Callable, Coroutine
+import pytz
 
 from telegram import Bot
 from telegram.ext import ContextTypes
@@ -40,7 +42,8 @@ class FollowUpScheduler:
         self.scheduler = AsyncIOScheduler(
             jobstores=jobstores,
             executors=executors,
-            job_defaults=job_defaults
+            job_defaults=job_defaults,
+            timezone=pytz.UTC
         )
         self.scheduler.start()
         
@@ -88,13 +91,17 @@ class FollowUpScheduler:
         # Schedule new follow-ups
         self.scheduled_tasks[user_id] = []
         
-        # Schedule follow-ups with 7.5-8 hour intervals
+        # Schedule follow-ups with 7.5-8 hour random intervals
+        cumulative_hours = 0
         for sequence in range(1, 25):  # Extended to 24 sequences based on newfollowup.txt
-            # Calculate delay based on sequence (7.5-8 hours between each)
-            delay_hours = sequence * 8  # 8 hours between each follow-up
+            # Calculate random delay between 7.5-8 hours for each message
+            random_interval = random.uniform(7.5, 8.0)  # Random interval between 7.5-8 hours
+            cumulative_hours += random_interval
             
-            # Calculate run time
-            run_time = datetime.now() + timedelta(hours=delay_hours)
+            # Calculate run time in UTC
+            run_time = datetime.now(pytz.UTC) + timedelta(hours=cumulative_hours)
+            
+            logger.info(f"Scheduling sequence {sequence} for user {user_id} in {random_interval:.2f} hours (total: {cumulative_hours:.2f} hours from now)")
             
             # Schedule job with APScheduler
             job = self.scheduler.add_job(
@@ -124,42 +131,57 @@ class FollowUpScheduler:
     async def _send_follow_up(self, user_id: int, sequence: int, user_data: Dict[str, Any]) -> None:
         """Send a follow-up message for a specific sequence"""
         try:
-            # Check if user has completed verification
-            is_verified = user_data.get('verified', False)
+            # Check if user has completed verification from database (real-time check)
+            from database.connection import get_user_data
+            current_user_data = await get_user_data(user_id)
+            is_verified = False
             
-            if not is_verified:
-                # Get the appropriate handler for this sequence
-                handler = self.follow_up_handlers.get(sequence)
-                if handler:
-                    # Create a fake update object with the user_id
-                    class FakeUpdate:
-                        def __init__(self, user_id, user_data):
-                            self.effective_user = FakeUser(user_id, user_data)
-                    
-                    class FakeUser:
-                        def __init__(self, user_id, user_data):
-                            self.id = user_id
-                            self.first_name = user_data.get('first_name', '')
-                            self.username = user_data.get('username', '')
-                    
-                    fake_update = FakeUpdate(user_id, user_data)
-                    
-                    # Create a minimal context for the handler
-                    from telegram.ext import ApplicationBuilder
-                    application = ApplicationBuilder().token(self.bot.token).build()
-                    context = ContextTypes.DEFAULT_TYPE(application=application)
-                    context.user_data = user_data
-                    
-                    # Call the handler
-                    await handler()(fake_update, context)
-                    logger.info(f"Sent sequence {sequence} follow-up to user {user_id}")
-                else:
-                    logger.warning(f"No handler found for sequence {sequence} follow-up")
+            if current_user_data:
+                verification_status = current_user_data.get('verification_status')
+                is_verified = verification_status == 'approved'
+            
+            # If user is verified, cancel all remaining follow-ups and exit
+            if is_verified:
+                logger.info(f"User {user_id} is verified, cancelling all remaining follow-ups")
+                await self.cancel_follow_ups(user_id)
+                return
+            
+            # Get the appropriate handler for this sequence
+            handler = self.follow_up_handlers.get(sequence)
+            if handler:
+                # Create a fake update object with the user_id
+                class FakeUpdate:
+                    def __init__(self, user_id, user_data):
+                        self.effective_user = FakeUser(user_id, user_data)
+                
+                class FakeUser:
+                    def __init__(self, user_id, user_data):
+                        self.id = user_id
+                        self.first_name = user_data.get('first_name', '')
+                        self.username = user_data.get('username', '')
+                
+                fake_update = FakeUpdate(user_id, user_data)
+                
+                # Create a minimal context for the handler
+                from telegram.ext import ApplicationBuilder
+                from collections import defaultdict
+                application = ApplicationBuilder().token(self.bot.token).build()
+                context = ContextTypes.DEFAULT_TYPE(application=application)
+                context._user_data = defaultdict(dict)
+                context._user_data[user_id] = user_data
+                context._user_id = user_id
+                
+                # Call the handler (handler is a getter method, so call it to get the actual handler function)
+                handler_function = handler()
+                
+                # Call the handler directly since it already has error handling decorator
+                await handler_function(fake_update, context)
+                logger.info(f"Successfully sent follow-up sequence {sequence} to user {user_id}")
             else:
-                logger.info(f"User {user_id} is verified, skipping sequence {sequence} follow-up")
+                logger.warning(f"No handler found for sequence {sequence} follow-up")
                 
         except Exception as e:
-            logger.error(f"Error sending sequence {sequence} follow-up to user {user_id}: {e}")
+            logger.error(f"Error sending follow-up sequence {sequence} to user {user_id}: {e}", exc_info=True)
             
         # Remove this job from scheduled tasks
         if user_id in self.scheduled_tasks:

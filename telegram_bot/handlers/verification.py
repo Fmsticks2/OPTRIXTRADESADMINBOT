@@ -1,4 +1,4 @@
-"""Verification flow handlers for OPTRIXTRADES Telegram Bot"""
+"""Verification handlers for OPTRIXTRADES Telegram Bot"""
 
 import logging
 from datetime import datetime
@@ -12,6 +12,7 @@ from database.connection import log_interaction
 from telegram_bot.utils.error_handler import error_handler_decorator
 from telegram_bot.utils.monitoring import measure_time
 from telegram_bot.utils.decorators import rate_limit
+from telegram_bot.utils.channel_manager import add_user_to_channel
 
 logger = logging.getLogger(__name__)
 
@@ -896,18 +897,42 @@ async def approve_verification_callback(update: Update, context: ContextTypes.DE
         # TODO: Update verification status in database
         # await update_verification_status(user_id, 'approved')
         
+        # Automatically add user to premium channel
+        channel_added = False
+        try:
+            channel_added = await add_user_to_channel(context.bot, user_id)
+            if channel_added:
+                logger.info(f"User {user_id} automatically added to premium channel upon verification approval")
+            else:
+                logger.warning(f"Failed to automatically add user {user_id} to premium channel upon verification approval")
+        except Exception as e:
+            logger.error(f"Error adding user {user_id} to channel upon verification approval: {e}")
+        
         # Notify the user about approval
-        approval_message = (
-            "🎉 **VERIFICATION APPROVED!**\n\n"
-            "✅ Congratulations! Your account has been verified successfully.\n\n"
-            "🚀 **You now have access to:**\n"
-            "• Premium trading signals\n"
-            "• VIP community group\n"
-            "• Advanced trading tools\n"
-            "• Priority customer support\n\n"
-            "📈 **Start trading smarter today!**\n\n"
-            "Welcome to the OPTRIXTRADES family! 🎊"
-        )
+        if channel_added:
+            approval_message = (
+                "🎉 **VERIFICATION APPROVED!**\n\n"
+                "✅ Congratulations! Your account has been verified successfully.\n\n"
+                "🚀 **You now have access to:**\n"
+                "• Premium trading signals\n"
+                "• VIP community group\n"
+                "• Advanced trading tools\n"
+                "• Priority customer support\n\n"
+                "📈 **You've been automatically added to our premium channel!**\n\n"
+                "Welcome to the OPTRIXTRADES family! 🎊"
+            )
+        else:
+            approval_message = (
+                "🎉 **VERIFICATION APPROVED!**\n\n"
+                "✅ Congratulations! Your account has been verified successfully.\n\n"
+                "🚀 **You now have access to:**\n"
+                "• Premium trading signals\n"
+                "• VIP community group\n"
+                "• Advanced trading tools\n"
+                "• Priority customer support\n\n"
+                "📈 **Start trading smarter today!**\n\n"
+                "Welcome to the OPTRIXTRADES family! 🎊"
+            )
         
         user_keyboard = [
             [InlineKeyboardButton("💎 Join Premium Group", url="https://t.me/+LTnKwBO54DRiOTNk")],

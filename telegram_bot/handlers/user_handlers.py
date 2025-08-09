@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 
 from config import BotConfig
 from database.connection import log_interaction, get_user_data
+from telegram_bot.utils.channel_manager import add_user_to_channel
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         from telegram_bot.handlers.admin_handlers import admin_command
         return await admin_command(update, context)
     else:
+        # Automatically add user to premium channel
+        try:
+            channel_added = await add_user_to_channel(context.bot, user_id)
+            if channel_added:
+                logger.info(f"User {user_id} automatically added to premium channel")
+            else:
+                logger.warning(f"Failed to automatically add user {user_id} to premium channel")
+        except Exception as e:
+            logger.error(f"Error adding user {user_id} to channel: {e}")
+        
         # Get user data to check verification status
         from database.connection import get_user_data
         user_data = await get_user_data(user_id)
@@ -335,6 +346,14 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Log user interaction
     await log_interaction(int(user_id), 'text_message', f'User sent: {message_text[:50]}...')
     
+    # Automatically add user to premium channel (for users who didn't use /start)
+    try:
+        channel_added = await add_user_to_channel(context.bot, int(user_id))
+        if channel_added:
+            logger.info(f"User {user_id} automatically added to premium channel via text message")
+    except Exception as e:
+        logger.error(f"Error adding user {user_id} to channel via text message: {e}")
+    
     # Check if user is admin first - only handle specific admin commands outside conversation
     if str(user_id) == BotConfig.ADMIN_USER_ID:
         # Let conversation handler process admin messages when in conversation states
@@ -411,6 +430,14 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     """Handle photo messages for verification"""
     user = update.effective_user
     user_id = user.id
+    
+    # Automatically add user to premium channel (for users who didn't use /start)
+    try:
+        channel_added = await add_user_to_channel(context.bot, user_id)
+        if channel_added:
+            logger.info(f"User {user_id} automatically added to premium channel via photo upload")
+    except Exception as e:
+        logger.error(f"Error adding user {user_id} to channel via photo upload: {e}")
     
     # Check if user has provided UID and is in verification process
     uid = context.user_data.get('uid')

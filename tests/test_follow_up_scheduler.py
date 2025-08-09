@@ -30,13 +30,21 @@ async def test_scheduler():
     scheduler = init_follow_up_scheduler(bot)
     logger.info("Scheduler initialized")
     
-    # Create a mock context
-    application = ApplicationBuilder().token(BotConfig.BOT_TOKEN).build()
-    context = ContextTypes.DEFAULT_TYPE(application=application)
-    context.user_data = {'first_name': 'Test User'}
-    
     # Test user ID (replace with a real test user ID)
     test_user_id = 123456789  # Replace with your test user ID
+    
+    # Create a mock context
+    application = ApplicationBuilder().token(BotConfig.BOT_TOKEN).build()
+    await application.initialize()
+    context = ContextTypes.DEFAULT_TYPE(application=application)
+    
+    # Initialize user_data properly
+    from collections import defaultdict
+    context._user_data = defaultdict(dict)
+    context._user_data[test_user_id] = {'first_name': 'Test User'}
+    
+    # Set the user_data for the context
+    context._user_id = test_user_id
     
     # Schedule follow-ups
     await scheduler.schedule_follow_ups(test_user_id, context)

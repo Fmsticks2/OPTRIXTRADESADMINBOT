@@ -12,6 +12,7 @@ from database.connection import (
     get_all_users, get_pending_verifications, update_verification_status,
     get_user_data, db_manager, log_interaction
 )
+from telegram_bot.utils.batch_follow_up import BatchFollowUpManager, start_batch_follow_ups, get_batch_follow_up_stats
 
 logger = logging.getLogger(__name__)
 
@@ -115,12 +116,243 @@ async def admin_auto_verify_stats_command(update: Update, context: ContextTypes.
     else:
         await update.message.reply_text("⛔ You are not authorized to use admin commands.")
 
+async def admin_batch_followup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle the /batchfollowup command"""
+    user_id = update.effective_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await update.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return
+    
+    await admin_batch_followup_callback(update, context)
+
 async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle the /broadcast command"""
     user_id = update.effective_user.id
     if str(user_id) != BotConfig.ADMIN_USER_ID:
         await update.message.reply_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
+
+async def admin_batch_followup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle batch follow-up management"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    try:
+        # Get bot instance from application
+        bot_instance = context.application.bot_data.get('bot_instance')
+        if not bot_instance:
+            await query.message.reply_text("❌ Bot instance not available. Please restart the bot.")
+            return ConversationHandler.END
+        
+        # Create batch follow-up manager
+        batch_manager = BatchFollowUpManager(context.bot, db_manager)
+        
+        # Get current statistics
+        stats = await batch_manager.get_follow_up_stats()
+        unverified_users = await batch_manager.get_unverified_users()
+        
+        # Create response message
+        response_text = "🔄 **Batch Follow-Up Management**\n\n"
+        
+        # Current statistics
+        response_text += "📊 **Current Statistics:**\n"
+        response_text += f"• Users with active follow-ups: {stats.get('total_users_with_follow_ups', 0)}\n"
+        response_text += f"• Total scheduled tasks: {stats.get('total_scheduled_tasks', 0)}\n"
+        response_text += f"• Scheduler status: {stats.get('scheduler_status', 'unknown')}\n\n"
+        
+        # Unverified users
+        response_text += "👥 **Unverified Users:**\n"
+        response_text += f"• Total unverified users: {len(unverified_users)}\n"
+        
+        if len(unverified_users) > 0:
+            response_text += f"• Users without follow-ups: {len(unverified_users) - stats.get('total_users_with_follow_ups', 0)}\n\n"
+            
+            # Show sample of unverified users
+            response_text += "📋 **Sample Unverified Users:**\n"
+            for i, user in enumerate(unverified_users[:5]):
+                status = user.get('verification_status', 'None')
+                name = user.get('first_name', 'Unknown')
+                response_text += f"• {name} (ID: {user['user_id']}) - Status: {status}\n"
+            
+            if len(unverified_users) > 5:
+                response_text += f"... and {len(unverified_users) - 5} more\n"
+        else:
+            response_text += "• All users are verified! 🎉\n"
+        
+        # Create action buttons
+        keyboard = []
+        
+        if len(unverified_users) > stats.get('total_users_with_follow_ups', 0):
+            keyboard.append([
+                InlineKeyboardButton("🚀 Start Follow-ups (All)", callback_data="batch_followup_start_all"),
+                InlineKeyboardButton("🎯 Start Follow-ups (10)", callback_data="batch_followup_start_10")
+            ])
+        
+        if stats.get('total_users_with_follow_ups', 0) > 0:
+            keyboard.append([
+                InlineKeyboardButton("📊 Refresh Stats", callback_data="batch_followup_stats"),
+                InlineKeyboardButton("🛑 Cancel All", callback_data="batch_followup_cancel_all")
+            ])
+        else:
+            keyboard.append([
+                InlineKeyboardButton("📊 Refresh Stats", callback_data="batch_followup_stats")
+            ])
+        
+        keyboard.append([InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.message.reply_text(
+            response_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in batch follow-up callback: {e}")
+        await query.message.reply_text(f"❌ Error: {str(e)}")
+    
+    return ConversationHandler.END
+
+async def batch_followup_start_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Start follow-ups for all unverified users"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    try:
+        await query.message.reply_text("🔄 Starting follow-ups for all unverified users...")
+        
+        # Start batch follow-ups
+        result = await start_batch_follow_ups(db_manager, context.bot)
+        
+        response_text = "✅ **Batch Follow-Up Results**\n\n"
+        response_text += f"• Users processed: {result.get('processed', 0)}\n"
+        response_text += f"• Follow-ups scheduled: {result.get('scheduled', 0)}\n"
+        response_text += f"• Already scheduled: {result.get('already_scheduled', 0)}\n"
+        response_text += f"• Failed: {result.get('failed', 0)}\n\n"
+        
+        if result.get('scheduled', 0) > 0:
+            response_text += "🎯 Follow-up sequences have been started for unverified users.\n"
+            response_text += "Messages will be sent at 7.5-8 hour intervals."
+        
+        keyboard = [[InlineKeyboardButton("🔙 Back to Batch Management", callback_data="admin_batch_followup")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.message.reply_text(
+            response_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error starting batch follow-ups: {e}")
+        await query.message.reply_text(f"❌ Error starting follow-ups: {str(e)}")
+    
+    return ConversationHandler.END
+
+async def batch_followup_start_10_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Start follow-ups for 10 unverified users"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    try:
+        await query.message.reply_text("🔄 Starting follow-ups for 10 unverified users...")
+        
+        # Start batch follow-ups with limit
+        result = await start_batch_follow_ups(db_manager, context.bot, limit=10)
+        
+        response_text = "✅ **Batch Follow-Up Results (Limited)**\n\n"
+        response_text += f"• Users processed: {result.get('processed', 0)}\n"
+        response_text += f"• Follow-ups scheduled: {result.get('scheduled', 0)}\n"
+        response_text += f"• Already scheduled: {result.get('already_scheduled', 0)}\n"
+        response_text += f"• Failed: {result.get('failed', 0)}\n\n"
+        
+        if result.get('scheduled', 0) > 0:
+            response_text += "🎯 Follow-up sequences have been started for 10 unverified users.\n"
+            response_text += "Messages will be sent at 7.5-8 hour intervals."
+        
+        keyboard = [[InlineKeyboardButton("🔙 Back to Batch Management", callback_data="admin_batch_followup")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.message.reply_text(
+            response_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error starting limited batch follow-ups: {e}")
+        await query.message.reply_text(f"❌ Error starting follow-ups: {str(e)}")
+    
+    return ConversationHandler.END
+
+async def batch_followup_cancel_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancel all scheduled follow-ups"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    try:
+        await query.message.reply_text("🛑 Cancelling all scheduled follow-ups...")
+        
+        # Cancel all follow-ups
+        batch_manager = BatchFollowUpManager(context.bot, db_manager)
+        cancelled_count = await batch_manager.cancel_all_follow_ups()
+        
+        response_text = "✅ **Follow-Up Cancellation Complete**\n\n"
+        response_text += f"• Cancelled follow-ups for {cancelled_count} users\n\n"
+        
+        if cancelled_count > 0:
+            response_text += "🛑 All scheduled follow-up messages have been cancelled."
+        else:
+            response_text += "ℹ️ No follow-ups were scheduled to cancel."
+        
+        keyboard = [[InlineKeyboardButton("🔙 Back to Batch Management", callback_data="admin_batch_followup")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.message.reply_text(
+            response_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error cancelling follow-ups: {e}")
+        await query.message.reply_text(f"❌ Error cancelling follow-ups: {str(e)}")
+    
+    return ConversationHandler.END
+
+async def batch_followup_stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Refresh batch follow-up statistics"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    # Redirect to main batch follow-up callback to refresh stats
+    return await admin_batch_followup_callback(update, context)
     
     broadcast_text = (
         "📢 **Broadcast Message**\n\n"
@@ -1120,7 +1352,8 @@ async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT
     admin_text += "📋 **Queue** - View pending verification requests\n"
     admin_text += "📢 **Broadcast** - Send message to all users\n"
     admin_text += "🔍 **Search User** - Find user by ID or username\n"
-    admin_text += "👥 **All Users** - View all registered users\n\n"
+    admin_text += "👥 **All Users** - View all registered users\n"
+    admin_text += "📨 **Batch Follow-up** - Manage follow-up messages for unverified users\n\n"
     admin_text += "Use the buttons below or type commands directly."
     
     keyboard = [
@@ -1128,6 +1361,7 @@ async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT
          InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
         [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user"),
          InlineKeyboardButton("👥 All Users", callback_data="admin_all_users")],
+        [InlineKeyboardButton("📨 Batch Follow-up", callback_data="admin_batch_followup")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     

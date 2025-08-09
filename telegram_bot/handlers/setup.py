@@ -39,6 +39,7 @@ from telegram_bot.handlers.admin_handlers import (
     admin_recent_activity_command,
     admin_search_user_command,
     admin_auto_verify_stats_command,
+    admin_batch_followup_command,
     handle_broadcast,
     handle_broadcast_message,
     handle_user_lookup,
@@ -54,7 +55,12 @@ from telegram_bot.handlers.admin_handlers import (
     admin_chat_history_callback,
     admin_dashboard_callback,
     admin_all_users_callback,
-    admin_user_activity_callback
+    admin_user_activity_callback,
+    admin_batch_followup_callback,
+    batch_followup_start_all_callback,
+    batch_followup_start_10_callback,
+    batch_followup_cancel_all_callback,
+    batch_followup_stats_callback
 )
 
 from telegram_bot.handlers.verification import (
@@ -139,7 +145,12 @@ def setup_all_handlers(bot):
             CallbackQueryHandler(admin_recent_activity_callback, pattern='^admin_recent_activity$'),
             CallbackQueryHandler(admin_auto_verify_stats_callback, pattern='^admin_auto_verify_stats$'),
             CallbackQueryHandler(admin_all_users_callback, pattern='^admin_all_users$'),
-            CallbackQueryHandler(admin_user_activity_callback, pattern='^admin_user_activity$')
+            CallbackQueryHandler(admin_user_activity_callback, pattern='^admin_user_activity$'),
+            CallbackQueryHandler(admin_batch_followup_callback, pattern='^admin_batch_followup$'),
+            CallbackQueryHandler(batch_followup_start_all_callback, pattern='^batch_followup_start_all$'),
+            CallbackQueryHandler(batch_followup_start_10_callback, pattern='^batch_followup_start_10$'),
+            CallbackQueryHandler(batch_followup_cancel_all_callback, pattern='^batch_followup_cancel_all$'),
+            CallbackQueryHandler(batch_followup_stats_callback, pattern='^batch_followup_stats$')
         ],
         states={
             BROADCAST_MESSAGE: [
@@ -183,6 +194,7 @@ def setup_all_handlers(bot):
     bot.application.add_handler(CommandHandler("admin_queue", admin_queue_command))
     bot.application.add_handler(CommandHandler("admin_broadcast", admin_broadcast_command))
     bot.application.add_handler(CommandHandler("admin_search_user", admin_search_user_command))
+    bot.application.add_handler(CommandHandler("batchfollowup", admin_batch_followup_command))
     bot.application.add_handler(CommandHandler("broadcast", handle_broadcast))
     bot.application.add_handler(CommandHandler("lookup", handle_user_lookup))
     bot.application.add_handler(CommandHandler("searchuser", admin_search_user_command))

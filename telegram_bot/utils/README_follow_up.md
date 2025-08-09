@@ -6,9 +6,9 @@ The Follow-Up Scheduler is a component of the OPTRIXTRADES Telegram Bot that aut
 
 ## Features
 
-- Automatically schedules a series of 10 follow-up messages over a period of days
-- First follow-up is sent 4 hours after initial interaction
-- Subsequent follow-ups are sent approximately daily
+- Automatically schedules a series of 24 follow-up messages over a period of days
+- Follow-ups are sent at random intervals between 7.5-8 hours
+- Each message is automatically sent if user hasn't completed verification
 - Each follow-up has a unique message and call-to-action
 - Messages use different psychological triggers (scarcity, social proof, FOMO, etc.)
 - Follow-ups are automatically cancelled when a user completes verification
@@ -35,16 +35,21 @@ The scheduler is automatically used when:
 
 ## Follow-Up Sequence
 
-1. **Day 1 (4 hours)**: Reminder of benefits, gentle nudge
-2. **Day 2**: Scarcity and social proof
-3. **Day 3**: Value recap
-4. **Day 4**: Personal outreach and soft CTA
-5. **Day 5**: Last chance with exit option
-6. **Day 6**: Education and trust-building
-7. **Day 7**: Light humor and re-activation
-8. **Day 8**: FOMO and success stories
-9. **Day 9**: Start small offer
-10. **Day 10**: Final reminder and hard close
+The system now includes 24 follow-up sequences, each sent at random intervals between 7.5-8 hours:
+
+1. **Sequence 1 (7.5-8 hours)**: Reminder of benefits, gentle nudge
+2. **Sequence 2 (7.5-8 hours later)**: Scarcity and social proof
+3. **Sequence 3 (7.5-8 hours later)**: Value recap
+4. **Sequence 4 (7.5-8 hours later)**: Personal outreach and soft CTA
+5. **Sequence 5 (7.5-8 hours later)**: Last chance with exit option
+6. **Sequence 6 (7.5-8 hours later)**: Education and trust-building
+7. **Sequence 7 (7.5-8 hours later)**: Light humor and re-activation
+8. **Sequence 8 (7.5-8 hours later)**: FOMO and success stories
+9. **Sequence 9 (7.5-8 hours later)**: Start small offer
+10. **Sequence 10 (7.5-8 hours later)**: Final reminder and hard close
+11-24. **Additional sequences**: Extended follow-up campaign with varied messaging
+
+**Note**: Each interval is randomized between 7.5-8 hours to appear more natural and avoid detection as automated messaging.
 
 ## Customization
 

@@ -5,7 +5,7 @@ from typing import Callable, Any, Coroutine
 from telegram.ext import ContextTypes
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from config import BotConfig
-from telegram_bot.utils.error_handler import error_handler
+from telegram_bot.utils.error_handler import error_handler_decorator
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class FollowUpHandlers:
     
     def get_sequence1_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 1 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence1(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -47,7 +47,7 @@ class FollowUpHandlers:
     
     def get_sequence2_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 2 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence2(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -72,7 +72,7 @@ class FollowUpHandlers:
     
     def get_sequence3_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 3 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence3(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             
@@ -95,7 +95,7 @@ class FollowUpHandlers:
     
     def get_sequence4_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 4 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence4(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             
@@ -121,7 +121,7 @@ class FollowUpHandlers:
     
     def get_sequence5_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 5 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence5(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -146,7 +146,7 @@ class FollowUpHandlers:
     
     def get_sequence6_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 6 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence6(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -171,7 +171,7 @@ class FollowUpHandlers:
     
     def get_sequence7_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 7 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence7(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             
@@ -199,7 +199,7 @@ class FollowUpHandlers:
     
     def get_sequence8_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 8 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence8(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -223,7 +223,7 @@ class FollowUpHandlers:
     
     def get_sequence9_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 9 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence9(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -248,7 +248,7 @@ class FollowUpHandlers:
     
     def get_sequence10_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 10 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence10(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -272,7 +272,7 @@ class FollowUpHandlers:
     
     def get_sequence11_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 11 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence11(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             
@@ -297,7 +297,7 @@ class FollowUpHandlers:
     
     def get_sequence12_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 12 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence12(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -321,7 +321,7 @@ class FollowUpHandlers:
     
     def get_sequence13_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 13 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence13(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -346,7 +346,7 @@ class FollowUpHandlers:
     
     def get_sequence14_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 14 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence14(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             
@@ -371,7 +371,7 @@ class FollowUpHandlers:
     
     def get_sequence15_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 15 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence15(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -396,7 +396,7 @@ class FollowUpHandlers:
     
     def get_sequence16_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 16 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence16(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -421,7 +421,7 @@ class FollowUpHandlers:
     
     def get_sequence17_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 17 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence17(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             
@@ -450,7 +450,7 @@ class FollowUpHandlers:
     
     def get_sequence18_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 18 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence18(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -475,7 +475,7 @@ class FollowUpHandlers:
     
     def get_sequence19_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 19 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence19(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -499,7 +499,7 @@ class FollowUpHandlers:
     
     def get_sequence20_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 20 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence20(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             
@@ -524,7 +524,7 @@ class FollowUpHandlers:
     
     def get_sequence21_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 21 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence21(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             user_name = user.first_name or "there"
@@ -548,7 +548,7 @@ class FollowUpHandlers:
     
     def get_sequence22_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 22 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence22(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             
@@ -571,7 +571,7 @@ class FollowUpHandlers:
     
     def get_sequence23_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 23 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence23(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             
@@ -595,7 +595,7 @@ class FollowUpHandlers:
     
     def get_sequence24_handler(self) -> Callable[[Any, ContextTypes.DEFAULT_TYPE], Coroutine[Any, Any, None]]:
         """Get handler for sequence 24 follow-up"""
-        @error_handler
+        @error_handler_decorator
         async def followup_sequence24(update: Any, context: ContextTypes.DEFAULT_TYPE) -> None:
             user = update.effective_user
             
