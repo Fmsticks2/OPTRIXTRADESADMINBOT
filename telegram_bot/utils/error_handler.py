@@ -10,6 +10,7 @@ from typing import Callable, Dict, Any, Optional, Coroutine
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
+from telegram.error import Forbidden
 
 from config import BotConfig
 
@@ -26,6 +27,41 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         update: The update that caused the error
         context: The context object containing error information
     """
+    # Handle Forbidden errors (user blocked the bot)
+    if isinstance(context.error, Forbidden):
+        # Extract user ID from update or context
+        user_id = None
+        if hasattr(update, 'effective_user') and update.effective_user:
+            user_id = update.effective_user.id
+        elif hasattr(update, 'id'):
+            user_id = update.id
+        elif hasattr(context, '_user_id'):
+            user_id = context._user_id
+        
+        if user_id:
+            logger.warning(f"User {user_id} has blocked the bot. Canceling follow-ups and marking as inactive.")
+            
+            # Cancel follow-ups for this user
+            try:
+                from telegram_bot.utils.follow_up_scheduler import get_follow_up_scheduler
+                scheduler = get_follow_up_scheduler()
+                if scheduler:
+                    await scheduler.cancel_follow_ups(user_id)
+                    logger.info(f"Successfully canceled follow-ups for blocked user {user_id}")
+            except Exception as e:
+                logger.error(f"Failed to cancel follow-ups for user {user_id}: {e}")
+            
+            # Mark user as inactive in database to prevent future batch operations
+            try:
+                from database.connection import update_user_data
+                await update_user_data(user_id, is_active=False, blocked_bot=True)
+                logger.info(f"Successfully marked user {user_id} as inactive due to bot blocking")
+            except Exception as e:
+                logger.error(f"Failed to mark user {user_id} as inactive: {e}")
+        
+        # Don't send admin notification for blocked users as it's expected behavior
+        return
+    
     # Log the error
     logger.error("Exception while handling an update:", exc_info=context.error)
     

@@ -9,6 +9,7 @@ import pytz
 
 from telegram import Bot
 from telegram.ext import ContextTypes
+from telegram.error import Forbidden
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
@@ -180,6 +181,20 @@ class FollowUpScheduler:
             else:
                 logger.warning(f"No handler found for sequence {sequence} follow-up")
                 
+        except Forbidden as e:
+            # User has blocked the bot - cancel all remaining follow-ups and mark as inactive
+            logger.warning(f"User {user_id} has blocked the bot. Canceling all follow-ups and marking as inactive.")
+            await self.cancel_follow_ups(user_id)
+            
+            # Mark user as inactive in database to prevent future batch operations
+            try:
+                from database.connection import update_user_data
+                await update_user_data(user_id, is_active=False, blocked_bot=True)
+                logger.info(f"Successfully marked user {user_id} as inactive due to bot blocking")
+            except Exception as e:
+                logger.error(f"Failed to mark user {user_id} as inactive: {e}")
+            
+            return
         except Exception as e:
             logger.error(f"Error sending follow-up sequence {sequence} to user {user_id}: {e}", exc_info=True)
             
