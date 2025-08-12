@@ -313,6 +313,9 @@ class DatabaseManager:
                     ALTER TABLE verification_requests ADD COLUMN IF NOT EXISTS auto_verified BOOLEAN DEFAULT FALSE;
                     ALTER TABLE verification_requests ADD COLUMN IF NOT EXISTS admin_response TEXT;
                     ALTER TABLE verification_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                '''),
+                ('007_add_blocked_bot_column', '''
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked_bot BOOLEAN DEFAULT FALSE;
                 ''')
             ]
         else:
@@ -379,6 +382,9 @@ class DatabaseManager:
                     ALTER TABLE verification_requests ADD COLUMN auto_verified INTEGER DEFAULT 0;
                     ALTER TABLE verification_requests ADD COLUMN admin_response TEXT;
                     ALTER TABLE verification_requests ADD COLUMN updated_at TEXT;
+                '''),
+                ('007_add_blocked_bot_column', '''
+                    ALTER TABLE users ADD COLUMN blocked_bot INTEGER DEFAULT 0;
                 ''')
             ]
     
