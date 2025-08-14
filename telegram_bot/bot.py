@@ -15,6 +15,7 @@ from telegram.ext import (
 from config import BotConfig
 from database.connection import DatabaseManager
 from telegram_bot.utils.persistent_follow_up import init_persistent_follow_up_scheduler, get_persistent_follow_up_scheduler
+from telegram_bot.utils.enhanced_persistent_follow_up import init_enhanced_persistent_follow_up_scheduler, get_enhanced_persistent_follow_up_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,9 @@ class TradingBot:
         self.message_history = {}
         self.user_states = {}
         
-        # Persistent follow-up scheduler
+        # Persistent follow-up schedulers
         self.persistent_follow_up_scheduler = None
+        self.enhanced_persistent_follow_up_scheduler = None
         
         logger.info("TradingBot initialized")
     
@@ -275,7 +277,24 @@ class TradingBot:
         else:
             logger.debug(f"Persistent follow-up scheduler not initialized, can't stop persistent follow-up for user {user_id}")
     
+    async def start_enhanced_persistent_follow_up(self, user_id: int, user_data: Dict[str, Any]) -> None:
+        """Start enhanced persistent follow-up messages for a user (3 messages every 24 hours)"""
+        if self.enhanced_persistent_follow_up_scheduler:
+            await self.enhanced_persistent_follow_up_scheduler.start_enhanced_persistent_follow_up(user_id, user_data)
+            logger.info(f"Started enhanced persistent follow-up for user {user_id}")
+        else:
+            logger.warning(f"Enhanced persistent follow-up scheduler not initialized, can't start enhanced follow-up for user {user_id}")
+    
+    async def stop_enhanced_persistent_follow_up(self, user_id: int) -> None:
+        """Stop enhanced persistent follow-up messages for a user"""
+        if self.enhanced_persistent_follow_up_scheduler:
+            await self.enhanced_persistent_follow_up_scheduler.stop_enhanced_persistent_follow_up(user_id)
+            logger.info(f"Stopped enhanced persistent follow-up for user {user_id}")
+        else:
+            logger.debug(f"Enhanced persistent follow-up scheduler not initialized, can't stop enhanced follow-up for user {user_id}")
+    
     def init_persistent_scheduler(self, bot: Bot) -> None:
-        """Initialize the persistent follow-up scheduler"""
+        """Initialize the persistent follow-up schedulers"""
         self.persistent_follow_up_scheduler = init_persistent_follow_up_scheduler(bot)
-        logger.info("Persistent follow-up scheduler initialized")
+        self.enhanced_persistent_follow_up_scheduler = init_enhanced_persistent_follow_up_scheduler(bot)
+        logger.info("Persistent follow-up schedulers initialized")

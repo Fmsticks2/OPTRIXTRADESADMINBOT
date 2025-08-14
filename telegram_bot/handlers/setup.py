@@ -61,7 +61,11 @@ from telegram_bot.handlers.admin_handlers import (
     batch_followup_start_all_callback,
     batch_followup_start_10_callback,
     batch_followup_cancel_all_callback,
-    batch_followup_stats_callback
+    batch_followup_stats_callback,
+    admin_enhanced_followup_callback,
+    enhanced_followup_start_all_callback,
+    enhanced_followup_start_10_callback,
+    enhanced_followup_stop_all_callback
 )
 
 from telegram_bot.handlers.verification import (
@@ -152,7 +156,11 @@ def setup_all_handlers(bot):
             CallbackQueryHandler(batch_followup_start_all_callback, pattern='^batch_followup_start_all$'),
             CallbackQueryHandler(batch_followup_start_10_callback, pattern='^batch_followup_start_10$'),
             CallbackQueryHandler(batch_followup_cancel_all_callback, pattern='^batch_followup_cancel_all$'),
-            CallbackQueryHandler(batch_followup_stats_callback, pattern='^batch_followup_stats$')
+            CallbackQueryHandler(batch_followup_stats_callback, pattern='^batch_followup_stats$'),
+            CallbackQueryHandler(admin_enhanced_followup_callback, pattern='^admin_enhanced_followup$'),
+            CallbackQueryHandler(enhanced_followup_start_all_callback, pattern='^enhanced_followup_start_all$'),
+            CallbackQueryHandler(enhanced_followup_start_10_callback, pattern='^enhanced_followup_start_10$'),
+            CallbackQueryHandler(enhanced_followup_stop_all_callback, pattern='^enhanced_followup_stop_all$')
         ],
         states={
             BROADCAST_MESSAGE: [

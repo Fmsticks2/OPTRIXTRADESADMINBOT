@@ -35,7 +35,8 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         admin_text += "🔍 **Search User** - Find user by ID or username\n"
         admin_text += "👥 **All Users** - View all registered users\n"
         admin_text += "📨 **Batch Follow-up** - Manage follow-up messages for unverified users\n"
-        admin_text += "🔄 **Active Follow-ups** - View users receiving persistent follow-up messages\n\n"
+        admin_text += "🔄 **Active Follow-ups** - View users receiving persistent follow-up messages\n"
+        admin_text += "⚡ **Enhanced Follow-up** - Manage 3 messages/day follow-up system\n\n"
         admin_text += "Use the buttons below or type commands directly."
         
         keyboard = [
@@ -45,6 +46,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
              InlineKeyboardButton("👥 All Users", callback_data="admin_all_users")],
             [InlineKeyboardButton("📨 Batch Follow-up", callback_data="admin_batch_followup"),
              InlineKeyboardButton("🔄 Active Follow-ups", callback_data="admin_active_followups")],
+            [InlineKeyboardButton("⚡ Enhanced Follow-up", callback_data="admin_enhanced_followup")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
@@ -1426,6 +1428,311 @@ async def admin_all_users_callback(update: Update, context: ContextTypes.DEFAULT
     
     return ConversationHandler.END
 
+async def admin_enhanced_followup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle enhanced follow-up management callback"""
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        # Get enhanced follow-up statistics
+        from telegram_bot.utils.enhanced_persistent_follow_up import get_enhanced_persistent_follow_up_scheduler
+        enhanced_scheduler = get_enhanced_persistent_follow_up_scheduler()
+        
+        if not enhanced_scheduler:
+            await query.edit_message_text(
+                "❌ Enhanced follow-up scheduler not initialized.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")
+                ]])
+            )
+            return ConversationHandler.END
+        
+        # Get active users count
+        active_count = enhanced_scheduler.get_active_users_count()
+        active_users = enhanced_scheduler.get_all_active_users()
+        
+        # Get unverified users count for potential enhanced follow-up
+        from database.connection import get_all_users
+        all_users = await get_all_users()
+        unverified_users = [
+            user for user in all_users 
+            if user.get('registration_status') == 'not_started' and user.get('is_active', True)
+        ]
+        unverified_count = len(unverified_users)
+        
+        # Count users not in enhanced follow-up
+        users_without_enhanced = [
+            user for user in unverified_users 
+            if user['user_id'] not in active_users
+        ]
+        available_for_enhanced = len(users_without_enhanced)
+        
+        response_text = "⚡ **Enhanced Follow-up Management**\n\n"
+        response_text += "📊 **System Status:**\n"
+        response_text += f"• Active Enhanced Follow-ups: {active_count}\n"
+        response_text += f"• Total Unverified Users: {unverified_count}\n"
+        response_text += f"• Available for Enhanced: {available_for_enhanced}\n\n"
+        
+        response_text += "📋 **Enhanced Follow-up Details:**\n"
+        response_text += "• Sends 3 messages every 24 hours\n"
+        response_text += "• 8-hour intervals between messages\n"
+        response_text += "• Continuous loop until verified/blocked\n\n"
+        
+        if active_count > 0:
+            response_text += "👥 **Sample Active Users:**\n"
+            sample_users = list(active_users.items())[:5]
+            for user_id, user_info in sample_users:
+                cycle = user_info.get('daily_cycle', 1)
+                messages_today = user_info.get('messages_sent_today', 0)
+                response_text += f"• User {user_id}: Cycle {cycle}, {messages_today}/3 msgs today\n"
+            
+            if len(active_users) > 5:
+                response_text += f"• ... and {len(active_users) - 5} more\n"
+        
+        # Create action buttons
+        keyboard = []
+        
+        if available_for_enhanced > 0:
+            keyboard.extend([
+                [InlineKeyboardButton(f"🚀 Start Enhanced (All {available_for_enhanced})", 
+                                    callback_data="enhanced_followup_start_all")],
+                [InlineKeyboardButton("🚀 Start Enhanced (10 Users)", 
+                                    callback_data="enhanced_followup_start_10")]
+            ])
+        
+        if active_count > 0:
+            keyboard.append([
+                InlineKeyboardButton("🛑 Stop All Enhanced", 
+                               callback_data="enhanced_followup_stop_all")
+            ])
+        
+        keyboard.extend([
+            [InlineKeyboardButton("📊 Refresh Stats", 
+                               callback_data="admin_enhanced_followup")],
+            [InlineKeyboardButton("🔙 Back to Dashboard", 
+                               callback_data="admin_dashboard")]
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(
+            response_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in enhanced follow-up callback: {e}")
+        await query.edit_message_text(
+            f"❌ Error loading enhanced follow-up data: {str(e)}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")
+            ]])
+        )
+    
+    return ConversationHandler.END
+
+async def enhanced_followup_start_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Start enhanced follow-up for all unverified users"""
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        from telegram_bot.utils.enhanced_persistent_follow_up import get_enhanced_persistent_follow_up_scheduler
+        from database.connection import get_all_users
+        
+        enhanced_scheduler = get_enhanced_persistent_follow_up_scheduler()
+        if not enhanced_scheduler:
+            await query.edit_message_text(
+                "❌ Enhanced follow-up scheduler not initialized.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Back", callback_data="admin_enhanced_followup")
+                ]])
+            )
+            return ConversationHandler.END
+        
+        # Get unverified users not already in enhanced follow-up
+        all_users = await get_all_users()
+        active_users = enhanced_scheduler.get_all_active_users()
+        
+        unverified_users = [
+            user for user in all_users 
+            if (user.get('registration_status') == 'not_started' and 
+                user.get('is_active', True) and 
+                user['user_id'] not in active_users)
+        ]
+        
+        if not unverified_users:
+            await query.edit_message_text(
+                "ℹ️ No unverified users available for enhanced follow-up.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Back", callback_data="admin_enhanced_followup")
+                ]])
+            )
+            return ConversationHandler.END
+        
+        # Start enhanced follow-up for all users
+        started_count = 0
+        for user in unverified_users:
+            try:
+                user_data = {
+                    'first_name': user.get('first_name', ''),
+                    'username': user.get('username', ''),
+                    'verified': False
+                }
+                await enhanced_scheduler.start_enhanced_persistent_follow_up(user['user_id'], user_data)
+                started_count += 1
+            except Exception as e:
+                logger.error(f"Failed to start enhanced follow-up for user {user['user_id']}: {e}")
+        
+        await query.edit_message_text(
+            f"✅ Started enhanced follow-up for {started_count} users.\n\n"
+            f"Each user will receive 3 messages every 24 hours with 8-hour intervals.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Back to Enhanced Follow-up", callback_data="admin_enhanced_followup")
+            ]])
+        )
+        
+    except Exception as e:
+        logger.error(f"Error starting enhanced follow-up for all users: {e}")
+        await query.edit_message_text(
+            f"❌ Error starting enhanced follow-up: {str(e)}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Back", callback_data="admin_enhanced_followup")
+            ]])
+        )
+    
+    return ConversationHandler.END
+
+async def enhanced_followup_start_10_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Start enhanced follow-up for 10 unverified users"""
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        from telegram_bot.utils.enhanced_persistent_follow_up import get_enhanced_persistent_follow_up_scheduler
+        from database.connection import get_all_users
+        
+        enhanced_scheduler = get_enhanced_persistent_follow_up_scheduler()
+        if not enhanced_scheduler:
+            await query.edit_message_text(
+                "❌ Enhanced follow-up scheduler not initialized.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Back", callback_data="admin_enhanced_followup")
+                ]])
+            )
+            return ConversationHandler.END
+        
+        # Get unverified users not already in enhanced follow-up
+        all_users = await get_all_users()
+        active_users = enhanced_scheduler.get_all_active_users()
+        
+        unverified_users = [
+            user for user in all_users 
+            if (user.get('registration_status') == 'not_started' and 
+                user.get('is_active', True) and 
+                user['user_id'] not in active_users)
+        ][:10]  # Limit to 10 users
+        
+        if not unverified_users:
+            await query.edit_message_text(
+                "No unverified users available for enhanced follow-up.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Back", callback_data="admin_enhanced_followup")
+                ]])
+            )
+            return ConversationHandler.END
+        
+        # Start enhanced follow-up for selected users
+        started_count = 0
+        for user in unverified_users:
+            try:
+                user_data = {
+                    'first_name': user.get('first_name', ''),
+                    'username': user.get('username', ''),
+                    'verified': False
+                }
+                await enhanced_scheduler.start_enhanced_persistent_follow_up(user['user_id'], user_data)
+                started_count += 1
+            except Exception as e:
+                logger.error(f"Failed to start enhanced follow-up for user {user['user_id']}: {e}")
+        
+        await query.edit_message_text(
+            f"✅ Started enhanced follow-up for {started_count} users.\n\n"
+            f"Each user will receive 3 messages every 24 hours with 8-hour intervals.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Back to Enhanced Follow-up", callback_data="admin_enhanced_followup")
+            ]])
+        )
+        
+    except Exception as e:
+        logger.error(f"Error starting enhanced follow-up for 10 users: {e}")
+        await query.edit_message_text(
+            f"❌ Error starting enhanced follow-up: {str(e)}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Back", callback_data="admin_enhanced_followup")
+            ]])
+        )
+    
+    return ConversationHandler.END
+
+async def enhanced_followup_stop_all_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Stop enhanced follow-up for all users"""
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        from telegram_bot.utils.enhanced_persistent_follow_up import get_enhanced_persistent_follow_up_scheduler
+        
+        enhanced_scheduler = get_enhanced_persistent_follow_up_scheduler()
+        if not enhanced_scheduler:
+            await query.edit_message_text(
+                "❌ Enhanced follow-up scheduler not initialized.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Back", callback_data="admin_enhanced_followup")
+                ]])
+            )
+            return ConversationHandler.END
+        
+        # Get all active users
+        active_users = enhanced_scheduler.get_all_active_users()
+        
+        if not active_users:
+            await query.edit_message_text(
+                "No active enhanced follow-ups to stop.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Back", callback_data="admin_enhanced_followup")
+                ]])
+            )
+            return ConversationHandler.END
+        
+        # Stop enhanced follow-up for all users
+        stopped_count = 0
+        for user_id in list(active_users.keys()):
+            try:
+                await enhanced_scheduler.stop_enhanced_persistent_follow_up(user_id)
+                stopped_count += 1
+            except Exception as e:
+                logger.error(f"Failed to stop enhanced follow-up for user {user_id}: {e}")
+        
+        await query.edit_message_text(
+            f"✅ Stopped enhanced follow-up for {stopped_count} users.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Back to Enhanced Follow-up", callback_data="admin_enhanced_followup")
+            ]])
+        )
+        
+    except Exception as e:
+        logger.error(f"Error stopping enhanced follow-up for all users: {e}")
+        await query.edit_message_text(
+            f"❌ Error stopping enhanced follow-up: {str(e)}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Back", callback_data="admin_enhanced_followup")
+            ]])
+        )
+    
+    return ConversationHandler.END
+
 # Dashboard callback
 async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Return to admin dashboard"""
@@ -1448,7 +1755,8 @@ async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT
     admin_text += "🔍 **Search User** - Find user by ID or username\n"
     admin_text += "👥 **All Users** - View all registered users\n"
     admin_text += "📨 **Batch Follow-up** - Manage follow-up messages for unverified users\n"
-    admin_text += "🔄 **Active Follow-ups** - View users receiving persistent follow-up messages\n\n"
+    admin_text += "🔄 **Active Follow-ups** - View users receiving persistent follow-up messages\n"
+    admin_text += "⚡ **Enhanced Follow-up** - Manage 3 messages/day follow-up system\n\n"
     admin_text += "Use the buttons below or type commands directly."
     
     keyboard = [
@@ -1458,6 +1766,7 @@ async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT
          InlineKeyboardButton("👥 All Users", callback_data="admin_all_users")],
         [InlineKeyboardButton("📨 Batch Follow-up", callback_data="admin_batch_followup"),
          InlineKeyboardButton("🔄 Active Follow-ups", callback_data="admin_active_followups")],
+        [InlineKeyboardButton("⚡ Enhanced Follow-up", callback_data="admin_enhanced_followup")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
