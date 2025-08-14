@@ -316,6 +316,9 @@ class DatabaseManager:
                 '''),
                 ('007_add_blocked_bot_column', '''
                     ALTER TABLE users ADD COLUMN IF NOT EXISTS blocked_bot BOOLEAN DEFAULT FALSE;
+                '''),
+                ('008_add_follow_up_sequence_column', '''
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS follow_up_sequence INTEGER DEFAULT 1;
                 ''')
             ]
         else:
@@ -385,6 +388,9 @@ class DatabaseManager:
                 '''),
                 ('007_add_blocked_bot_column', '''
                     ALTER TABLE users ADD COLUMN blocked_bot INTEGER DEFAULT 0;
+                '''),
+                ('008_add_follow_up_sequence_column', '''
+                    ALTER TABLE users ADD COLUMN follow_up_sequence INTEGER DEFAULT 1;
                 ''')
             ]
     

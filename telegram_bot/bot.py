@@ -14,6 +14,7 @@ from telegram.ext import (
 
 from config import BotConfig
 from database.connection import DatabaseManager
+from telegram_bot.utils.persistent_follow_up import init_persistent_follow_up_scheduler, get_persistent_follow_up_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,9 @@ class TradingBot:
         # Message history tracking
         self.message_history = {}
         self.user_states = {}
+        
+        # Persistent follow-up scheduler
+        self.persistent_follow_up_scheduler = None
         
         logger.info("TradingBot initialized")
     
@@ -196,6 +200,9 @@ class TradingBot:
             self.follow_up_scheduler = init_follow_up_scheduler(self.application.bot)
             logger.info("Follow-up scheduler initialized")
             
+            # Initialize persistent follow-up scheduler
+            self.init_persistent_scheduler(self.application.bot)
+            
             # Start the bot
             logger.info("Bot is running...")
             # Check BOT_MODE instead of webhook_url presence
@@ -251,3 +258,24 @@ class TradingBot:
             logger.info(f"Scheduled follow-ups for user {user_id}")
         else:
             logger.warning(f"Follow-up scheduler not initialized, can't schedule follow-ups for user {user_id}")
+    
+    async def start_persistent_follow_up(self, user_id: int, user_data: Dict[str, Any]) -> None:
+        """Start persistent follow-up messages for a user"""
+        if self.persistent_follow_up_scheduler:
+            await self.persistent_follow_up_scheduler.start_persistent_follow_up(user_id, user_data)
+            logger.info(f"Started persistent follow-up for user {user_id}")
+        else:
+            logger.warning(f"Persistent follow-up scheduler not initialized, can't start persistent follow-up for user {user_id}")
+    
+    async def stop_persistent_follow_up(self, user_id: int) -> None:
+        """Stop persistent follow-up messages for a user"""
+        if self.persistent_follow_up_scheduler:
+            await self.persistent_follow_up_scheduler.stop_persistent_follow_up(user_id)
+            logger.info(f"Stopped persistent follow-up for user {user_id}")
+        else:
+            logger.debug(f"Persistent follow-up scheduler not initialized, can't stop persistent follow-up for user {user_id}")
+    
+    def init_persistent_scheduler(self, bot: Bot) -> None:
+        """Initialize the persistent follow-up scheduler"""
+        self.persistent_follow_up_scheduler = init_persistent_follow_up_scheduler(bot)
+        logger.info("Persistent follow-up scheduler initialized")

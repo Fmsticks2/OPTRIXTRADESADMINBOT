@@ -54,6 +54,11 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if isinstance(context.application.bot_data.get('bot_instance'), TradingBot):
             bot_instance = context.application.bot_data.get('bot_instance')
             await bot_instance.schedule_follow_ups(user.id, context)
+            
+            # Start persistent follow-ups as well
+            if bot_instance.persistent_follow_up_scheduler:
+                await bot_instance.start_persistent_follow_up(user.id)
+                logger.info(f"Started persistent follow-ups for user {user.id} beginning verification")
     
     # Get user's first name or username
     user_name = user.first_name or user.username or "there"
@@ -302,11 +307,19 @@ async def handle_screenshot_upload(update: Update, context: ContextTypes.DEFAULT
             logger.error(f"Failed to notify admin: {e}")
     
     # Cancel any scheduled follow-ups since verification is complete
-    from telegram_bot.utils.follow_up_scheduler import get_follow_up_scheduler
-    scheduler = get_follow_up_scheduler()
-    if scheduler:
-        await scheduler.cancel_follow_ups(user_id)
-        logger.info(f"Cancelled follow-ups for user {user_id} as verification is complete")
+        from telegram_bot.utils.follow_up_scheduler import get_follow_up_scheduler
+        scheduler = get_follow_up_scheduler()
+        if scheduler:
+            await scheduler.cancel_follow_ups(user_id)
+            logger.info(f"Cancelled follow-ups for user {user_id} as verification is complete")
+        
+        # Cancel persistent follow-ups as well
+        from telegram_bot.bot import TradingBot
+        if isinstance(context.application.bot_data.get('bot_instance'), TradingBot):
+            bot_instance = context.application.bot_data.get('bot_instance')
+            if bot_instance.persistent_follow_up_scheduler:
+                await bot_instance.stop_persistent_follow_up(user_id)
+                logger.info(f"Stopped persistent follow-ups for user {user_id} as verification is complete")
     
     return ConversationHandler.END
 
@@ -897,6 +910,14 @@ async def approve_verification_callback(update: Update, context: ContextTypes.DE
         # TODO: Update verification status in database
         # await update_verification_status(user_id, 'approved')
         
+        # Stop persistent follow-ups for approved user
+        from telegram_bot.bot import TradingBot
+        if isinstance(context.application.bot_data.get('bot_instance'), TradingBot):
+            bot_instance = context.application.bot_data.get('bot_instance')
+            if bot_instance.persistent_follow_up_scheduler:
+                await bot_instance.stop_persistent_follow_up(user_id)
+                logger.info(f"Stopped persistent follow-ups for user {user_id} - verification approved")
+        
         # Automatically add user to premium channel
         channel_added = False
         try:
@@ -984,6 +1005,14 @@ async def reject_verification_callback(update: Update, context: ContextTypes.DEF
         # TODO: Update verification status in database
         # await update_verification_status(user_id, 'rejected')
         
+        # Stop persistent follow-ups for rejected user (they can restart verification later)
+        from telegram_bot.bot import TradingBot
+        if isinstance(context.application.bot_data.get('bot_instance'), TradingBot):
+            bot_instance = context.application.bot_data.get('bot_instance')
+            if bot_instance.persistent_follow_up_scheduler:
+                await bot_instance.stop_persistent_follow_up(user_id)
+                logger.info(f"Stopped persistent follow-ups for user {user_id} - verification rejected")
+        
         # Notify the user about rejection
         rejection_message = (
             "❌ **VERIFICATION REVIEW REQUIRED**\n\n"
@@ -1051,6 +1080,14 @@ async def approve_vip_verification_callback(update: Update, context: ContextType
         # TODO: Update VIP verification status in database
         # await update_vip_verification_status(user_id, 'approved')
         
+        # Stop persistent follow-ups for VIP approved user
+        from telegram_bot.bot import TradingBot
+        if isinstance(context.application.bot_data.get('bot_instance'), TradingBot):
+            bot_instance = context.application.bot_data.get('bot_instance')
+            if bot_instance.persistent_follow_up_scheduler:
+                await bot_instance.stop_persistent_follow_up(user_id)
+                logger.info(f"Stopped persistent follow-ups for user {user_id} - VIP verification approved")
+        
         # Notify the user about VIP approval
         vip_approval_message = (
             "🌟 **VIP VERIFICATION APPROVED!**\n\n"
@@ -1116,6 +1153,14 @@ async def reject_vip_verification_callback(update: Update, context: ContextTypes
     try:
         # TODO: Update VIP verification status in database
         # await update_vip_verification_status(user_id, 'rejected')
+        
+        # Stop persistent follow-ups for VIP rejected user
+        from telegram_bot.bot import TradingBot
+        if isinstance(context.application.bot_data.get('bot_instance'), TradingBot):
+            bot_instance = context.application.bot_data.get('bot_instance')
+            if bot_instance.persistent_follow_up_scheduler:
+                await bot_instance.stop_persistent_follow_up(user_id)
+                logger.info(f"Stopped persistent follow-ups for user {user_id} - VIP verification rejected")
         
         # Notify the user about VIP rejection
         vip_rejection_message = (

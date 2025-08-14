@@ -34,7 +34,8 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         admin_text += "📢 **Broadcast** - Send message to all users\n"
         admin_text += "🔍 **Search User** - Find user by ID or username\n"
         admin_text += "👥 **All Users** - View all registered users\n"
-        admin_text += "📊 **User Activity** - View recent user interactions\n\n"
+        admin_text += "📨 **Batch Follow-up** - Manage follow-up messages for unverified users\n"
+        admin_text += "🔄 **Active Follow-ups** - View users receiving persistent follow-up messages\n\n"
         admin_text += "Use the buttons below or type commands directly."
         
         keyboard = [
@@ -42,7 +43,8 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
              InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
             [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user"),
              InlineKeyboardButton("👥 All Users", callback_data="admin_all_users")],
-            [InlineKeyboardButton("📊 User Activity", callback_data="admin_user_activity")],
+            [InlineKeyboardButton("📨 Batch Follow-up", callback_data="admin_batch_followup"),
+             InlineKeyboardButton("🔄 Active Follow-ups", callback_data="admin_active_followups")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
@@ -131,6 +133,98 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if str(user_id) != BotConfig.ADMIN_USER_ID:
         await update.message.reply_text("⛔ You are not authorized to use admin commands.")
         return ConversationHandler.END
+
+async def admin_active_followups_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Show users currently receiving persistent follow-up messages"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    if str(user_id) != BotConfig.ADMIN_USER_ID:
+        await query.message.reply_text("⛔ You are not authorized to use admin commands.")
+        return ConversationHandler.END
+    
+    try:
+        # Import the persistent follow-up manager
+        from telegram_bot.bot import TradingBot
+        
+        # Get the bot instance to access persistent follow-up scheduler
+        bot_instance = context.bot_data.get('bot_instance')
+        if not bot_instance or not hasattr(bot_instance, 'persistent_follow_up_scheduler'):
+            await query.message.reply_text(
+                "❌ Persistent follow-up system not available.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]])
+            )
+            return ConversationHandler.END
+        
+        scheduler = bot_instance.persistent_follow_up_scheduler
+        active_users = scheduler.active_users if hasattr(scheduler, 'active_users') else {}
+        
+        if not active_users:
+            response_text = "🔄 **Active Follow-up Messages**\n\n"
+            response_text += "📭 No users are currently receiving persistent follow-up messages.\n\n"
+            response_text += "💡 Users will appear here when they start the verification process but haven't completed it yet."
+        else:
+            response_text = f"🔄 **Active Follow-up Messages** ({len(active_users)} users)\n\n"
+            
+            # Get user data for each active user
+            for i, (user_id_int, user_info) in enumerate(active_users.items(), 1):
+                if i > 15:  # Limit display to first 15 users
+                    break
+                
+                try:
+                    user_data = await get_user_data(user_id_int)
+                    if user_data:
+                        first_name = user_data.get('first_name', 'Unknown')
+                        username = user_data.get('username', 'No username')
+                        sequence_num = user_data.get('follow_up_sequence', 1)
+                        
+                        # Calculate time since last message
+                        last_message_time = user_info.get('last_message_time')
+                        if last_message_time:
+                            time_diff = datetime.now() - last_message_time
+                            hours_ago = int(time_diff.total_seconds() / 3600)
+                            time_str = f"{hours_ago}h ago" if hours_ago > 0 else "<1h ago"
+                        else:
+                            time_str = "Unknown"
+                        
+                        response_text += f"{i}. **{first_name}** (@{username})\n"
+                        response_text += f"   User ID: `{user_id_int}`\n"
+                        response_text += f"   Current Sequence: {sequence_num}/24\n"
+                        response_text += f"   Last Message: {time_str}\n\n"
+                    else:
+                        response_text += f"{i}. **User {user_id_int}**\n"
+                        response_text += f"   Status: User data not found\n\n"
+                except Exception as e:
+                    logger.error(f"Error getting data for user {user_id_int}: {e}")
+                    response_text += f"{i}. **User {user_id_int}**\n"
+                    response_text += f"   Status: Error loading data\n\n"
+            
+            if len(active_users) > 15:
+                response_text += f"... and {len(active_users) - 15} more users.\n\n"
+            
+            # Add statistics
+            total_messages_sent = sum(info.get('message_count', 0) for info in active_users.values())
+            avg_sequence = sum(1 for info in active_users.values()) / len(active_users) if active_users else 0
+            
+            response_text += f"📊 **Statistics:**\n"
+            response_text += f"• Active Users: {len(active_users)}\n"
+            response_text += f"• Total Messages Sent: {total_messages_sent}\n"
+            response_text += f"• Average Progress: {avg_sequence:.1f} messages per user"
+        
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.message.reply_text(response_text, reply_markup=reply_markup, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error in admin_active_followups_callback: {e}")
+        error_text = "❌ Error retrieving active follow-up data."
+        keyboard = [[InlineKeyboardButton("🔙 Back to Dashboard", callback_data="admin_dashboard")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.reply_text(error_text, reply_markup=reply_markup)
+    
+    return ConversationHandler.END
 
 async def admin_batch_followup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle batch follow-up management"""
@@ -1353,7 +1447,8 @@ async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT
     admin_text += "📢 **Broadcast** - Send message to all users\n"
     admin_text += "🔍 **Search User** - Find user by ID or username\n"
     admin_text += "👥 **All Users** - View all registered users\n"
-    admin_text += "📨 **Batch Follow-up** - Manage follow-up messages for unverified users\n\n"
+    admin_text += "📨 **Batch Follow-up** - Manage follow-up messages for unverified users\n"
+    admin_text += "🔄 **Active Follow-ups** - View users receiving persistent follow-up messages\n\n"
     admin_text += "Use the buttons below or type commands directly."
     
     keyboard = [
@@ -1361,7 +1456,8 @@ async def admin_dashboard_callback(update: Update, context: ContextTypes.DEFAULT
          InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")],
         [InlineKeyboardButton("🔍 Search User", callback_data="admin_search_user"),
          InlineKeyboardButton("👥 All Users", callback_data="admin_all_users")],
-        [InlineKeyboardButton("📨 Batch Follow-up", callback_data="admin_batch_followup")],
+        [InlineKeyboardButton("📨 Batch Follow-up", callback_data="admin_batch_followup"),
+         InlineKeyboardButton("🔄 Active Follow-ups", callback_data="admin_active_followups")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
