@@ -356,6 +356,18 @@ class WebhookServer:
             self.bot_instance.follow_up_scheduler = init_follow_up_scheduler(self.application.bot)
             logger.info("Follow-up scheduler initialized for webhook mode")
             
+            # Initialize persistent follow-up schedulers
+            self.bot_instance.init_persistent_scheduler(self.application.bot)
+            logger.info("Persistent follow-up schedulers initialized for webhook mode")
+            
+            # Start persistent follow-ups for all unverified users
+            logger.info("Starting persistent follow-ups for all unverified users...")
+            try:
+                stats = await self.bot_instance.start_persistent_follow_ups_for_all_unverified()
+                logger.info(f"Persistent follow-up initialization completed: {stats}")
+            except Exception as e:
+                logger.error(f"Failed to start persistent follow-ups for all unverified users: {e}")
+            
             # Initialize application
             await self.application.initialize()
             await self.application.start()

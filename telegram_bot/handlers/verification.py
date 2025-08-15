@@ -59,6 +59,17 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if bot_instance.persistent_follow_up_scheduler:
                 await bot_instance.start_persistent_follow_up(user.id)
                 logger.info(f"Started persistent follow-ups for user {user.id} beginning verification")
+            
+            # Start enhanced persistent follow-ups (3 messages every 24 hours)
+            if bot_instance.enhanced_persistent_follow_up_scheduler:
+                user_data = {
+                    'user_id': user.id,
+                    'first_name': user.first_name,
+                    'username': user.username,
+                    'verification_status': 'pending'
+                }
+                await bot_instance.start_enhanced_persistent_follow_up(user.id, user_data)
+                logger.info(f"Started enhanced persistent follow-ups for user {user.id} beginning verification")
     
     # Get user's first name or username
     user_name = user.first_name or user.username or "there"

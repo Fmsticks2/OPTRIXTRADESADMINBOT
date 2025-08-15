@@ -205,6 +205,14 @@ class TradingBot:
             # Initialize persistent follow-up scheduler
             self.init_persistent_scheduler(self.application.bot)
             
+            # Start persistent follow-ups for all unverified users
+            logger.info("Starting persistent follow-ups for all unverified users...")
+            try:
+                stats = await self.start_persistent_follow_ups_for_all_unverified()
+                logger.info(f"Persistent follow-up initialization completed: {stats}")
+            except Exception as e:
+                logger.error(f"Failed to start persistent follow-ups for all unverified users: {e}")
+            
             # Start the bot
             logger.info("Bot is running...")
             # Check BOT_MODE instead of webhook_url presence
@@ -298,3 +306,83 @@ class TradingBot:
         self.persistent_follow_up_scheduler = init_persistent_follow_up_scheduler(bot)
         self.enhanced_persistent_follow_up_scheduler = init_enhanced_persistent_follow_up_scheduler(bot)
         logger.info("Persistent follow-up schedulers initialized")
+    
+    async def start_persistent_follow_ups_for_all_unverified(self) -> Dict[str, int]:
+        """Start persistent follow-ups for all unverified users in the database"""
+        stats = {
+            'processed': 0,
+            'started_persistent': 0,
+            'started_enhanced': 0,
+            'failed': 0,
+            'already_active': 0
+        }
+        
+        try:
+            # Get all unverified users from database
+            from database.connection import db_manager
+            
+            query = """
+            SELECT user_id, username, first_name, registration_status, created_at
+            FROM users
+            WHERE (registration_status = 'not_started' OR registration_status = 'pending' OR registration_status IS NULL)
+               AND is_active = TRUE
+               AND blocked_bot != TRUE
+            ORDER BY created_at DESC
+            """
+            
+            unverified_users = await db_manager.execute(query, fetch='all')
+            logger.info(f"Found {len(unverified_users)} unverified users for persistent follow-up")
+            
+            for user in unverified_users:
+                user_id = user['user_id']
+                stats['processed'] += 1
+                
+                try:
+                    # Prepare user data
+                    user_data = {
+                        'user_id': user_id,
+                        'first_name': user.get('first_name', ''),
+                        'username': user.get('username', ''),
+                        'verification_status': user.get('registration_status', 'not_started')
+                    }
+                    
+                    # Check if user already has active persistent follow-ups
+                    persistent_active = False
+                    enhanced_active = False
+                    
+                    if self.persistent_follow_up_scheduler:
+                        persistent_active = user_id in self.persistent_follow_up_scheduler.active_users
+                    
+                    if self.enhanced_persistent_follow_up_scheduler:
+                        enhanced_active = user_id in self.enhanced_persistent_follow_up_scheduler.active_users
+                    
+                    # Start persistent follow-up if not already active
+                    if not persistent_active and self.persistent_follow_up_scheduler:
+                        await self.persistent_follow_up_scheduler.start_persistent_follow_up(user_id, user_data)
+                        stats['started_persistent'] += 1
+                        logger.info(f"Started persistent follow-up for user {user_id} ({user.get('first_name', 'Unknown')})")
+                    elif persistent_active:
+                        stats['already_active'] += 1
+                        logger.debug(f"User {user_id} already has active persistent follow-up")
+                    
+                    # Start enhanced persistent follow-up if not already active
+                    if not enhanced_active and self.enhanced_persistent_follow_up_scheduler:
+                        await self.enhanced_persistent_follow_up_scheduler.start_enhanced_persistent_follow_up(user_id, user_data)
+                        stats['started_enhanced'] += 1
+                        logger.info(f"Started enhanced persistent follow-up for user {user_id} ({user.get('first_name', 'Unknown')})")
+                    elif enhanced_active:
+                        logger.debug(f"User {user_id} already has active enhanced persistent follow-up")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to start persistent follow-ups for user {user_id}: {e}")
+                    stats['failed'] += 1
+                
+                # Small delay to avoid overwhelming the system
+                await asyncio.sleep(0.1)
+            
+            logger.info(f"Persistent follow-up initialization completed: {stats}")
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Error starting persistent follow-ups for all unverified users: {e}")
+            return stats
