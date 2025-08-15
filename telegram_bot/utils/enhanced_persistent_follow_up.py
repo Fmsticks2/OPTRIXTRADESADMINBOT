@@ -19,7 +19,6 @@ from apscheduler.executors.asyncio import AsyncIOExecutor
 
 from config import BotConfig
 from telegram_bot.utils.error_handler import error_handler_decorator
-from telegram_bot.utils.follow_up_handlers import FollowUpHandlers
 
 logger = logging.getLogger(__name__)
 
@@ -51,36 +50,7 @@ class EnhancedPersistentFollowUpScheduler:
         )
         self.scheduler.start()
         
-        # Initialize follow-up handlers to get all 24 message templates
-        self.handlers = FollowUpHandlers(bot)
-        
-        # Create mapping of all 24 follow-up handlers
-        self.follow_up_handlers = {
-            1: self.handlers.get_sequence1_handler,
-            2: self.handlers.get_sequence2_handler,
-            3: self.handlers.get_sequence3_handler,
-            4: self.handlers.get_sequence4_handler,
-            5: self.handlers.get_sequence5_handler,
-            6: self.handlers.get_sequence6_handler,
-            7: self.handlers.get_sequence7_handler,
-            8: self.handlers.get_sequence8_handler,
-            9: self.handlers.get_sequence9_handler,
-            10: self.handlers.get_sequence10_handler,
-            11: self.handlers.get_sequence11_handler,
-            12: self.handlers.get_sequence12_handler,
-            13: self.handlers.get_sequence13_handler,
-            14: self.handlers.get_sequence14_handler,
-            15: self.handlers.get_sequence15_handler,
-            16: self.handlers.get_sequence16_handler,
-            17: self.handlers.get_sequence17_handler,
-            18: self.handlers.get_sequence18_handler,
-            19: self.handlers.get_sequence19_handler,
-            20: self.handlers.get_sequence20_handler,
-            21: self.handlers.get_sequence21_handler,
-            22: self.handlers.get_sequence22_handler,
-            23: self.handlers.get_sequence23_handler,
-            24: self.handlers.get_sequence24_handler,
-        }
+        # Note: Using direct message content instead of handlers for enhanced persistent follow-ups
         
         logger.info("Enhanced persistent follow-up scheduler initialized")
     
@@ -263,15 +233,12 @@ class EnhancedPersistentFollowUpScheduler:
             # Get user's current sequence number
             current_sequence = await self.get_user_sequence_number(user_id)
             
-            # Get the appropriate handler for this sequence
-            handler_func = self.follow_up_handlers.get(current_sequence)
+            # Get message content for this sequence
+            message_data = await self._get_message_content_for_sequence(current_sequence)
             
-            if not handler_func:
-                logger.error(f"No handler found for sequence {current_sequence}")
+            if not message_data:
+                logger.error(f"No message content found for sequence {current_sequence}")
                 return
-            
-            # Get message content from handler
-            message_data = handler_func()
             
             # Get current user data for personalization
             from database.connection import get_user_data
@@ -283,9 +250,7 @@ class EnhancedPersistentFollowUpScheduler:
             if first_name:
                 message_text = f"Hi {first_name}! 👋\n\n" + message_text
             
-            # Add message number indicator for clarity
-            cycle_info = f"📅 Message {message_number}/3 today\n\n"
-            message_text = cycle_info + message_text
+            # No message number indicator needed
             
             # Send message
             await self.bot.send_message(
@@ -323,6 +288,52 @@ class EnhancedPersistentFollowUpScheduler:
             
         except Exception as e:
             logger.error(f"Unexpected error sending enhanced message to user {user_id}: {e}")
+    
+    async def _get_message_content_for_sequence(self, sequence: int) -> Optional[Dict[str, Any]]:
+        """Get message content for a specific sequence number"""
+        try:
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            
+            # Define message content for all 24 sequences
+            messages = {
+                1: {
+                    'text': "just checking in…\nYou haven't completed your free VIP access setup yet. If you still want:\n✅ Daily signals\n✅ Auto trading bot\n✅ Bonus deposit rewards\n…then don't miss out. Traders are already making serious moves this week.\nTap below to continue your registration. You're just one step away 👇",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                2: {
+                    'text': "Quick question…\nAre you still interested in getting free VIP access to our trading signals?\n\nI noticed you started the setup but didn't finish.\n\nJust so you know, we're helping traders make consistent profits with:\n📈 Daily market analysis\n🤖 Automated trading strategies\n💰 Bonus rewards on deposits\n\nIf you're ready to take your trading to the next level, complete your registration below 👇",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("✅ Yes, Complete My Registration", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("💬 Talk to Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                3: {
+                    'text': "Last chance reminder…\n\nYour free VIP trading access is still waiting for you.\n\nDon't let this opportunity slip away. Other traders are already:\n💰 Making profits with our signals\n🤖 Using our automated trading bot\n📊 Getting daily market insights\n\nComplete your setup now before this offer expires 👇",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🚀 Complete Setup Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("💬 Need Help?", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                }
+            }
+            
+            # For sequences 4-24, use a default message with sequence number
+            if sequence not in messages:
+                messages[sequence] = {
+                    'text': f"Follow-up message #{sequence}\n\nYour VIP trading access is still available!\n\nJoin thousands of successful traders who are already:\n✅ Receiving daily profitable signals\n✅ Using our automated trading system\n✅ Earning bonus rewards\n\nDon't miss out on this opportunity. Complete your registration now 👇",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🎯 Complete Registration", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("💬 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                }
+            
+            return messages.get(sequence)
+            
+        except Exception as e:
+            logger.error(f"Error getting message content for sequence {sequence}: {e}")
+            return None
     
     def get_active_users_count(self) -> int:
         """Get count of users with active enhanced persistent follow-ups"""
