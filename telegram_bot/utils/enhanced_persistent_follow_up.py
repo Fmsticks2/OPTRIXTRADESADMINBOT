@@ -322,7 +322,7 @@ class EnhancedPersistentFollowUpScheduler:
             # For sequences 4-24, use a default message with sequence number
             if sequence not in messages:
                 messages[sequence] = {
-                    'text': f"Follow-up message #{sequence}\n\nYour VIP trading access is still available!\n\nJoin thousands of successful traders who are already:\n✅ Receiving daily profitable signals\n✅ Using our automated trading system\n✅ Earning bonus rewards\n\nDon't miss out on this opportunity. Complete your registration now 👇",
+                     'text': "Your VIP trading access is still available!\n\nJoin thousands of successful traders who are already:\n✅ Receiving daily profitable signals\n✅ Using our automated trading system\n✅ Earning bonus rewards\n\nDon't miss out on this opportunity. Complete your registration now 👇",
                     'reply_markup': InlineKeyboardMarkup([
                         [InlineKeyboardButton("🎯 Complete Registration", callback_data="activation_instructions")],
                         [InlineKeyboardButton("💬 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
