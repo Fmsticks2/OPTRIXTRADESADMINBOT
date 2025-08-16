@@ -244,10 +244,18 @@ class EnhancedPersistentFollowUpScheduler:
             from database.connection import get_user_data
             current_user_data = await get_user_data(user_id)
             
-            # Personalize message if first name is available
+            # Personalize message with first name
             message_text = message_data['text']
             first_name = current_user_data.get('first_name', '') if current_user_data else ''
-            if first_name:
+            
+            # Replace {first_name} placeholder in the message text
+            if '{first_name}' in message_text:
+                if first_name:
+                    message_text = message_text.replace('{first_name}', first_name)
+                else:
+                    message_text = message_text.replace('{first_name}', 'there')
+            elif first_name and not message_text.startswith('Hey'):
+                # Add greeting only if message doesn't already have one and first name is available
                 message_text = f"Hi {first_name}! 👋\n\n" + message_text
             
             # No message number indicator needed
@@ -294,40 +302,177 @@ class EnhancedPersistentFollowUpScheduler:
         try:
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             
-            # Define message content for all 24 sequences
+            # Define all 24 follow-up messages from newfollowup.txt
             messages = {
                 1: {
-                    'text': "just checking in…\nYou haven't completed your free VIP access setup yet. If you still want:\n✅ Daily signals\n✅ Auto trading bot\n✅ Bonus deposit rewards\n…then don't miss out. Traders are already making serious moves this week.\nTap below to continue your registration. You're just one step away 👇",
+                    'text': "Hey {first_name} 👋\n\njust checking in…\nYou haven't completed your free VIP access setup yet. If you still want:\n✅ Daily signals\n✅ Auto trading bot\n✅ Bonus deposit rewards\n…then don't miss out. Traders are already making serious moves this week.\nTap below to continue your registration. You're just one step away 👇",
                     'reply_markup': InlineKeyboardMarkup([
                         [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
                         [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
                     ])
                 },
                 2: {
-                    'text': "Quick question…\nAre you still interested in getting free VIP access to our trading signals?\n\nI noticed you started the setup but didn't finish.\n\nJust so you know, we're helping traders make consistent profits with:\n📈 Daily market analysis\n🤖 Automated trading strategies\n💰 Bonus rewards on deposits\n\nIf you're ready to take your trading to the next level, complete your registration below 👇",
+                    'text': "⌛ Still thinking, {first_name}?\nThis could be the shift you've been waiting for. The sooner you move, the better you for you.\nFree slot won't be open forever.",
                     'reply_markup': InlineKeyboardMarkup([
-                        [InlineKeyboardButton("✅ Yes, Complete My Registration", callback_data="activation_instructions")],
-                        [InlineKeyboardButton("💬 Talk to Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
                     ])
                 },
                 3: {
-                    'text': "Last chance reminder…\n\nYour free VIP trading access is still waiting for you.\n\nDon't let this opportunity slip away. Other traders are already:\n💰 Making profits with our signals\n🤖 Using our automated trading bot\n📊 Getting daily market insights\n\nComplete your setup now before this offer expires 👇",
+                    'text': "👋 Just checking in... You haven't taken the next step yet. Are you having any issues?\nLet's fix that and get you in before it's too late.",
                     'reply_markup': InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🚀 Complete Setup Now", callback_data="activation_instructions")],
-                        [InlineKeyboardButton("💬 Need Help?", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                4: {
+                    'text': "📈 Just an update…\nWe've already had many traders activate their access this week and most of them are already using the free bot + signals to start profiting.\nYou're still eligible but access may close soon once we hit this week's quota.\nDon't miss your shot.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Complete My Free access", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                5: {
+                    'text': "💪 You've come this far. Why stop now, {first_name}?\nEverything you need to be a successful trader is on our premium channel\nTap the button and let's make it real.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                6: {
+                    'text': "⏰ Opportunities don't wait.\nEvery minute you delay, someone else is stepping up.\nDon't get left behind, {first_name}.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                7: {
+                    'text': "Hey! Just wanted to remind you of everything you get for free once you sign up:\n✅ Daily VIP signals\n✅ Auto-trading bot\n✅ Strategy sessions\n✅ Private trader group\n✅ Up to $500 in deposit bonuses\nAnd yes, it's still 100% free when you use our broker link 🔥",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ I'm Ready to Activate", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                8: {
+                    'text': "💪 {first_name}, just a gentle nudge.\nSuccess rewards action, don't let procrastination steal this from you.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                9: {
+                    'text': "You saw the message, but didn't move.\nThat's okay, but nothing changes until you do.\nMake today count, {first_name}",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                10: {
+                    'text': "⚡ Quick one, {first_name}.\nIf you're still interested, act now, this free spot won't be open forever",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                11: {
+                    'text': "💭 You've been on our early access list for a few days…\nIf you're still interested but something's holding you back, reply to this message and let's help you sort it out.\nEven if you don't have a big budget right now, we'll guide you to start small and smart.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ I Have a Question", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")],
+                        [InlineKeyboardButton("➡️ Continue Activation", callback_data="activation_instructions")]
+                    ])
+                },
+                12: {
+                    'text': "💎 We don't want you to miss out, {first_name}.\nSo here's your friendly reminder. Click below and lock in your access.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                13: {
+                    'text': "🤔 Still on the fence, {first_name}?\nWhat's stopping you? Let's break through that together.\nOne click is all it takes.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                14: {
+                    'text': "🚨 Last call to claim your free access to OPTRIXTRADES.\nThis week's onboarding closes in a few hours. After that, you'll need to wait for the next batch, no guarantees it'll still be free.\nWant in?",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("✅ Yes, Activate Me Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("❌ Not Interested", callback_data="not_interested")]
+                    ])
+                },
+                15: {
+                    'text': "⏰ Your wake-up call, {first_name}.\nEvery hour, someone else makes a move.\nBe one of them.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                16: {
+                    'text': "This is for you, {first_name}.\nNot just anyone.\nYou joined for a reason, honor that reason.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                17: {
+                    'text': "Wondering if OPTRIXTRADES is legit?\nWe totally get it. That's why we host free sessions, give access to our AI, and don't charge upfront.\n✅ Real traders use us.\n✅ Real results.\n✅ Real support, 24/7.\nWe only earn a small % when you win. That's why we want to help you trade smarter.\nWant to test us out with just $20?",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Try With $20 I'm Curious", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                18: {
+                    'text': "You deserve better, {first_name}.\nAnd this is the first step.\nDon't delay the version of you that's waiting to become a profitable trader!",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                19: {
+                    'text': "Quick reminder, {first_name}.\nYou haven't taken action. We're holding space, but not for long.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                20: {
+                    'text': "Okay… we're starting to think you're ghosting us 😅\n\nBut seriously, if you've been busy, no stress. Just pick up where you left off and grab your free access before this week closes.\nThe AI bot is still available for new traders using our link.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Okay, Let's Do This", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                21: {
+                    'text': "We're still waiting on you, {first_name}.\nBut not forever. Tap in before the window closes.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                22: {
+                    'text': "Don't look back with regret.\nMoments like this seem small... until they're gone. Act now.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Claim Free Access Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                23: {
+                    'text': "Another trader just flipped a $100 deposit into $390 using our AI bot + signal combo in 4 days.\nWe can't guarantee profits, but the tools work when used right.\nIf you missed your shot last time, you're still eligible now 🔥",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️ Activate My Tools Now", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️ Contact support team", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+                    ])
+                },
+                24: {
+                    'text': "⏳ FINAL REMINDER\nWe're closing registrations today for this round of free VIP access. No promises it'll open again, especially not at this level of access.\nIf you want in, this is it.",
+                    'reply_markup': InlineKeyboardMarkup([
+                        [InlineKeyboardButton("➡️✅ Count Me In", callback_data="activation_instructions")],
+                        [InlineKeyboardButton("➡️❌ Remove Me From This List", callback_data="remove_from_list")]
                     ])
                 }
             }
-            
-            # For sequences 4-24, use a default message with sequence number
-            if sequence not in messages:
-                messages[sequence] = {
-                     'text': "Your VIP trading access is still available!\n\nJoin thousands of successful traders who are already:\n✅ Receiving daily profitable signals\n✅ Using our automated trading system\n✅ Earning bonus rewards\n\nDon't miss out on this opportunity. Complete your registration now 👇",
-                    'reply_markup': InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🎯 Complete Registration", callback_data="activation_instructions")],
-                        [InlineKeyboardButton("💬 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
-                    ])
-                }
             
             return messages.get(sequence)
             
