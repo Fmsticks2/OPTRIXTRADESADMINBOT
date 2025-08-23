@@ -47,64 +47,16 @@ class WebhookServer:
     def setup_routes(self, app: FastAPI):
         """Setup FastAPI routes"""
         
-        @app.get("/", response_class=HTMLResponse)
+        @app.get("/")
         async def root(request: Request):
-            """Serve professional landing page with Facebook Pixel integration"""
-            try:
-                # Import Facebook Pixel config with fallback
-                try:
-                    from .facebook_pixel_config import fb_pixel_config
-                except ImportError:
-                    try:
-                        from facebook_pixel_config import fb_pixel_config
-                    except ImportError:
-                        # Fallback configuration if import fails
-                        class FallbackConfig:
-                            FACEBOOK_PIXEL_ID = 'YOUR_PIXEL_ID'
-                            AUTO_REDIRECT_DELAY = 10
-                            ENGAGEMENT_TRACKING_DELAY = 5
-                            TRACK_PAGE_VIEW = True
-                            TRACK_LEAD_CONVERSION = True
-                            TRACK_ENGAGEMENT = True
-                            
-                            @classmethod
-                            def is_pixel_configured(cls):
-                                return False
-                            
-                            @classmethod
-                            def get_pixel_script(cls):
-                                return None
-                            
-                            @classmethod
-                            def get_noscript_tag(cls):
-                                return None
-                        
-                        fb_pixel_config = FallbackConfig()
-                
-                # Get bot username for the Telegram link
-                bot_username = await self.get_bot_username()
-                
-                # Prepare template context with Facebook Pixel data
-                context = {
-                    "request": request,
-                    "bot_username": bot_username,
-                    "facebook_pixel_id": fb_pixel_config.FACEBOOK_PIXEL_ID,
-                    "facebook_pixel_enabled": fb_pixel_config.is_pixel_configured(),
-                    "facebook_pixel_script": fb_pixel_config.get_pixel_script(),
-                    "facebook_noscript_tag": fb_pixel_config.get_noscript_tag(),
-                    "auto_redirect_delay": fb_pixel_config.AUTO_REDIRECT_DELAY,
-                    "engagement_delay": fb_pixel_config.ENGAGEMENT_TRACKING_DELAY,
-                    "track_page_view": fb_pixel_config.TRACK_PAGE_VIEW,
-                    "track_lead_conversion": fb_pixel_config.TRACK_LEAD_CONVERSION,
-                    "track_engagement": fb_pixel_config.TRACK_ENGAGEMENT
-                }
-                
-                return self.templates.TemplateResponse("landing.html", context)
-                
-            except Exception as e:
-                logger.error(f"Error serving landing page: {e}")
-                # Fallback to JSON response
-                return JSONResponse({"message": "OPTRIXTRADES Bot Webhook Server", "status": "running"})
+            """Redirect directly to Telegram channel"""
+            from fastapi.responses import RedirectResponse
+            
+            # Direct redirect to the Telegram channel
+            channel_url = "https://t.me/Optrixtradeschannel"
+            logger.info(f"Redirecting user to channel: {channel_url}")
+            
+            return RedirectResponse(url=channel_url, status_code=302)
         
         @app.get("/favicon.svg")
         async def favicon():

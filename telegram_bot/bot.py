@@ -16,6 +16,7 @@ from config import BotConfig
 from database.connection import DatabaseManager
 from telegram_bot.utils.persistent_follow_up import init_persistent_follow_up_scheduler, get_persistent_follow_up_scheduler
 from telegram_bot.utils.enhanced_persistent_follow_up import init_enhanced_persistent_follow_up_scheduler, get_enhanced_persistent_follow_up_scheduler
+from telegram_bot.utils.channel_monitor import initialize_channel_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,9 @@ class TradingBot:
         # Persistent follow-up schedulers
         self.persistent_follow_up_scheduler = None
         self.enhanced_persistent_follow_up_scheduler = None
+        
+        # Channel monitor
+        self.channel_monitor = None
         
         logger.info("TradingBot initialized")
     
@@ -204,6 +208,14 @@ class TradingBot:
             
             # Initialize persistent follow-up scheduler
             self.init_persistent_scheduler(self.application.bot)
+            
+            # Initialize and start channel monitor
+            try:
+                self.channel_monitor = initialize_channel_monitor(self.application.bot)
+                await self.channel_monitor.start_monitoring()
+                logger.info("Channel member monitoring started")
+            except Exception as e:
+                logger.error(f"Failed to start channel monitoring: {e}")
             
             # Start persistent follow-ups for all unverified users
             logger.info("Starting persistent follow-ups for all unverified users...")

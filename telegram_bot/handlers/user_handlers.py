@@ -141,6 +141,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         from database.connection import get_user_data
         user_data = await get_user_data(user_id)
         
+        # Check if user is a new channel member and send welcome message
+        try:
+            from telegram_bot.utils.channel_monitor import get_channel_monitor
+            monitor = get_channel_monitor()
+            if monitor and start_param == 'welcome':
+                await monitor.send_welcome_message(user_id)
+                logger.info(f"Welcome message sent to new channel member {user_id}")
+        except Exception as e:
+            logger.error(f"Failed to send welcome message to user {user_id}: {e}")
+        
         # Handle different start scenarios
         if start_param == 'welcome':
             logger.info(f"START_COMMAND: New user {user_id} from landing page, showing channel links")
