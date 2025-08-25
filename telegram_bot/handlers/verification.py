@@ -76,19 +76,17 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Welcome message (Flow 1)
     welcome_text = f"Hey {user_name}\n\n"
-    welcome_text += "Welcome to OPTRIXTRADES\n"
-    welcome_text += "You're one step away from unlocking high-accuracy trading signals, expert strategies, and real trader bonuses, completely free.\n\n"
-    welcome_text += "Here's what you get as a member:\n"
+    welcome_text += "Here's what you get as a member of our premium channel for free :\n\n"
     welcome_text += "✅ Daily VIP trading signals\n"
-    welcome_text += "✅ Strategy sessions from 6-figure traders\n"
+    welcome_text += "✅ Training sessions from 6-figure traders\n"
     welcome_text += "✅ Access to our private trader community\n"
-    welcome_text += "✅ Exclusive signup bonuses (up to $500)\n\n"
-    welcome_text += "👇 Tap below to activate your free VIP access and get started."
+    welcome_text += "✅ Exclusive trading bonuses (up to $500)\n\n"
+    welcome_text += "Click get started to access premium channel NOW 👇"
     
     # Create keyboard with activation button and contact support
     keyboard = [
-        [InlineKeyboardButton("➡️ Get Free VIP Access", callback_data="activation_instructions")],
-        [InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+        [InlineKeyboardButton("Get free vip access", callback_data="activation_instructions")],
+        [InlineKeyboardButton("Contact support - ( I want to access premium channel)", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -115,18 +113,18 @@ async def activation_instructions(update: Update, context: ContextTypes.DEFAULT_
     
     # Activation instructions text
     activation_text = "To activate your free access and join our VIP Signal Channel, follow these steps:\n\n"
-    activation_text += "1️⃣ Click the link below to register with our official broker partner\n"
-    activation_text += f"[{BotConfig.BROKER_LINK}]\n"
-    activation_text += "2️⃣ Deposit $20 or more\n"
-    activation_text += "3️⃣ Send your proof of deposit\n"
+    activation_text += "⿡ Click the link below to register with our official broker partner\n"
+    activation_text += f"[ `https://iqbroker.com/lp/mobile-partner-pwa/?aff=755757&aff_model=revenue&afftrack=]` \n"
+    activation_text += "⿢ Deposit atleast $10 or more to start trading\n"
+    activation_text += "⿣ Send your uid + proof of deposit to @Optrixtradesadmin\n\n"
     activation_text += "Once your proof has been confirmed, your access will be unlocked immediately\n\n"
     activation_text += "The more you deposit, the more powerful your AI access:\n"
     activation_text += "✅ $100+ → Full access to OPTRIX Web AI Portal, Live Signals & AI tools.\n\n"
     activation_text += "✅ $500+ → Includes:\n"
-    activation_text += "All available signal alert options\n"
-    activation_text += "VIP telegram group\n"
-    activation_text += "Access to private sessions and risk management blueprint\n"
-    activation_text += "OPTRIX AI Auto-Trading (trades for you automatically)"
+    activation_text += "◽All available signal alert options\n"
+    activation_text += "◽VIP telegram group\n"
+    activation_text += "◽Access to private sessions and risk management blueprint\n"
+    activation_text += "◽OPTRIX AI Auto-Trading (trades for you automatically)"
     
     # Create keyboard with registration buttons and contact support
     keyboard = [
