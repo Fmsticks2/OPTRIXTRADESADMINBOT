@@ -1,488 +1,568 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>OPTRIXTRADES - Premium Trading Signals</title>
-  <meta name="description" content="Join OPTRIXTRADES for premium trading signals and expert market analysis. Start your profitable trading journey today!"/>
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OPTRIXTRADES - Premium Trading Signals</title>
+    <meta
+      name="description"
+      content="Join OPTRIXTRADES for premium trading signals and expert market analysis. Start your profitable trading journey today!"
+    />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-cache, no-store, must-revalidate"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
 
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    
-    /* Professional Trading Platform Design */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
 
-    :root {
-      --primary-gold: #FFD700;
-      --secondary-gold: #FFA500;
-      --accent-green: #00D4AA;
-      --dark-bg: #0A0B0D;
-      --card-bg: rgba(255, 255, 255, 0.05);
-      --text-primary: #FFFFFF;
-      --text-secondary: rgba(255, 255, 255, 0.8);
-      --border-color: rgba(255, 255, 255, 0.1);
-      --shadow-primary: rgba(255, 215, 0, 0.2);
-      --shadow-secondary: rgba(0, 212, 170, 0.15);
-    }
-
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--dark-bg);
-      background-image: 
-        radial-gradient(circle at 15% 25%, rgba(255, 215, 0, 0.08) 0%, transparent 60%),
-        radial-gradient(circle at 85% 75%, rgba(0, 212, 170, 0.06) 0%, transparent 60%),
-        radial-gradient(circle at 50% 10%, rgba(255, 165, 0, 0.04) 0%, transparent 50%),
-        linear-gradient(135deg, #0A0B0D 0%, #0F1419 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-primary);
-      overflow-x: hidden;
-    }
-
-    .container {
-      text-align: center;
-      max-width: 600px;
-      padding: 60px 30px;
-      position: relative;
-      z-index: 2;
-    }
-
-    .hero-section {
-      background: var(--card-bg);
-      backdrop-filter: blur(20px);
-      border: 1px solid var(--border-color);
-      border-radius: 24px;
-      padding: 50px 40px;
-      box-shadow: 
-        0 20px 40px rgba(0, 0, 0, 0.3),
-        0 0 80px var(--shadow-primary),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .hero-section::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--primary-gold), transparent);
-      opacity: 0.6;
-    }
-
-    .logo {
-      font-size: 3.2em;
-      font-weight: 800;
-      margin-bottom: 16px;
-      background: linear-gradient(135deg, var(--primary-gold) 0%, var(--secondary-gold) 50%, var(--accent-green) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      letter-spacing: -0.02em;
-      text-shadow: 0 0 30px var(--shadow-primary);
-      animation: logoGlow 3s ease-in-out infinite alternate;
-    }
-
-    @keyframes logoGlow {
-      0% { filter: brightness(1) drop-shadow(0 0 20px rgba(255, 215, 0, 0.3)); }
-      100% { filter: brightness(1.1) drop-shadow(0 0 30px rgba(255, 215, 0, 0.5)); }
-    }
-
-    .subtitle {
-      font-size: 1.4em;
-      font-weight: 500;
-      margin-bottom: 40px;
-      color: var(--text-secondary);
-      line-height: 1.4;
-      letter-spacing: 0.01em;
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 16px;
-      margin: 40px 0;
-      text-align: left;
-    }
-
-    .feature {
-      display: flex;
-      align-items: center;
-      padding: 16px 20px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      font-size: 1.1em;
-      font-weight: 500;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .feature:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: var(--accent-green);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(0, 212, 170, 0.15);
-    }
-
-    .feature::before {
-      content: "";
-      width: 20px;
-      height: 20px;
-      background: linear-gradient(135deg, var(--accent-green), #00B894);
-      border-radius: 50%;
-      margin-right: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      position: relative;
-    }
-
-    .feature::after {
-      content: "✓";
-      position: absolute;
-      left: 26px;
-      color: white;
-      font-size: 12px;
-      font-weight: bold;
-    }
-
-    .cta-section {
-      margin: 50px 0 30px;
-    }
-
-    .cta-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, var(--accent-green) 0%, #00B894 100%);
-      color: white;
-      padding: 18px 40px;
-      text-decoration: none;
-      border-radius: 16px;
-      font-size: 1.3em;
-      font-weight: 600;
-      letter-spacing: 0.01em;
-      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 
-        0 8px 25px rgba(0, 212, 170, 0.3),
-        0 0 0 1px rgba(255, 255, 255, 0.1);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .cta-button::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-      transition: left 0.6s ease;
-    }
-
-    .cta-button:hover::before {
-      left: 100%;
-    }
-
-    .cta-button:hover {
-      transform: translateY(-3px) scale(1.02);
-      box-shadow: 
-        0 15px 35px rgba(0, 212, 170, 0.4),
-        0 0 0 1px rgba(255, 255, 255, 0.2);
-    }
-
-    .cta-button:active {
-      transform: translateY(-1px) scale(1.01);
-    }
-
-    .redirect-info {
-      margin-top: 30px;
-      padding: 24px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      font-size: 0.95em;
-      color: var(--text-secondary);
-      line-height: 1.6;
-    }
-
-    .redirect-info p {
-      margin-bottom: 8px;
-    }
-
-    .redirect-info p:last-child {
-      margin-bottom: 0;
-    }
-
-    .countdown {
-      color: var(--accent-green);
-      font-weight: 600;
-    }
-
-    .security-note {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      margin-top: 16px;
-      font-size: 0.85em;
-      opacity: 0.7;
-    }
-
-    /* Floating particles animation */
-    .particles {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .particle {
-      position: absolute;
-      width: 2px;
-      height: 2px;
-      background: var(--primary-gold);
-      border-radius: 50%;
-      opacity: 0.3;
-      animation: float 6s infinite linear;
-    }
-
-    @keyframes float {
-      0% {
-        transform: translateY(100vh) rotate(0deg);
-        opacity: 0;
+      /* Professional Trading Platform Design */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
-      10% {
-        opacity: 0.3;
-      }
-      90% {
-        opacity: 0.3;
-      }
-      100% {
-        transform: translateY(-10vh) rotate(360deg);
-        opacity: 0;
-      }
-    }
 
-    /* Background pattern */
-    body::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-image: 
-        radial-gradient(circle at 1px 1px, rgba(255, 215, 0, 0.1) 1px, transparent 0);
-      background-size: 50px 50px;
-      opacity: 0.1;
-      z-index: 0;
-      pointer-events: none;
-    }
+      :root {
+        --primary-gold: #ffd700;
+        --secondary-gold: #ffa500;
+        --accent-green: #00d4aa;
+        --dark-bg: #0a0b0d;
+        --card-bg: rgba(255, 255, 255, 0.05);
+        --text-primary: #ffffff;
+        --text-secondary: rgba(255, 255, 255, 0.8);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --shadow-primary: rgba(255, 215, 0, 0.2);
+        --shadow-secondary: rgba(0, 212, 170, 0.15);
+      }
 
-    @media (max-width: 768px) {
+      body {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: var(--dark-bg);
+        background-image: radial-gradient(
+            circle at 15% 25%,
+            rgba(255, 215, 0, 0.08) 0%,
+            transparent 60%
+          ),
+          radial-gradient(
+            circle at 85% 75%,
+            rgba(0, 212, 170, 0.06) 0%,
+            transparent 60%
+          ),
+          radial-gradient(
+            circle at 50% 10%,
+            rgba(255, 165, 0, 0.04) 0%,
+            transparent 50%
+          ),
+          linear-gradient(135deg, #0a0b0d 0%, #0f1419 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-primary);
+        overflow-x: hidden;
+      }
+
       .container {
-        padding: 30px 20px;
+        text-align: center;
+        max-width: 600px;
+        padding: 60px 30px;
+        position: relative;
+        z-index: 2;
       }
 
       .hero-section {
-        padding: 40px 24px;
-        border-radius: 20px;
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border-color);
+        border-radius: 24px;
+        padding: 50px 40px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3),
+          0 0 80px var(--shadow-primary), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero-section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--primary-gold),
+          transparent
+        );
+        opacity: 0.6;
       }
 
       .logo {
-        font-size: 2.4em;
+        font-size: 3.2em;
+        font-weight: 800;
+        margin-bottom: 16px;
+        background: linear-gradient(
+          135deg,
+          var(--primary-gold) 0%,
+          var(--secondary-gold) 50%,
+          var(--accent-green) 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.02em;
+        text-shadow: 0 0 30px var(--shadow-primary);
+        animation: logoGlow 3s ease-in-out infinite alternate;
+      }
+
+      @keyframes logoGlow {
+        0% {
+          filter: brightness(1) drop-shadow(0 0 20px rgba(255, 215, 0, 0.3));
+        }
+        100% {
+          filter: brightness(1.1) drop-shadow(0 0 30px rgba(255, 215, 0, 0.5));
+        }
       }
 
       .subtitle {
-        font-size: 1.2em;
-      }
-
-      .cta-button {
-        padding: 16px 32px;
-        font-size: 1.2em;
+        font-size: 1.4em;
+        font-weight: 500;
+        margin-bottom: 40px;
+        color: var(--text-secondary);
+        line-height: 1.4;
+        letter-spacing: 0.01em;
       }
 
       .features-grid {
-        gap: 12px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+        margin: 40px 0;
+        text-align: left;
       }
 
       .feature {
-        padding: 14px 16px;
-        font-size: 1em;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .container {
-        padding: 20px 16px;
-      }
-
-      .hero-section {
-        padding: 30px 20px;
-      }
-
-      .logo {
-        font-size: 2em;
-      }
-
-      .subtitle {
+        display: flex;
+        align-items: center;
+        padding: 16px 20px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
         font-size: 1.1em;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
       }
-    }
-  </style>
-  
-  <!-- Meta Pixel Code -->
-  {% if facebook_pixel_enabled %}
-  <script>
-  !function(f,b,e,v,n,t,s)
-  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-  n.queue=[];t=b.createElement(e);t.async=!0;
-  t.src=v;s=b.getElementsByTagName(e)[0];
-  s.parentNode.insertBefore(t,s)}(window, document,'script',
-  'https://connect.facebook.net/en_US/fbevents.js');
-  fbq('init', '{{ facebook_pixel_id }}');
-  fbq('track', 'PageView');
-  </script>
-  <noscript><img height="1" width="1" style="display:none"
-  src="https://www.facebook.com/tr?id={{ facebook_pixel_id }}&ev=PageView&noscript=1"
-  /></noscript>
-  {% endif %}
-  <!-- End Meta Pixel Code -->
-</head>
-<body>
-  <!-- Floating particles background -->
-  <div class="particles"></div>
-  
-  <div class="container">
-    <div class="hero-section">
-      <div class="logo">OPTRIXTRADES</div>
-      <div class="subtitle">Free premium trading signals & market Analysis</div>
 
-      <div class="features-grid">
-        <div class="feature">Free Daily premium signals</div>
-        <div class="feature">Expert market analysis</div>
-        <div class="feature">Real time trade alerts</div>
-        <div class="feature">Professional support</div>
-        <div class="feature">Live training sessions</div>
-      </div>
+      .feature:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: var(--accent-green);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 212, 170, 0.15);
+      }
 
-      <div class="cta-section">
-        <a href="https://t.me/Optrixtradeschannel" class="cta-button" id="joinBtn" onclick="trackConversion()">
-          Join channel
-        </a>
-      </div>
-      
-      <!-- Force refresh timestamp: 2025-01-16-15:15 -->
+      .feature::before {
+        content: "";
+        width: 20px;
+        height: 20px;
+        background: linear-gradient(135deg, var(--accent-green), #00b894);
+        border-radius: 50%;
+        margin-right: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        position: relative;
+      }
 
-      <div class="redirect-info">
-        <p><strong>Important:</strong> After opening Telegram, please click the <strong>"START"</strong> button to begin!</p>
-        <p class="auto-redirect">Auto-redirecting in <span id="countdown" class="countdown">5</span> seconds...</p>
-        <p style="font-size: 0.8em; margin-top: 10px; opacity: 0.7;">💡 This is required by Telegram for your security</p>
-        <div class="security-note">
-          <span>🔒</span>
-          <span>Secure & Verified Platform</span>
+      .feature::after {
+        content: "✓";
+        position: absolute;
+        left: 26px;
+        color: white;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .cta-section {
+        margin: 50px 0 30px;
+      }
+
+      .cta-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(
+          135deg,
+          var(--accent-green) 0%,
+          #00b894 100%
+        );
+        color: white;
+        padding: 18px 40px;
+        text-decoration: none;
+        border-radius: 16px;
+        font-size: 1.3em;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 8px 25px rgba(0, 212, 170, 0.3),
+          0 0 0 1px rgba(255, 255, 255, 0.1);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .cta-button::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.2),
+          transparent
+        );
+        transition: left 0.6s ease;
+      }
+
+      .cta-button:hover::before {
+        left: 100%;
+      }
+
+      .cta-button:hover {
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 15px 35px rgba(0, 212, 170, 0.4),
+          0 0 0 1px rgba(255, 255, 255, 0.2);
+      }
+
+      .cta-button:active {
+        transform: translateY(-1px) scale(1.01);
+      }
+
+      .redirect-info {
+        margin-top: 30px;
+        padding: 24px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        font-size: 0.95em;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+
+      .redirect-info p {
+        margin-bottom: 8px;
+      }
+
+      .redirect-info p:last-child {
+        margin-bottom: 0;
+      }
+
+      .countdown {
+        color: var(--accent-green);
+        font-weight: 600;
+      }
+
+      .security-note {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 16px;
+        font-size: 0.85em;
+        opacity: 0.7;
+      }
+
+      /* Floating particles animation */
+      .particles {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      .particle {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: var(--primary-gold);
+        border-radius: 50%;
+        opacity: 0.3;
+        animation: float 6s infinite linear;
+      }
+
+      @keyframes float {
+        0% {
+          transform: translateY(100vh) rotate(0deg);
+          opacity: 0;
+        }
+        10% {
+          opacity: 0.3;
+        }
+        90% {
+          opacity: 0.3;
+        }
+        100% {
+          transform: translateY(-10vh) rotate(360deg);
+          opacity: 0;
+        }
+      }
+
+      /* Background pattern */
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: radial-gradient(
+          circle at 1px 1px,
+          rgba(255, 215, 0, 0.1) 1px,
+          transparent 0
+        );
+        background-size: 50px 50px;
+        opacity: 0.1;
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          padding: 30px 20px;
+        }
+
+        .hero-section {
+          padding: 40px 24px;
+          border-radius: 20px;
+        }
+
+        .logo {
+          font-size: 2.4em;
+        }
+
+        .subtitle {
+          font-size: 1.2em;
+        }
+
+        .cta-button {
+          padding: 16px 32px;
+          font-size: 1.2em;
+        }
+
+        .features-grid {
+          gap: 12px;
+        }
+
+        .feature {
+          padding: 14px 16px;
+          font-size: 1em;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .container {
+          padding: 20px 16px;
+        }
+
+        .hero-section {
+          padding: 30px 20px;
+        }
+
+        .logo {
+          font-size: 2em;
+        }
+
+        .subtitle {
+          font-size: 1.1em;
+        }
+      }
+    </style>
+
+    <!-- Meta Pixel Code -->
+    {% if facebook_pixel_enabled %}
+    <script>
+      !(function (f, b, e, v, n, t, s) {
+        if (f.fbq) return;
+        n = f.fbq = function () {
+          n.callMethod
+            ? n.callMethod.apply(n, arguments)
+            : n.queue.push(arguments);
+        };
+        if (!f._fbq) f._fbq = n;
+        n.push = n;
+        n.loaded = !0;
+        n.version = "2.0";
+        n.queue = [];
+        t = b.createElement(e);
+        t.async = !0;
+        t.src = v;
+        s = b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t, s);
+      })(
+        window,
+        document,
+        "script",
+        "https://connect.facebook.net/en_US/fbevents.js"
+      );
+      fbq("init", "{{ facebook_pixel_id }}");
+      fbq("track", "PageView");
+    </script>
+    <noscript
+      ><img
+        height="1"
+        width="1"
+        style="display: none"
+        src="https://www.facebook.com/tr?id={{ facebook_pixel_id }}&ev=PageView&noscript=1"
+    /></noscript>
+    {% endif %}
+    <!-- End Meta Pixel Code -->
+  </head>
+  <body>
+    <!-- Floating particles background -->
+    <div class="particles"></div>
+
+    <div class="container">
+      <div class="hero-section">
+        <div class="logo">OPTRIXTRADES</div>
+        <div class="subtitle">
+          Free premium trading signals & market Analysis
+        </div>
+
+        <div class="features-grid">
+          <div class="feature">Free Daily premium signals</div>
+          <div class="feature">Expert market analysis</div>
+          <div class="feature">Real time trade alerts</div>
+          <div class="feature">Professional support</div>
+          <div class="feature">Live training sessions</div>
+        </div>
+
+        <div class="cta-section">
+          <a
+            href="https://t.me/+g7AYDytK3IBhN2U0"
+            class="cta-button"
+            id="joinBtn"
+            onclick="trackConversion()"
+          >
+            Join channel
+          </a>
+        </div>
+
+        <!-- Force refresh timestamp: 2025-01-16-15:15 -->
+
+        <div class="redirect-info">
+          <p>
+            <strong>Important:</strong> After opening Telegram, please click the
+            <strong>"START"</strong> button to begin!
+          </p>
+          <p class="auto-redirect">
+            Auto-redirecting in
+            <span id="countdown" class="countdown">5</span> seconds...
+          </p>
+          <p style="font-size: 0.8em; margin-top: 10px; opacity: 0.7">
+            💡 This is required by Telegram for your security
+          </p>
+          <div class="security-note">
+            <span>🔒</span>
+            <span>Secure & Verified Platform</span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <script>
-    // Create floating particles
-    function createParticles() {
-      const particlesContainer = document.querySelector('.particles');
-      const particleCount = 15;
-      
-      for (let i = 0; i < particleCount; i++) {
-        const particle = document.createElement('div');
-        particle.className = 'particle';
-        particle.style.left = Math.random() * 100 + '%';
-        particle.style.animationDelay = Math.random() * 6 + 's';
-        particle.style.animationDuration = (Math.random() * 3 + 4) + 's';
-        particlesContainer.appendChild(particle);
+    <script>
+      // Create floating particles
+      function createParticles() {
+        const particlesContainer = document.querySelector(".particles");
+        const particleCount = 15;
+
+        for (let i = 0; i < particleCount; i++) {
+          const particle = document.createElement("div");
+          particle.className = "particle";
+          particle.style.left = Math.random() * 100 + "%";
+          particle.style.animationDelay = Math.random() * 6 + "s";
+          particle.style.animationDuration = Math.random() * 3 + 4 + "s";
+          particlesContainer.appendChild(particle);
+        }
       }
-    }
 
-    // Auto-redirect countdown timer (5 seconds)
-    let countdown = 5;
-    const countdownElement = document.getElementById('countdown');
-    
-    const timer = setInterval(function() {
-      countdown--;
-      countdownElement.textContent = countdown;
-      
-      if (countdown <= 0) {
-        clearInterval(timer);
-        window.location.href = 'https://t.me/Optrixtradeschannel';
+      // Auto-redirect countdown timer (5 seconds)
+      let countdown = 5;
+      const countdownElement = document.getElementById("countdown");
+
+      const timer = setInterval(function () {
+        countdown--;
+        countdownElement.textContent = countdown;
+
+        if (countdown <= 0) {
+          clearInterval(timer);
+          window.location.href = "https://t.me/+g7AYDytK3IBhN2U0";
+        }
+      }, 1000);
+
+      // Configuration (dynamic from server)
+      const config = {
+        facebookPixelEnabled: JSON.parse(
+          "{{ 'true' if facebook_pixel_enabled else 'false' }}"
+        ),
+        trackEngagement: JSON.parse(
+          "{{ 'true' if track_engagement else 'false' }}"
+        ),
+        trackLeadConversion: JSON.parse(
+          "{{ 'true' if track_lead_conversion else 'false' }}"
+        ),
+      };
+
+      function trackLead() {
+        if (config.facebookPixelEnabled && typeof fbq !== "undefined") {
+          fbq("track", "Lead", {
+            content_name: "OPTRIXTRADES Bot Access",
+            content_category: "Trading Bot",
+            value: 1.0,
+            currency: "USD",
+          });
+        }
       }
-    }, 1000);
 
-    // Configuration (dynamic from server)
-  const config = {
-    facebookPixelEnabled: JSON.parse("{{ 'true' if facebook_pixel_enabled else 'false' }}"),
-    trackEngagement: JSON.parse("{{ 'true' if track_engagement else 'false' }}"),
-    trackLeadConversion: JSON.parse("{{ 'true' if track_lead_conversion else 'false' }}")
-  };
+      function trackEngagement() {
+        if (config.facebookPixelEnabled && typeof fbq !== "undefined") {
+          fbq("track", "ViewContent", {
+            content_name: "Landing Page Engagement",
+            content_category: "User Interaction",
+          });
+        }
+      }
 
-    function trackLead() {
-      if (config.facebookPixelEnabled && typeof fbq !== 'undefined') {
-        fbq('track', 'Lead', {
-          content_name: 'OPTRIXTRADES Bot Access',
-          content_category: 'Trading Bot',
-          value: 1.00,
-          currency: 'USD'
+      function trackConversion() {
+        if (config.facebookPixelEnabled) {
+          trackLead();
+        }
+      }
+
+      // Track engagement after page load if enabled
+      if (config.facebookPixelEnabled && config.trackEngagement) {
+        window.addEventListener("load", () => {
+          setTimeout(() => {
+            trackEngagement();
+          }, 5000); // Track after 5 seconds
         });
       }
-    }
 
-    function trackEngagement() {
-      if (config.facebookPixelEnabled && typeof fbq !== 'undefined') {
-        fbq('track', 'ViewContent', {
-          content_name: 'Landing Page Engagement',
-          content_category: 'User Interaction'
-        });
-      }
-    }
-
-    function trackConversion() {
-      if (config.facebookPixelEnabled) {
-        trackLead();
-      }
-    }
-
-    // Track engagement after page load if enabled
-    if (config.facebookPixelEnabled && config.trackEngagement) {
-      window.addEventListener('load', () => {
-        setTimeout(() => {
-          trackEngagement();
-        }, 5000); // Track after 5 seconds
+      // Initialize particles when page loads
+      document.addEventListener("DOMContentLoaded", function () {
+        createParticles();
       });
-    }
-
-    // Initialize particles when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-      createParticles();
-    });
-  </script>
-</body>
+    </script>
+  </body>
 </html>
