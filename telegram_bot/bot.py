@@ -59,10 +59,6 @@ class TradingBot:
         """Initialize the bot"""
         await self.db_manager.initialize()
         logger.info("Database initialized")
-        
-        # Initialize channel monitor
-        initialize_channel_monitor(self.application.bot)
-        logger.info("Channel monitor initialized")
     
     def _setup_handlers(self):
         """Setup all bot handlers - this will be refactored to use modular handlers"""
