@@ -131,15 +131,25 @@ def error_handler_decorator(func: Callable) -> Callable:
             # Log the error
             logger.error(f"Error in {func.__name__}: {e}", exc_info=True)
             
-            # Create a mock context with the error for the error handler
-            error_context = context
-            error_context.error = e
+            # For user-facing functions, handle errors gracefully without re-raising
+            # This prevents the generic error message from appearing
+            try:
+                # If the update is a callback query, answer it to prevent loading icon
+                if isinstance(update, Update) and update.callback_query:
+                    await update.callback_query.answer(
+                        "Please try again in a moment."
+                    )
+                
+                # Send a more user-friendly error message
+                if isinstance(update, Update) and update.effective_message:
+                    await update.effective_message.reply_text(
+                        "⚠️ Something went wrong. Please try again or contact support if the issue persists."
+                    )
+            except Exception as notify_error:
+                logger.error(f"Failed to notify user of error: {notify_error}")
             
-            # Call the main error handler
-            await error_handler(update, error_context)
-            
-            # Re-raise the exception if needed
-            raise
+            # Don't re-raise for user-facing functions to prevent double error messages
+            return None
     
     return wrapper
 

@@ -26,7 +26,7 @@ from telegram_bot.handlers.user_handlers import (
     handle_text_message,
     handle_photo,
     handle_document,
-    contact_support,
+
     button_callback
 )
 
@@ -101,8 +101,7 @@ from telegram_bot.handlers.verification import (
     vip_verification_requirements_callback,
     vip_continue_registration_callback,
     approve_vip_verification_callback,
-    reject_vip_verification_callback,
-    contact_support_premium
+    reject_vip_verification_callback
 )
 
 # Conversation states
@@ -211,8 +210,7 @@ def setup_all_handlers(bot):
     bot.application.add_handler(CommandHandler("searchuser", admin_search_user_command))
     
     # Specific callback handlers
-    bot.application.add_handler(CallbackQueryHandler(contact_support, pattern='^contact_support$'))
-    bot.application.add_handler(CallbackQueryHandler(contact_support_premium, pattern='^contact_support_premium$'))
+
     bot.application.add_handler(CallbackQueryHandler(get_started_callback, pattern='^get_started$'))
     # Note: admin_broadcast_callback, admin_search_user_callback, and admin_chat_history_callback
     # are handled by the ConversationHandler above, not as standalone handlers

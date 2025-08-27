@@ -169,17 +169,21 @@ class ChannelMemberMonitor:
     async def send_welcome_message(self, user_id: int) -> bool:
         """Send welcome message to a user who joined the channel"""
         try:
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            
             welcome_text = (
-                "🎉 Welcome to OPTRIXTRADES Premium Channel!\n\n"
-                "Thank you for joining our exclusive trading community. "
-                "You now have access to premium trading signals and insights.\n\n"
-                "📈 Get ready to elevate your trading game!\n\n"
-                "If you have any questions, feel free to reach out to our support team."
+                "🎉 You have successfully joined the channel, click start to continue registration."
             )
+            
+            # Create inline keyboard with start button
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🚀 Start", url=f"https://t.me/{self.bot.username}?start=welcome")]
+            ])
             
             await self.bot.send_message(
                 chat_id=user_id,
                 text=welcome_text,
+                reply_markup=keyboard,
                 parse_mode='HTML'
             )
             

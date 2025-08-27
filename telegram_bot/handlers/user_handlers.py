@@ -212,9 +212,9 @@ async def support_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user_id = update.effective_user.id
     await log_interaction(user_id, 'support_command', 'User requested support')
     
-    # Placeholder
+    # Direct link to admin with pre-filled message
     keyboard = [
-        [InlineKeyboardButton("Contact Support", callback_data="contact_support")]
+        [InlineKeyboardButton("Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}?text=I need help with my account")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
@@ -300,7 +300,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             # Add admin contact options for unverified users
             keyboard.append([
                 InlineKeyboardButton("💬 Message Admin", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}"),
-                InlineKeyboardButton("📞 Contact Support", callback_data="contact_support")
+                InlineKeyboardButton("📞 Contact Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}?text=I need help with verification")
             ])
         else:
             # For verified users, show support option
@@ -517,14 +517,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         "I've received your document. How can I help you?"
     )
 
-async def contact_support(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle contact_support callback"""
-    # Placeholder
-    query = update.callback_query
-    await query.answer()
-    await query.message.reply_text(
-        f"Please contact our support team at @{BotConfig.ADMIN_USERNAME}"
-    )
+
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle button callbacks"""

@@ -86,7 +86,7 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Create keyboard with activation button and contact support
     keyboard = [
         [InlineKeyboardButton("Get free vip access", callback_data="activation_instructions")],
-        [InlineKeyboardButton("Contact support - ( I want to access premium channel)", callback_data="contact_support_premium")]
+        [InlineKeyboardButton("Contact support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}?text=I want to access premium channel")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -98,53 +98,7 @@ async def start_verification(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     return ConversationHandler.END
 
-@error_handler_decorator
-@measure_time
-async def contact_support_premium(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle contact support button click - automatically send message to admin"""
-    query = update.callback_query
-    await query.answer()
-    
-    user = query.from_user
-    user_name = user.first_name or user.username or "User"
-    
-    # Send automatic message to admin
-    admin_message = f"🔔 **PREMIUM CHANNEL ACCESS REQUEST**\n\n"
-    admin_message += f"**User Details:**\n"
-    admin_message += f"• Name: {user.first_name} {user.last_name if user.last_name else ''}\n"
-    admin_message += f"• Username: @{user.username if user.username else 'None'}\n"
-    admin_message += f"• User ID: `{user.id}`\n\n"
-    admin_message += f"**Message:** I want to access premium channel\n\n"
-    admin_message += f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    
-    try:
-        # Send message to admin
-        await context.bot.send_message(
-            chat_id=BotConfig.ADMIN_CHAT_ID,
-            text=admin_message,
-            parse_mode='Markdown'
-        )
-        
-        # Confirm to user that message was sent
-        await query.edit_message_text(
-            text=f"✅ **Message Sent Successfully!**\n\n"
-                 f"Hi {user_name}, your request has been automatically forwarded to our support team.\n\n"
-                 f"📩 **Message sent:** \"I want to access premium channel\"\n\n"
-                 f"⏰ **Expected response time:** Within 2-24 hours\n\n"
-                 f"Our team will contact you directly to assist with your premium channel access.",
-            parse_mode='Markdown'
-        )
-        
-        logger.info(f"Premium channel access request sent to admin for user {user.id}")
-        
-    except Exception as e:
-        logger.error(f"Failed to send premium access request to admin for user {user.id}: {e}")
-        await query.edit_message_text(
-            text="❌ **Error sending message**\n\n"
-                 f"Sorry {user_name}, there was an issue sending your request. "
-                 f"Please try contacting support directly at @{BotConfig.ADMIN_USERNAME}",
-            parse_mode='Markdown'
-        )
+
 
 @error_handler_decorator
 @measure_time
