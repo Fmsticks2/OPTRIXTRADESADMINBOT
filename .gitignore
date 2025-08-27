@@ -81,3 +81,5 @@ htmlcov/
 
 # Documentation
 docs/_build/
+
+.env.test
