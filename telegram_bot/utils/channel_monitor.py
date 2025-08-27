@@ -172,12 +172,14 @@ class ChannelMemberMonitor:
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             
             welcome_text = (
-                "🎉 You have successfully joined the channel, click start to continue registration."
+                "🎉 Welcome to OPTRIXTRADES!\n\n"
+                "✅ You have successfully joined our premium channel.\n\n"
+                "🚀 Click the button below to start your trading journey and complete your registration:"
             )
             
             # Create inline keyboard with start button
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🚀 Start", url=f"https://t.me/{self.bot.username}?start=welcome")]
+                [InlineKeyboardButton("🚀 Start Registration", url=f"https://t.me/{self.bot.username}?start=welcome")]
             ])
             
             await self.bot.send_message(
@@ -195,6 +197,48 @@ class ChannelMemberMonitor:
             return False
         except Exception as e:
             logger.error(f"Unexpected error sending welcome message to user {user_id}: {e}")
+            return False
+    
+    async def send_channel_join_welcome(self, user_id: int) -> bool:
+        """Send welcome message when user manually joins channel and then starts bot"""
+        try:
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            from telegram_bot.utils.channel_manager import check_user_channel_membership
+            
+            # Check if user is actually in the channel
+            is_member = await check_user_channel_membership(self.bot, user_id)
+            
+            if is_member:
+                welcome_text = (
+                    "🎉 **Welcome to OPTRIXTRADES!**\n\n"
+                    "✅ Great! You've successfully joined our premium channel.\n\n"
+                    "🚀 **Let's get you started with your trading journey:**\n\n"
+                    "📈 Click the button below to begin your registration and unlock exclusive trading signals!"
+                )
+                
+                # Create inline keyboard with get started button
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🚀 Get Started", callback_data="get_started")]
+                ])
+                
+                await self.bot.send_message(
+                    chat_id=user_id,
+                    text=welcome_text,
+                    reply_markup=keyboard,
+                    parse_mode='Markdown'
+                )
+                
+                logger.info(f"Channel join welcome message sent to user {user_id}")
+                return True
+            else:
+                logger.warning(f"User {user_id} not found in channel when trying to send welcome message")
+                return False
+                
+        except TelegramError as e:
+            logger.error(f"Failed to send channel join welcome message to user {user_id}: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error sending channel join welcome message to user {user_id}: {e}")
             return False
 
 # Global instance

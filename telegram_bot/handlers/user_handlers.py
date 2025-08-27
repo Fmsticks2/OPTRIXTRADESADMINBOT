@@ -146,8 +146,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             from telegram_bot.utils.channel_monitor import get_channel_monitor
             monitor = get_channel_monitor()
             if monitor and start_param == 'welcome':
-                await monitor.send_welcome_message(user_id)
-                logger.info(f"Welcome message sent to new channel member {user_id}")
+                success = await monitor.send_channel_join_welcome(user_id)
+                if success:
+                    logger.info(f"Enhanced welcome message sent to new channel member {user_id}")
+                    return
+                else:
+                    logger.warning(f"Failed to send enhanced welcome message to user {user_id}, falling back to regular flow")
         except Exception as e:
             logger.error(f"Failed to send welcome message to user {user_id}: {e}")
         
@@ -519,15 +523,98 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle button callbacks"""
+async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle get started callback from channel welcome message"""
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    try:
+        # Check if user is verified
+        is_verified = await check_user_verification_status(user_id)
+        
+        if is_verified:
+            # User is already verified, show main menu
+            await show_main_menu(update, context)
+        else:
+            # User needs verification, show verification menu
+            await show_verification_menu(update, context)
+            
+    except Exception as e:
+        logger.error(f"Error in get_started_callback for user {user_id}: {e}")
+        await query.edit_message_text(
+            "❌ An error occurred. Please try again.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Try Again", callback_data="get_started")]
+            ])
+        )
+
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle callback queries from inline keyboards"""
     query = update.callback_query
     await query.answer()
-    callback_data = query.data
+    
+    user_id = query.from_user.id
+    data = query.data
+    
+    logger.info(f"Callback query received from user {user_id}: {data}")
+    
     # Ignore admin callbacks to avoid overriding admin handlers
-    if callback_data and callback_data.startswith('admin_'):
-        # Optionally log or ignore silently
+    if data and data.startswith('admin_'):
         return
-    await query.message.reply_text(
-        "Button callback received."
+    
+    try:
+        if data == "get_started":
+            return await get_started_callback(update, context)
+        elif data == "start_verification":
+            from telegram_bot.handlers.verification import start_verification
+            return await start_verification(update, context)
+        elif data == "main_menu":
+            await show_main_menu(update, context)
+        elif data == "account_menu":
+            await show_account_menu(update, context)
+        else:
+            await query.edit_message_text("❌ Unknown command. Please try again.")
+            
+    except Exception as e:
+        logger.error(f"Error handling callback query {data}: {e}")
+        await query.edit_message_text(
+            "❌ An error occurred. Please try again.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Try Again", callback_data="get_started")]
+            ])
+        )
+
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show main menu for verified users"""
+    query = update.callback_query
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 VIP Signals", callback_data="vip_signals")],
+        [InlineKeyboardButton("👤 My Account", callback_data="account_menu")],
+        [InlineKeyboardButton("📞 Support", url=f"https://t.me/{BotConfig.ADMIN_USERNAME}")]
+    ])
+    
+    await query.edit_message_text(
+        "📊 **Main Menu**\n\n"
+        "Welcome to your premium dashboard!",
+        reply_markup=keyboard,
+        parse_mode='Markdown'
     )
+
+async def show_account_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show account menu"""
+    query = update.callback_query
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 Account Status", callback_data="account_status")],
+        [InlineKeyboardButton("🔙 Back to Menu", callback_data="main_menu")]
+    ])
+    
+    await query.edit_message_text(
+        "👤 **Account Menu**\n\n"
+        "Manage your account settings here.",
+        reply_markup=keyboard,
+        parse_mode='Markdown'
+    )
+
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle button callbacks - deprecated, use handle_callback_query instead"""
+    return await handle_callback_query(update, context)
