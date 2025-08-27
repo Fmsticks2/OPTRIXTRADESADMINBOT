@@ -28,13 +28,13 @@ async def pin_vip_message():
         
         # Create inline keyboard with "FREE VIP" button
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎁 FREE VIP", url=bot_url)]
+            [InlineKeyboardButton("🚀 ACCESS VIP", url=f"{bot_url}?start=welcome")]
         ])
         
         # Message text
-        message_text = "🎉 **Free VIP Channel** 🎉\n\n" \
+        message_text = "🎉 Free VIP Channel 🎉\n\n" \
                       "Get exclusive trading signals and premium content!\n" \
-                      "Click the button below to start with our bot."
+                      "Click the button below to get started"
         
         # Send the message to the channel
         print("📤 Sending message to channel...")
