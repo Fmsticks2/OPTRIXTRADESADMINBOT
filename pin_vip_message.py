@@ -20,7 +20,7 @@ async def pin_vip_message():
         # Get bot info to create the redirect URL
         bot_info = await bot.get_me()
         bot_username = bot_info.username
-        bot_url = f"https://t.me/{bot_username}"
+        bot_url = f"https://t.me/Optrixtradesadmin"
         
         print(f"🤖 Bot: @{bot_username}")
         print(f"📢 Channel ID: {BotConfig.PREMIUM_CHANNEL_ID}")
@@ -28,7 +28,7 @@ async def pin_vip_message():
         
         # Create inline keyboard with "FREE VIP" button
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🚀 ACCESS VIP", url=f"{bot_url}?start=welcome")]
+            [InlineKeyboardButton("FREE PREMIUM ACCESS", url=f"{bot_url}?start=premium_access&text=I%20want%20to%20get%20access%20to%20the%20premium%20channel")]
         ])
         
         # Message text
