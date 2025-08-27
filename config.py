@@ -15,6 +15,10 @@ class BotConfig:
     ADMIN_USERNAME: str = os.getenv('ADMIN_USERNAME', '')
     ADMIN_USER_ID: str = os.getenv('ADMIN_USER_ID', '')
     
+    # Chat Join Request Configuration
+    ENABLE_AUTO_APPROVE_JOIN_REQUESTS: bool = os.getenv('ENABLE_AUTO_APPROVE_JOIN_REQUESTS', 'true').lower() == 'true'
+    JOIN_REQUEST_WELCOME_MESSAGE_ENABLED: bool = os.getenv('JOIN_REQUEST_WELCOME_MESSAGE_ENABLED', 'true').lower() == 'true'
+    
     # Database
     DATABASE_PATH: str = os.getenv('DATABASE_PATH', 'trading_bot.db')
     SQLITE_DATABASE_PATH: str = os.path.join(os.path.dirname(__file__), os.getenv('SQLITE_DATABASE_PATH', 'trading_bot.db'))
@@ -181,6 +185,10 @@ Webhook Settings:
 - Enabled: {cls.WEBHOOK_ENABLED}
 - Port: {cls.WEBHOOK_PORT}
 - URL: {cls.WEBHOOK_URL or 'Auto-detect on Railway'}
+
+Chat Join Requests:
+- Auto-Approve: {cls.ENABLE_AUTO_APPROVE_JOIN_REQUESTS}
+- Welcome Message: {cls.JOIN_REQUEST_WELCOME_MESSAGE_ENABLED}
 
 Auto-Verification:
 - Enabled: {cls.AUTO_VERIFY_ENABLED}

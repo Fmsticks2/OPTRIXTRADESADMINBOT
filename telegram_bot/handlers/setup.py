@@ -8,6 +8,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     ConversationHandler,
     ChatMemberHandler,
+    ChatJoinRequestHandler,
     filters
 )
 
@@ -29,6 +30,10 @@ from telegram_bot.handlers.user_handlers import (
     handle_document,
     handle_chat_member_update,
     button_callback
+)
+
+from telegram_bot.handlers.join_request_handlers import (
+    handle_chat_join_request
 )
 
 from telegram_bot.handlers.admin_handlers import (
@@ -247,6 +252,9 @@ def setup_all_handlers(bot):
     
     # Add chat member update handler for new channel members
     bot.application.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
+    
+    # Add chat join request handler
+    bot.application.add_handler(ChatJoinRequestHandler(handle_chat_join_request))
     
     # Add text, photo, and document handlers (lower priority)
     # Note: Admin text messages are handled by the admin conversation handler above
