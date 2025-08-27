@@ -339,7 +339,7 @@ class WebhookServer:
                 secret_token=secret_token,
                 max_connections=100,
                 drop_pending_updates=True,
-                allowed_updates=["message", "callback_query", "inline_query"]
+                allowed_updates=["message", "callback_query", "inline_query",  "chat_join_request"]
             )
             
             if result:
