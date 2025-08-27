@@ -672,3 +672,53 @@ async def show_account_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle button callbacks - deprecated, use handle_callback_query instead"""
     return await handle_callback_query(update, context)
+
+async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle chat member updates (when users join/leave the channel)"""
+    try:
+        # Get the chat member update
+        chat_member_update = update.chat_member or update.my_chat_member
+        
+        if not chat_member_update:
+            return
+            
+        # Check if this is our premium channel
+        chat_id = str(chat_member_update.chat.id)
+        if chat_id != BotConfig.PREMIUM_CHANNEL_ID:
+            return
+            
+        # Get user info
+        user = chat_member_update.from_user
+        user_id = user.id
+        
+        # Check if user joined the channel
+        old_status = chat_member_update.old_chat_member.status
+        new_status = chat_member_update.new_chat_member.status
+        
+        # User joined if they went from not being a member to being a member
+        if old_status in ['left', 'kicked'] and new_status in ['member', 'administrator', 'creator']:
+            logger.info(f"User {user_id} ({user.first_name}) joined the premium channel")
+            
+            # Send welcome message immediately
+            try:
+                from telegram_bot.utils.channel_monitor import get_channel_monitor
+                monitor = get_channel_monitor()
+                
+                if monitor:
+                    success = await monitor.send_welcome_message(user_id)
+                    if success:
+                        logger.info(f"Welcome message sent to new channel member {user_id}")
+                    else:
+                        logger.warning(f"Failed to send welcome message to user {user_id}")
+                else:
+                    logger.warning("Channel monitor not available for sending welcome message")
+                    
+            except Exception as e:
+                logger.error(f"Error sending welcome message to user {user_id}: {e}")
+                
+        # Log member leaving for monitoring
+        elif old_status in ['member', 'administrator'] and new_status in ['left', 'kicked']:
+            logger.info(f"User {user_id} ({user.first_name}) left the premium channel")
+            
+    except Exception as e:
+        logger.error(f"Error handling chat member update: {e}")
