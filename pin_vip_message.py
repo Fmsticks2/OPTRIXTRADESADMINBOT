@@ -31,18 +31,21 @@ async def pin_vip_message():
             [InlineKeyboardButton("FREE PREMIUM ACCESS", url=f"{bot_url}?start=premium_access&text=I%20want%20to%20get%20access%20to%20the%20premium%20channel")]
         ])
         
-        # Message text
+        # Message text (now as caption for the video)
         message_text = "🎉 Free VIP Channel 🎉\n\n" \
                       "Get exclusive trading signals and premium content!\n" \
                       "Click the button below to get started"
         
-        # Send the message to the channel
-        print("📤 Sending message to channel...")
-        message = await bot.send_message(
+        # Video URL from CDN - replace with your actual CDN URL
+        video_url = "https://res.cloudinary.com/dapoadedire/video/upload/v1756314223/video_2025-08-27_18-02-34_eftzum.mp4"
+        
+        # Send the video with caption to the channel
+        print("📤 Sending video message to channel...")
+        message = await bot.send_video(
             chat_id=BotConfig.PREMIUM_CHANNEL_ID,
-            text=message_text,
-            parse_mode='Markdown',
-            reply_markup=keyboard
+            video=video_url,
+            reply_markup=keyboard,
+            supports_streaming=True  # Enable streaming for better user experience
         )
         
         print(f"✅ Message sent successfully! Message ID: {message.message_id}")
