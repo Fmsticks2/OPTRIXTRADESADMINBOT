@@ -1,5 +1,6 @@
 """Handler for chat join requests"""
 
+import asyncio
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -70,6 +71,7 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
     if BotConfig.ENABLE_AUTO_APPROVE_JOIN_REQUESTS:
         # Approve the join request
         try:
+            await asyncio.sleep(1)
             await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
             logger.info(f"Approved join request for user {user_id} in chat {chat_id}")
 
@@ -78,7 +80,9 @@ async def handle_chat_join_request(update: Update, context: ContextTypes.DEFAULT
                 confirmation_message = (
                     "✅ Channel joined successfully\n\n"
                     "> Your request to join *OPTRIXTRADES* has been approved\\!"
+                    "📢 [Visit OPTRIXTRADES Channel](https://t.me/+g7AYDytK3IBhN2U0)"
                 )
+                
                 await context.bot.send_message(
                     chat_id=user_id, text=confirmation_message, parse_mode="MarkdownV2"
                 )
