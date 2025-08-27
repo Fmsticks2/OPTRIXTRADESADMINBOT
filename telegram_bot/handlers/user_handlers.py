@@ -15,184 +15,145 @@ logger = logging.getLogger(__name__)
 # Placeholder functions that will need to be implemented with actual logic
 # These would be extracted from the original telegram_bot.py file
 
-async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handle the Get Started button callback by triggering verification flow"""
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = query.from_user.id
-    logger.info(f"GET_STARTED: User {user_id} clicked Get Started button - starting verification flow")
-    
-    # Get user data from database
-    user_data = await get_user_data(user_id)
-    
-    # Check user verification status for the regular welcome flow
-    if user_data and user_data.get('verification_status') == 'approved':
-        # Existing verified user - show main menu
-        logger.info(f"GET_STARTED: Verified user {user_id} accessing main menu")
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📊 Main Menu", callback_data="main_menu")],
-            [InlineKeyboardButton("👤 My Account", callback_data="account_menu")]
-        ])
-        # Send new message instead of editing to keep original message visible
-        await query.message.reply_text(
-            f"👋 Welcome back, {query.from_user.first_name or 'User'}!\n\n"
-            f"Your account is verified and active.\n"
-            f"Ready to access premium trading signals!",
-            reply_markup=keyboard
-        )
-    else:
-        # New or unverified user - start verification flow
-        logger.info(f"GET_STARTED: Starting verification flow for user {user_id}")
-        from telegram_bot.handlers.verification import start_verification
-        
-        # Create a new update object that simulates a regular message instead of callback query
-        # This prevents start_verification from editing the original message
-        class MockMessage:
-            def __init__(self, original_message):
-                self.chat = original_message.chat
-                self.from_user = original_message.from_user
-                self.message_id = original_message.message_id
-                
-            async def reply_text(self, text, **kwargs):
-                # Send new message to chat instead of editing
-                return await query.message.chat.send_message(text, **kwargs)
-        
-        class MockUpdate:
-            def __init__(self, original_update):
-                self.message = MockMessage(original_update.callback_query.message)
-                self.effective_user = original_update.effective_user
-                self.effective_chat = original_update.effective_chat
-                self.callback_query = None  # Remove callback query to simulate regular message
-        
-        mock_update = MockUpdate(update)
-        return await start_verification(mock_update, context)
-    
-    return None
+# Removed duplicate get_started_callback function - using the one at line 526 instead
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Handle the /start command"""
-    user = update.effective_user
-    user_id = user.id
-    username = user.username or ""
-    first_name = user.first_name or "User"
-    
-    # Check if user came from landing page with start parameter
-    start_param = None
-    if context.args:
-        start_param = context.args[0] if context.args else None
-    
-    # Enhanced logging for webhook debugging
-    logger.info(f"START_COMMAND: Processing /start for user {user_id} ({username}) - {first_name}")
-    logger.info(f"START_COMMAND: context.args = {context.args}")
-    logger.info(f"START_COMMAND: start_param = {start_param}")
-    
-    # Check database connection status before attempting user registration
-    from database.connection import create_user, db_manager
-    
     try:
-        # Verify database connection
-        if not db_manager.pool:
-            logger.error(f"START_COMMAND: Database pool not initialized for user {user_id}")
-            await update.message.reply_text("⚠️ Service temporarily unavailable. Please try again in a moment.")
-            return
+        user = update.effective_user
+        user_id = user.id
+        username = user.username or ""
+        first_name = user.first_name or "User"
         
-        logger.info(f"START_COMMAND: Database connection verified for user {user_id}")
+        # Check if user came from landing page with start parameter
+        start_param = None
+        if context.args:
+            start_param = context.args[0] if context.args else None
         
-        # Attempt user registration with detailed logging
-        logger.info(f"START_COMMAND: Attempting to register/update user {user_id} in database")
-        result = await create_user(user_id, username, first_name)
+        # Enhanced logging for webhook debugging
+        logger.info(f"START_COMMAND: Processing /start for user {user_id} ({username}) - {first_name}")
+        logger.info(f"START_COMMAND: context.args = {context.args}")
+        logger.info(f"START_COMMAND: start_param = {start_param}")
         
-        if result:
-            logger.info(f"START_COMMAND: ✅ User {user_id} ({username}) successfully registered/updated in database")
-        else:
-            logger.warning(f"START_COMMAND: ⚠️ User registration returned False for user {user_id}")
+        # Check database connection status before attempting user registration
+        from database.connection import create_user, db_manager
+        
+        try:
+            # Verify database connection
+            if not db_manager.pool:
+                logger.error(f"START_COMMAND: Database pool not initialized for user {user_id}")
+                await update.message.reply_text("⚠️ Service temporarily unavailable. Please try again in a moment.")
+                return
             
-    except Exception as e:
-        logger.error(f"START_COMMAND: ❌ Failed to register user {user_id} in database: {type(e).__name__}: {e}")
-        logger.error(f"START_COMMAND: Database error details - Pool status: {bool(db_manager.pool)}, DB type: {getattr(db_manager, 'db_type', 'unknown')}")
-        # Continue execution even if user registration fails
-    
-    # Log user interaction with error handling
-    try:
-        await log_interaction(user_id, 'start_command', f'User started bot with param: {start_param}')
-        logger.info(f"START_COMMAND: User interaction logged for {user_id}")
-    except Exception as e:
-        logger.error(f"START_COMMAND: Failed to log interaction for user {user_id}: {e}")
-    
-    # Check if user is admin first
-    if str(user_id) == BotConfig.ADMIN_USER_ID:
-        logger.info(f"START_COMMAND: Redirecting admin user {user_id} to admin dashboard")
-        # Show admin dashboard for admin users
-        from telegram_bot.handlers.admin_handlers import admin_command
-        return await admin_command(update, context)
-    else:
-        # Automatically add user to premium channel
-        try:
-            channel_added = await add_user_to_channel(context.bot, user_id)
-            if channel_added:
-                logger.info(f"User {user_id} automatically added to premium channel")
+            logger.info(f"START_COMMAND: Database connection verified for user {user_id}")
+            
+            # Attempt user registration with detailed logging
+            logger.info(f"START_COMMAND: Attempting to register/update user {user_id} in database")
+            result = await create_user(user_id, username, first_name)
+            
+            if result:
+                logger.info(f"START_COMMAND: ✅ User {user_id} ({username}) successfully registered/updated in database")
             else:
-                logger.warning(f"Failed to automatically add user {user_id} to premium channel")
+                logger.warning(f"START_COMMAND: ⚠️ User registration returned False for user {user_id}")
+                
         except Exception as e:
-            logger.error(f"Error adding user {user_id} to channel: {e}")
+            logger.error(f"START_COMMAND: ❌ Failed to register user {user_id} in database: {type(e).__name__}: {e}")
+            logger.error(f"START_COMMAND: Database error details - Pool status: {bool(db_manager.pool)}, DB type: {getattr(db_manager, 'db_type', 'unknown')}")
+            # Continue execution even if user registration fails
         
-        # Get user data to check verification status
-        from database.connection import get_user_data
-        user_data = await get_user_data(user_id)
-        
-        # Check if user is a new channel member and send welcome message
+        # Log user interaction with error handling
         try:
-            from telegram_bot.utils.channel_monitor import get_channel_monitor
-            monitor = get_channel_monitor()
-            if monitor and start_param == 'welcome':
-                success = await monitor.send_channel_join_welcome(user_id)
-                if success:
-                    logger.info(f"Enhanced welcome message sent to new channel member {user_id}")
-                    return
+            await log_interaction(user_id, 'start_command', f'User started bot with param: {start_param}')
+            logger.info(f"START_COMMAND: User interaction logged for {user_id}")
+        except Exception as e:
+            logger.error(f"START_COMMAND: Failed to log interaction for user {user_id}: {e}")
+        
+        # Check if user is admin first
+        if str(user_id) == BotConfig.ADMIN_USER_ID:
+            logger.info(f"START_COMMAND: Redirecting admin user {user_id} to admin dashboard")
+            # Show admin dashboard for admin users
+            from telegram_bot.handlers.admin_handlers import admin_command
+            return await admin_command(update, context)
+        else:
+            # Automatically add user to premium channel
+            try:
+                channel_added = await add_user_to_channel(context.bot, user_id)
+                if channel_added:
+                    logger.info(f"User {user_id} automatically added to premium channel")
                 else:
-                    logger.warning(f"Failed to send enhanced welcome message to user {user_id}, falling back to regular flow")
-        except Exception as e:
-            logger.error(f"Failed to send welcome message to user {user_id}: {e}")
-        
-        # Handle different start scenarios
-        if start_param == 'welcome':
-            logger.info(f"START_COMMAND: New user {user_id} from landing page, showing channel links")
-            welcome_message = (
-                f"🎉 Welcome to OPTRIXTRADES\n\n"
-                f"Glad to have you onboard with us, join these channels to get access to our free trading tools and signals (either vip signals or our auto trading bot)\n\n"
-                f"DO WELL TO PIN AND UNMUTE THE CHANNEL\n\n"
-            )
+                    logger.warning(f"Failed to automatically add user {user_id} to premium channel")
+            except Exception as e:
+                logger.error(f"Error adding user {user_id} to channel: {e}")
             
-            # Create inline keyboard with channel links
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("📱 Join Telegram Channel", url="https://t.me/Optrixtradeschannel")],
-                [InlineKeyboardButton("📱 Join WhatsApp Channel", url="https://whatsapp.com/channel/0029VbALds8GufIqYtg4uY1W")],
-                [InlineKeyboardButton("🚀 Get Started", callback_data="get_started")]
-            ])
+            # Get user data to check verification status
+            from database.connection import get_user_data
+            user_data = await get_user_data(user_id)
             
-            await update.message.reply_text(welcome_message, reply_markup=keyboard, parse_mode='Markdown')
-            return
-        else:
-            # Regular start command - check user status
-            if user_data and user_data.get('verification_status') == 'approved':
-                # Existing verified user
-                logger.info(f"START_COMMAND: Verified user {user_id} accessing main menu")
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📊 Main Menu", callback_data="main_menu")],
-                    [InlineKeyboardButton("👤 My Account", callback_data="account_menu")]
-                ])
-                await update.message.reply_text(
-                    f"👋 Welcome back, {first_name}!\n\n"
-                    f"Your account is verified and active.\n"
-                    f"Ready to access premium trading signals!",
-                    reply_markup=keyboard
+            # Check if user is a new channel member and send welcome message
+            try:
+                from telegram_bot.utils.channel_monitor import get_channel_monitor
+                monitor = get_channel_monitor()
+                if monitor and start_param == 'welcome':
+                    success = await monitor.send_channel_join_welcome(user_id)
+                    if success:
+                        logger.info(f"Enhanced welcome message sent to new channel member {user_id}")
+                        return
+                    else:
+                        logger.warning(f"Failed to send enhanced welcome message to user {user_id}, falling back to regular flow")
+            except Exception as e:
+                logger.error(f"Failed to send welcome message to user {user_id}: {e}")
+            
+            # Handle different start scenarios
+            if start_param == 'welcome':
+                logger.info(f"START_COMMAND: New user {user_id} from landing page, showing channel links")
+                welcome_message = (
+                    f"🎉 Welcome to OPTRIXTRADES\n\n"
+                    f"Glad to have you onboard with us, join these channels to get access to our free trading tools and signals (either vip signals or our auto trading bot)\n\n"
+                    f"DO WELL TO PIN AND UNMUTE THE CHANNEL\n\n"
                 )
+                
+                # Create inline keyboard with channel links
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📱 Join Telegram Channel", url="https://t.me/Optrixtradeschannel")],
+                    [InlineKeyboardButton("📱 Join WhatsApp Channel", url="https://whatsapp.com/channel/0029VbALds8GufIqYtg4uY1W")],
+                    [InlineKeyboardButton("🚀 Get Started", callback_data="get_started")]
+                ])
+                
+                await update.message.reply_text(welcome_message, reply_markup=keyboard, parse_mode='Markdown')
+                return
             else:
-                # New or unverified user
-                logger.info(f"START_COMMAND: Starting verification flow for user {user_id}")
-                from telegram_bot.handlers.verification import start_verification
-                return await start_verification(update, context)
+                # Regular start command - check user status
+                if user_data and user_data.get('verification_status') == 'approved':
+                    # Existing verified user
+                    logger.info(f"START_COMMAND: Verified user {user_id} accessing main menu")
+                    keyboard = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("📊 Main Menu", callback_data="main_menu")],
+                        [InlineKeyboardButton("👤 My Account", callback_data="account_menu")]
+                    ])
+                    await update.message.reply_text(
+                        f"👋 Welcome back, {first_name}!\n\n"
+                        f"Your account is verified and active.\n"
+                        f"Ready to access premium trading signals!",
+                        reply_markup=keyboard
+                    )
+                else:
+                    # New or unverified user
+                    logger.info(f"START_COMMAND: Starting verification flow for user {user_id}")
+                    from telegram_bot.handlers.verification import start_verification
+                    return await start_verification(update, context)
+                
+    except Exception as e:
+        logger.error(f"START_COMMAND: Unexpected error for user {update.effective_user.id if update.effective_user else 'unknown'}: {type(e).__name__}: {e}")
+        try:
+            await update.message.reply_text(
+                "🔧 **System Update in Progress**\n\n"
+                "We're currently updating our systems to serve you better.\n\n"
+                "Please try again in a few moments. If the issue persists, contact our support team.",
+                parse_mode='Markdown'
+            )
+        except Exception as reply_error:
+            logger.error(f"START_COMMAND: Failed to send error message: {reply_error}")
+        return None
 
 async def vip_signals_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /vipsignals command"""

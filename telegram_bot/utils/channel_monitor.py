@@ -36,6 +36,16 @@ class ChannelMemberMonitor:
             logger.error("PREMIUM_CHANNEL_ID not configured")
             return
             
+        # Test channel accessibility before starting monitoring
+        try:
+            await self.bot.get_chat(self.channel_id)
+            logger.info(f"Channel {self.channel_id} is accessible")
+        except Exception as e:
+            logger.error(f"Cannot access channel {self.channel_id}: {e}")
+            logger.error("Channel monitoring disabled due to inaccessible channel")
+            logger.info("To fix: Add bot @Optrixtrades_bot to the channel as administrator")
+            return
+            
         self.monitoring_active = True
         self.monitoring_task = asyncio.create_task(self._monitoring_loop())
         logger.info(f"Channel member monitoring started for channel {self.channel_id}")
