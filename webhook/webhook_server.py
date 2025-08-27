@@ -48,18 +48,11 @@ class WebhookServer:
         """Setup FastAPI routes"""
         
         @app.get("/")
-        async def root(request: Request):
-            """Serve landing page"""
-            logger.info("Serving landing page to user")
-            
-            # Serve the landing page template
-            templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
-            return templates.TemplateResponse("landing.html", {
-                "request": request,
-                "facebook_pixel_enabled": False,
-                "track_engagement": False,
-                "track_lead_conversion": False
-            })
+        async def root():
+             """Redirect to Telegram channel with bot link in description"""
+             from fastapi.responses import RedirectResponse
+             # Redirect to channel - users should see bot link in channel description/pinned message
+             return RedirectResponse(url='https://t.me/Optrixtradeschannel', status_code=302)
         
         @app.get("/favicon.svg")
         async def favicon():

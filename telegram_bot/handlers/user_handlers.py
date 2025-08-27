@@ -530,14 +530,55 @@ async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     
     try:
         # Check if user is verified
-        is_verified = await check_user_verification_status(user_id)
+        from database.connection import get_user_data
+        user_data = await get_user_data(user_id)
+        is_verified = user_data and user_data.get('verification_status') == 'approved'
         
         if is_verified:
             # User is already verified, show main menu
             await show_main_menu(update, context)
         else:
-            # User needs verification, show verification menu
-            await show_verification_menu(update, context)
+            # User needs verification, check if they came from channel join flow
+            # Check if user is actually in the channel
+            from telegram_bot.utils.channel_manager import check_user_channel_membership
+            is_channel_member = await check_user_channel_membership(context.bot, user_id)
+            
+            if is_channel_member:
+                # Send enhanced welcome message for users coming from channel
+                welcome_text = (
+                    "🎉 **Welcome to OPTRIXTRADES!**\n\n"
+                    "✅ Great! You've successfully joined our premium channel.\n\n"
+                    "🚀 **Let's get you started with your trading journey:**\n\n"
+                    "📈 Click the button below to begin your registration and unlock exclusive trading signals!"
+                )
+                
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🚀 Start Verification", callback_data="start_verification")]
+                ])
+                
+                await query.edit_message_text(
+                    welcome_text,
+                    reply_markup=keyboard,
+                    parse_mode='Markdown'
+                )
+                return
+            else:
+                # User not in channel, ask them to join first
+                await query.edit_message_text(
+                    "❌ **Please join our channel first!**\n\n"
+                    "You need to be a member of our premium channel to access the bot.\n\n"
+                    "👆 Click the link below to join:",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("📢 Join Channel", url="https://t.me/Optrixtradeschannel")],
+                        [InlineKeyboardButton("🔄 I've Joined", callback_data="check_membership")]
+                    ]),
+                    parse_mode='Markdown'
+                )
+                return
+            
+            # Show verification menu for other cases
+            from telegram_bot.handlers.verification import start_verification
+            return await start_verification(update, context)
             
     except Exception as e:
         logger.error(f"Error in get_started_callback for user {user_id}: {e}")
@@ -545,6 +586,56 @@ async def get_started_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             "❌ An error occurred. Please try again.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔄 Try Again", callback_data="get_started")]
+            ])
+        )
+
+async def check_membership_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle check membership callback"""
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    try:
+        # Check if user is actually in the channel
+        from telegram_bot.utils.channel_manager import check_user_channel_membership
+        is_channel_member = await check_user_channel_membership(context.bot, user_id)
+        
+        if is_channel_member:
+            # User has joined, proceed with verification
+            welcome_text = (
+                "🎉 **Welcome to OPTRIXTRADES!**\n\n"
+                "✅ Great! You've successfully joined our premium channel.\n\n"
+                "🚀 **Let's get you started with your trading journey:**\n\n"
+                "📈 Click the button below to begin your registration and unlock exclusive trading signals!"
+            )
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🚀 Start Verification", callback_data="start_verification")]
+            ])
+            
+            await query.edit_message_text(
+                welcome_text,
+                reply_markup=keyboard,
+                parse_mode='Markdown'
+            )
+        else:
+            # User still not in channel
+            await query.edit_message_text(
+                "❌ **You haven't joined our channel yet!**\n\n"
+                "Please join our premium channel first to access the bot.\n\n"
+                "👆 Click the link below to join:",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📢 Join Channel", url="https://t.me/Optrixtradeschannel")],
+                    [InlineKeyboardButton("🔄 I've Joined", callback_data="check_membership")]
+                ]),
+                parse_mode='Markdown'
+            )
+            
+    except Exception as e:
+        logger.error(f"Error in check_membership_callback for user {user_id}: {e}")
+        await query.edit_message_text(
+            "❌ An error occurred while checking membership. Please try again.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Try Again", callback_data="check_membership")]
             ])
         )
 
@@ -568,6 +659,8 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         elif data == "start_verification":
             from telegram_bot.handlers.verification import start_verification
             return await start_verification(update, context)
+        elif data == "check_membership":
+            return await check_membership_callback(update, context)
         elif data == "main_menu":
             await show_main_menu(update, context)
         elif data == "account_menu":
