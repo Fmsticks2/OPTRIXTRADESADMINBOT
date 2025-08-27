@@ -123,7 +123,7 @@ class TradingBot:
         # Set webhook
         await self.application.bot.set_webhook(
             url=self.webhook_url,
-            allowed_updates=["message", "callback_query"]
+            allowed_updates=["message", "callback_query", "chat_join_request"]
         )
         
         # Start webhook server using the application's built-in method

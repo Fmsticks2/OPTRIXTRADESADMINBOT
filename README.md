@@ -32,7 +32,16 @@ The codebase has been refactored into a modular structure for better maintainabi
 
 ## 🆕 New Features
 
+### 🔄 Automatic Channel Join Request Handling
+
+- **Welcome Messages**: Automatically sends welcome messages to users requesting to join
+- **Auto-Approval**: Approves join requests automatically (configurable)
+- **Admin Notifications**: Notifies admins about new join requests
+- **Deep Linking**: Includes a deep link to start the bot
+- **Configurable**: Can be enabled/disabled via environment variables
+
 ### 🤖 Auto-Verification System
+
 - **Intelligent UID Validation**: Automatically validates UID format and patterns
 - **Instant Approval**: Users get immediate access when criteria are met
 - **Admin Override**: Manual verification still available for edge cases
@@ -40,12 +49,14 @@ The codebase has been refactored into a modular structure for better maintainabi
 - **Configurable Settings**: Enable/disable auto-verification as needed
 
 ### 👨‍💼 Admin Dashboard
+
 - **Real-time Statistics**: User counts, verification stats, daily signups
 - **Verification Queue**: View all pending manual verifications
 - **Manual Controls**: Approve/reject users with simple commands
 - **Audit Trail**: Complete log of all verification activities
 
 ### 📊 Comprehensive Monitoring and Metrics
+
 - **Usage Tracking**: Monitor commands, callbacks, and user activity
 - **Performance Metrics**: Track response times and system performance
 - **Health Checks**: Automated monitoring of all system components
@@ -53,6 +64,7 @@ The codebase has been refactored into a modular structure for better maintainabi
 - **Performance Measurement**: Decorator for measuring function execution time
 
 ### 🔒 Enhanced Security Features
+
 - **Rate Limiting**: Prevent abuse by limiting request frequency
 - **Input Validation**: Sanitize all user inputs to prevent attacks
 - **HMAC Verification**: Ensure webhook requests are authentic
@@ -60,12 +72,14 @@ The codebase has been refactored into a modular structure for better maintainabi
 - **IP Validation**: Validate incoming webhook requests
 
 ### ⚡ Performance Optimization
+
 - **Caching System**: Both in-memory and Redis-based caching
 - **Cached Decorator**: Simple way to cache function results
 - **Async Support**: Full support for asynchronous functions
 - **TTL Control**: Configurable time-to-live for cached items
 
 ### 🧪 Comprehensive Testing
+
 - **Unit Tests**: Test individual components in isolation
 - **Integration Tests**: Test component interactions
 - **Test Runner**: Easy-to-use script for running tests
@@ -73,48 +87,54 @@ The codebase has been refactored into a modular structure for better maintainabi
 ## 🔧 Environment Variables
 
 ### Required Settings
+
 \`\`\`
 BOT_TOKEN=7560905481:AAFm1Ra0zAknomOhXvjsR4kkruurz_O033s
 BROKER_LINK=https://affiliate.iqbroker.com/redir/?aff=755757&aff_model=revenue&afftrack=
 PREMIUM_CHANNEL_ID=-1001002557285297
 ADMIN_USERNAME=Optrixtradesadmin
-ADMIN_USER_ID=123456789  # Your Telegram user ID for admin commands
+ADMIN_USER_ID=123456789 # Your Telegram user ID for admin commands
 \`\`\`
 
 ### Auto-Verification Settings
+
 \`\`\`
-AUTO_VERIFY_ENABLED=true          # Enable/disable auto-verification
-MIN_UID_LENGTH=6                  # Minimum UID length
-MAX_UID_LENGTH=20                 # Maximum UID length
+AUTO_VERIFY_ENABLED=true # Enable/disable auto-verification
+MIN_UID_LENGTH=6 # Minimum UID length
+MAX_UID_LENGTH=20 # Maximum UID length
 \`\`\`
 
 ## 📋 Admin Commands
 
 ### Verification Management
+
 - `/queue` - View pending verifications
 - `/verify <user_id>` - Manually approve a user
 - `/reject <user_id>` - Reject a user's verification
 - `/stats` - View bot statistics and metrics
 
 ### Monitoring Commands
+
 - `/metrics` - View current bot metrics
 - `/health` - Run health checks and view results
 - `/report` - Generate and send a metrics report
 
 ### Usage Examples
+
 \`\`\`
-/queue                    # Show all pending verifications
-/verify 123456789        # Approve user with ID 123456789
-/reject 987654321        # Reject user with ID 987654321
-/stats                   # Show comprehensive bot statistics
-/metrics                 # Show current metrics
-/health                  # Run health checks
-/report                  # Generate metrics report
+/queue # Show all pending verifications
+/verify 123456789 # Approve user with ID 123456789
+/reject 987654321 # Reject user with ID 987654321
+/stats # Show comprehensive bot statistics
+/metrics # Show current metrics
+/health # Run health checks
+/report # Generate metrics report
 \`\`\`
 
 ## 🔄 Verification Flow
 
 ### Auto-Verification Process
+
 1. **User submits UID** → System validates format
 2. **User uploads screenshot** → Auto-verification triggered
 3. **Validation checks**:
@@ -125,6 +145,7 @@ MAX_UID_LENGTH=20                 # Maximum UID length
 5. **Added to admin queue** for review
 
 ### Manual Verification Fallback
+
 - Users who fail auto-verification enter manual queue
 - Admin receives notification with user details
 - Admin can approve/reject with simple commands
@@ -133,11 +154,13 @@ MAX_UID_LENGTH=20                 # Maximum UID length
 ## 🎯 Key Benefits
 
 ### For Users
+
 - ✅ **Instant Access**: Auto-verification provides immediate premium access
 - ✅ **Clear Status**: Always know verification status
 - ✅ **Fair Process**: Manual review available for edge cases
 
 ### For Admins
+
 - ✅ **Reduced Workload**: 80%+ of verifications handled automatically
 - ✅ **Full Control**: Override any decision manually
 - ✅ **Complete Visibility**: Track all verification activities
@@ -153,6 +176,7 @@ MAX_UID_LENGTH=20                 # Maximum UID length
 ## 📊 Verification Statistics
 
 The bot tracks:
+
 - Total users and verified users
 - Auto vs manual verification counts
 - Daily signup trends
@@ -191,8 +215,8 @@ user_input = SecurityUtils.sanitize_input(update.message.text)
 
 # Validate webhook request
 is_valid = SecurityUtils.validate_webhook_request(
-    request_data, 
-    signature, 
+    request_data,
+    signature,
     secret_key
 )
 ```
@@ -200,6 +224,7 @@ is_valid = SecurityUtils.validate_webhook_request(
 ## 🎛️ Configuration Options
 
 ### Auto-Verification Criteria (Customizable)
+
 - UID length requirements
 - Character validation rules
 - Blacklisted patterns
@@ -207,18 +232,21 @@ is_valid = SecurityUtils.validate_webhook_request(
 - Time-based verification windows
 
 ### Admin Notification Settings
+
 - Instant alerts for manual verification needed
 - Daily/weekly summary reports
 - Queue size warnings
 - Performance metrics
 
 ### Caching Configuration
+
 - Memory cache TTL settings
 - Redis connection parameters
 - Cache key prefixes
 - Cache size limits
 
 ### Monitoring Settings
+
 - Health check intervals
 - Metrics collection frequency
 - Report scheduling
@@ -378,6 +406,7 @@ python run_tests.py --verbose
 ### Test Coverage
 
 The test suite covers:
+
 - Error handling system
 - Monitoring and metrics
 - Security features
@@ -455,3 +484,4 @@ BROKER_SPECIFIC = {
         'Date and time stamp'
     ]
 }
+```
