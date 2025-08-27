@@ -45,12 +45,12 @@ async def pin_vip_message():
         message_text = (
             "🔥 To get access to our Premium Channel follow this steps :\n\n"
             "Step 1:\n"
-            "Create your trading account using this link 👉 https://iqbroker.com/lp/mobile-partner-pwa/?aff=755757&aff_model=revenue&afftrack=\n\n"
+            "Create your trading account using this link 👉 https://iqbroker\\.com/lp/mobile\\-partner\\-pwa/\\?aff\\=755757&aff\\_model\\=revenue&afftrack\\=\n\n"
             "Step 2:\n"
-            "Fund your account with Any Amount !!!! \n\n"
+            "Fund your account with Any Amount \\!\\!\\!\\! \n\n"
             "Step 3:\n"
             "Use one of these promo codes to double your deposit instantly:\n"
-            "*OPTRIXBONUS also valid for up to 150% bonus *\n\n"
+            "\\*\\*OPTRIXBONUS also valid for up to 150% bonus\\*\\*\n\n"
             "Step 4:\n"
             "Once funded, send a dm to @Optrixtradesadmin to activate your free AI access and get added to the Premium Channel for free"
         )
@@ -82,7 +82,7 @@ async def pin_vip_message():
                 caption=message_text,
                 reply_markup=keyboard,
                 supports_streaming=True,
-                parse_mode="Markdown",
+                parse_mode="MarkdownV2",
             )
 
         # Clean up the temporary file
