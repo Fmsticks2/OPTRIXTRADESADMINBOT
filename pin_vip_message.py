@@ -35,7 +35,7 @@ async def pin_vip_message():
                 [
                     InlineKeyboardButton(
                         "FREE PREMIUM ACCESS",
-                        url=f"{bot_url}&text=I%20want%20to%20get%20access%20to%20the%20premium%20channel",
+                        url=f"{bot_url}?text=I%20want%20to%20get%20access%20to%20the%20premium%20channel",
                     )
                 ]
             ]
