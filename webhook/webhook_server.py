@@ -52,14 +52,21 @@ class WebhookServer:
         """Setup FastAPI routes"""
 
         @app.get("/")
-        async def root():
-            """Redirect to Telegram channel with bot link in description"""
-            from fastapi.responses import RedirectResponse
-
-            # Redirect to channel - users should see bot link in channel description/pinned message
-            return RedirectResponse(
-                url="https://t.me/+g7AYDytK3IBhN2U0", status_code=302
-            )
+        async def root(request: Request):
+            """Serve professional landing page with embedded Facebook Pixel"""
+            from facebook_pixel_config import fb_pixel_config
+            
+            # Template context with Facebook Pixel configuration
+            context = {
+                "request": request,
+                "facebook_pixel_enabled": fb_pixel_config.FACEBOOK_PIXEL_ENABLED,
+                "facebook_pixel_id": fb_pixel_config.FACEBOOK_PIXEL_ID,
+                "track_engagement": fb_pixel_config.TRACK_ENGAGEMENT,
+                "track_lead_conversion": fb_pixel_config.TRACK_LEAD_CONVERSION,
+                "auto_redirect_delay": fb_pixel_config.AUTO_REDIRECT_DELAY
+            }
+            
+            return self.templates.TemplateResponse("landing.html", context)
 
         @app.get("/favicon.svg")
         async def favicon():
