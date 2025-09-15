@@ -54,19 +54,37 @@ class WebhookServer:
         @app.get("/")
         async def root(request: Request):
             """Serve professional landing page with embedded Facebook Pixel"""
-            from facebook_pixel_config import fb_pixel_config
-            
-            # Template context with Facebook Pixel configuration
-            context = {
-                "request": request,
-                "facebook_pixel_enabled": fb_pixel_config.FACEBOOK_PIXEL_ENABLED,
-                "facebook_pixel_id": fb_pixel_config.FACEBOOK_PIXEL_ID,
-                "track_engagement": fb_pixel_config.TRACK_ENGAGEMENT,
-                "track_lead_conversion": fb_pixel_config.TRACK_LEAD_CONVERSION,
-                "auto_redirect_delay": fb_pixel_config.AUTO_REDIRECT_DELAY
-            }
-            
-            return self.templates.TemplateResponse("landing.html", context)
+            try:
+                # Import Facebook Pixel configuration
+                import sys
+                import os
+                current_dir = os.path.dirname(__file__)
+                sys.path.insert(0, current_dir)
+                from facebook_pixel_config import FacebookPixelConfig
+                
+                # Template context with Facebook Pixel configuration
+                context = {
+                    "request": request,
+                    "facebook_pixel_enabled": FacebookPixelConfig.FACEBOOK_PIXEL_ENABLED,
+                    "facebook_pixel_id": FacebookPixelConfig.FACEBOOK_PIXEL_ID,
+                    "track_engagement": FacebookPixelConfig.TRACK_ENGAGEMENT,
+                    "track_lead_conversion": FacebookPixelConfig.TRACK_LEAD_CONVERSION,
+                    "auto_redirect_delay": FacebookPixelConfig.AUTO_REDIRECT_DELAY
+                }
+                
+                return self.templates.TemplateResponse("landing.html", context)
+            except Exception as e:
+                logger.error(f"Error loading landing page: {e}")
+                # Fallback context with default values
+                context = {
+                    "request": request,
+                    "facebook_pixel_enabled": True,
+                    "facebook_pixel_id": "4028331754048614",
+                    "track_engagement": True,
+                    "track_lead_conversion": True,
+                    "auto_redirect_delay": 5
+                }
+                return self.templates.TemplateResponse("landing.html", context)
 
         @app.get("/favicon.svg")
         async def favicon():
