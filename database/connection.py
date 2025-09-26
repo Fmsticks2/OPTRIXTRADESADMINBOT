@@ -575,21 +575,37 @@ async def create_user(user_id: int, username: str, first_name: str) -> bool:
         
         if db_manager.db_type == 'postgresql':
             query = '''
-                INSERT INTO users (user_id, username, first_name, join_date, last_interaction, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                INSERT INTO users (
+                    user_id, username, first_name, join_date, last_interaction, 
+                    created_at, updated_at, registration_status, verification_status, 
+                    is_active
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 ON CONFLICT (user_id) DO UPDATE SET
                     username = EXCLUDED.username,
                     first_name = EXCLUDED.first_name,
                     last_interaction = EXCLUDED.last_interaction,
                     updated_at = EXCLUDED.updated_at
             '''
+            await db_manager.execute(
+                query, user_id, username, first_name, now, now, now, now, 
+                'registered', 'pending', 1
+            )
         else:
             query = '''
-                INSERT OR REPLACE INTO users (user_id, username, first_name, join_date, last_interaction, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO users (
+                    user_id, username, first_name, join_date, last_interaction, 
+                    created_at, updated_at, registration_status, verification_status, 
+                    is_active
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             '''
+            await db_manager.execute(
+                query, user_id, username, first_name, now, now, now, now, 
+                'registered', 'pending', 1
+            )
         
-        await db_manager.execute(query, user_id, username, first_name, now, now, now, now)
+        logger.info(f"User {user_id} ({username}) successfully created/updated in database")
         return True
     except Exception as e:
         logger.error(f"Error creating user: {e}")
