@@ -897,6 +897,8 @@ async def handle_chat_member_update(
         # Get user info
         user = chat_member_update.from_user
         user_id = user.id
+        username = user.username or ""
+        first_name = user.first_name or ""
 
         # Check if user joined the channel
         old_status = chat_member_update.old_chat_member.status
@@ -909,8 +911,32 @@ async def handle_chat_member_update(
             "creator",
         ]:
             logger.info(
-                f"User {user_id} ({user.first_name}) joined the premium channel"
+                f"User {user_id} ({first_name}) joined the premium channel"
             )
+
+            # Create/update user in database when they join the channel
+            try:
+                from database.connection import create_user
+                
+                result = await create_user(user_id, username, first_name)
+                if result:
+                    logger.info(
+                        f"✅ Channel join: User {user_id} ({username}) successfully registered/updated in database"
+                    )
+                    
+                    # Log the channel join interaction
+                    await log_interaction(
+                        user_id, "channel_join", f"User joined premium channel {chat_id}"
+                    )
+                else:
+                    logger.warning(
+                        f"⚠️ Channel join: User registration returned False for user {user_id}"
+                    )
+                    
+            except Exception as e:
+                logger.error(
+                    f"❌ Channel join: Failed to register user {user_id} in database: {type(e).__name__}: {e}"
+                )
 
             # Send welcome message immediately
             try:
@@ -941,7 +967,15 @@ async def handle_chat_member_update(
             "left",
             "kicked",
         ]:
-            logger.info(f"User {user_id} ({user.first_name}) left the premium channel")
+            logger.info(f"User {user_id} ({first_name}) left the premium channel")
+            
+            # Log the channel leave interaction
+            try:
+                await log_interaction(
+                    user_id, "channel_leave", f"User left premium channel {chat_id}"
+                )
+            except Exception as e:
+                logger.error(f"Error logging channel leave for user {user_id}: {e}")
 
     except Exception as e:
         logger.error(f"Error handling chat member update: {e}")
